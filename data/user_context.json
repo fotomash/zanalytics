@@ -1,0 +1,37 @@
+{
+  "user_id": "default_user",
+  "date": "YYYY-MM-DD",
+  "memory": {},
+  "interactions": [],
+  "tags": [],
+  "agent_calls": []
+}
+{
+  "user_id": "<string>: unique user identifier",
+  "business_type": "<string>: domain or agent key (e.g., dietpilot, carematch)",
+  "date": "<string>: YYYY-MM-DD",
+  "memory": {
+    "<module_name>": {
+      "state": {},
+      "last_updated": "<ISO8601 timestamp>"
+    }
+  },
+  "interactions": [
+    {
+      "timestamp": "<ISO8601>",
+      "intent": "<string>",
+      "agent": "<string>",
+      "input": {},
+      "output": {}
+    }
+  ],
+  "tags": ["<string>"],
+  "agent_calls": [
+    {
+      "timestamp": "<ISO8601>",
+      "agent": "<string>",
+      "request": {},
+      "response": {}
+    }
+  ]
+}

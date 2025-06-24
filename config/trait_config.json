@@ -1,0 +1,19 @@
+{
+  "dss": {
+    "overbought_threshold": 80,
+    "oversold_threshold": 20
+  },
+  "bb": {
+    "window": 20,
+    "deviation_multiplier": 2
+  },
+  "fractal": {
+    "lookback_window": 2
+  },
+  "momentum": {
+    "min_slope_threshold": 0.1
+  },
+  "vwap": {
+    "enabled": true
+  }
+}

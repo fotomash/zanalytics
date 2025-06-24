@@ -1,0 +1,57 @@
+{
+  "default_chart_settings": {
+    "style": "SMC_Combined",
+    "elements": {
+      "base_chart_type": "candlestick",
+      "show_market_structure_line": true,
+      "show_bos_choch_labels": true,
+      "show_mitigation_poi": true,
+      "show_key_levels": true,
+      "show_demand_zones": true,
+      "show_liquidity_sweeps": true,
+      "show_inducement_labels": true,
+      "show_fvg_zones": true,
+      "show_retest_zones": true,
+      "show_breakout_arrows": true,
+      "show_sl_tp_rectangles": true,
+      "show_poi_box": true,
+      "show_setup_summary_text": false,
+      "show_rsi_pane": true,
+      "show_rsi_divergence_lines": true,
+      "show_ema_cross_markers": true,
+      "show_pinbar_markers": true
+    },
+    "visuals": {
+      "zone_style": "shaded_box",
+      "label_visibility": "readable",
+      "price_axis": "visible",
+      "time_axis": "visible",
+      "entry_marker": "arrow",
+      "candle_wick_color": "#888888",
+      "bullish_candle_color": "#26a69a",
+      "bearish_candle_color": "#ef5350",
+      "market_structure_line_color": "#4682B4",
+      "market_structure_line_style": "dashed",
+      "market_structure_line_width": 1,
+      "poi_fill_color": "rgba(100, 100, 255, 0.1)",
+      "poi_border_color": "#6464FF",
+      "demand_zone_fill_color": "rgba(100, 200, 100, 0.1)",
+      "demand_zone_border_color": "#64C864",
+      "fvg_fill_color": "rgba(216, 191, 216, 0.15)",
+      "fvg_border_color": "#D8BFD8",
+      "sl_fill_color": "rgba(255, 82, 82, 0.2)",
+      "tp_fill_color": "rgba(0, 128, 0, 0.2)",
+      "ema_cross_marker_style": "cross",
+      "ema_cross_marker_color": "#FFD700",
+      "pinbar_marker_style": "star",
+      "pinbar_marker_color": "#ADFF2F",
+      "divergence_line_color": "#FFA500",
+      "divergence_line_style": "dotted"
+    },
+    "layout": {
+      "multi_tf_default": false,
+      "default_context_tfs": ["H4", "D1"],
+      "rsi_pane_height_ratio": 0.2
+    }
+  }
+}

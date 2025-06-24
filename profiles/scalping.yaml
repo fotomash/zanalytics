@@ -1,0 +1,25 @@
+profile_name: scalping
+tick_context:
+  enable_tick_merge: true
+  tick_density_threshold: 10
+  spread_spike_multiple: 3
+  discard_on_spread_spike: true
+  journal_tick_context: true
+context_analyzer:
+  timeframes: ["M1", "M5"]
+  required_phase: "Phase E"
+liquidity_engine:
+  sweep_lookback_bars: 25
+  inducement_check: true
+structure_validator:
+  break_type: ["CHoCH", "BoS"]
+  swing_lookback_bars: 6
+risk_manager:
+  min_rr: 2.0
+  sl_buffer_pips: 1.5
+journaling:
+  verbosity: "all"
+  enable_zbar: true
+meta_agent:
+  llm_contextualization: true
+  memory_embed: false

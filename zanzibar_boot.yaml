@@ -1,0 +1,36 @@
+# zanzibar_boot.yaml
+# Master manifest for initializing Zanzibar v5.1
+
+init_prompt: prompts/ZANZIBAR_V5.1_INIT_PROMPT.md
+
+orchestrator: core/copilot_orchestrator.py
+
+config_files:
+  zanzibar_startup: config/zanzibar_startup.yaml
+  trait_config: config/trait_config.json
+  strategy_profiles: config/strategy_profiles.json
+  chart_config: config/chart_config.json
+
+prompts_dir: prompts/
+
+agents:
+  copilot: "Captain Zanzibar"
+  risk_manager: "Risk Sentinel"
+  entry_executor: "Strike Commander"
+  session_scanner: "Session Scout"
+  mood_interpreter: "Mind Whisperer"
+  confirmation_engine: "Logic Oracle"
+  poi_manager: "Treasure Mapper"
+  trade_logger: "Chronicle Keeper"
+
+default_workflow:
+  - top_down_analysis   # D1→H4→H1→M15→M5→M1
+  - include_macro       # VIX, DXY, US10Y, Gold, BTC, SPX
+  - poi_validation
+  - entry_confirmation
+  - risk_check
+  - chart_export
+
+notifications:
+  discord_webhook: ""  # Add your Discord webhook URL here when ready
+  notify_on_report: true  # Set to false if you want to disable

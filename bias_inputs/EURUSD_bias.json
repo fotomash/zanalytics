@@ -1,0 +1,27 @@
+[
+  {
+    "timestamp": "2025-04-27T09:05:00+01:00",
+    "htf_bias": "Bullish",
+    "reason": [
+      "Strong H4 bullish BOS",
+      "SPX + BTC showing risk-on",
+      "Sweep of structure on H1"
+    ],
+    "conditions": [
+      "DXY < 100",
+      "Only London session"
+    ]
+  },
+  {
+    "timestamp": "2025-04-27T14:10:00+01:00",
+    "htf_bias": "Bearish",
+    "reason": [
+      "DXY breakout",
+      "VIX spike to 27+",
+      "SPX retracement started"
+    ],
+    "conditions": [
+      "Valid only during NY session"
+    ]
+  }
+]

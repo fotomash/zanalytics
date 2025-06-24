@@ -1,0 +1,19 @@
+type: object
+properties:
+  profile_name:
+    type: string
+  tick_context:
+    type: object
+    properties:
+      enable_tick_merge: { type: boolean }
+      tick_density_threshold: { type: number }
+      spread_spike_multiple: { type: number }
+      discard_on_spread_spike: { type: boolean }
+      journal_tick_context: { type: boolean }
+  context_analyzer: { type: object }
+  liquidity_engine: { type: object }
+  structure_validator: { type: object }
+  risk_manager: { type: object }
+  journaling: { type: object }
+  meta_agent: { type: object }
+required: [profile_name, context_analyzer, liquidity_engine, structure_validator, risk_manager, journaling, meta_agent]

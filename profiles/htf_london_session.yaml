@@ -1,0 +1,25 @@
+profile_name: htf_london_session
+tick_context:
+  enable_tick_merge: true
+  tick_density_threshold: 12
+  spread_spike_multiple: 2.5
+  discard_on_spread_spike: true
+  journal_tick_context: true
+context_analyzer:
+  timeframes: ["D1", "H4", "H1"]
+  required_phase: "Phase E"
+liquidity_engine:
+  sweep_lookback_bars: 30
+  inducement_check: true
+structure_validator:
+  break_type: ["BoS"]
+  swing_lookback_bars: 10
+risk_manager:
+  min_rr: 3.0
+  sl_buffer_pips: 4
+journaling:
+  verbosity: "context_only"
+  enable_zbar: true
+meta_agent:
+  llm_contextualization: true
+  memory_embed: true

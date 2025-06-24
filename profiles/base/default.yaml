@@ -1,0 +1,7 @@
+profile_name: default
+context_analyzer: {}
+liquidity_engine: {}
+structure_validator: {}
+risk_manager: {}
+journaling: {}
+meta_agent: {}

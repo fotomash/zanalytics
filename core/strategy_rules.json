@@ -1,0 +1,50 @@
+{
+  "Wyckoff Accumulation Phase C": [
+    {"source": "macro", "metric": "risk_state", "condition": "equals", "value": "Risk ON"},
+    {"source": "indicator", "name": "RSI_14", "metric": "divergence_bullish", "condition": "equals", "value": true},
+    {"source": "indicator", "name": "OBV", "metric": "trend", "condition": "equals", "value": "up"},
+    {"source": "smc", "metric": "liq_sweep_low", "condition": "is_not_nan", "value": null},
+    {"source": "smc", "metric": "fvg_bullish_nearby", "condition": "equals", "value": true}
+  ],
+  "Wyckoff Distribution Phase C": [
+    {"source": "macro", "metric": "risk_state", "condition": "equals", "value": "Risk OFF"},
+    {"source": "indicator", "name": "RSI_14", "metric": "divergence_bearish", "condition": "equals", "value": true},
+    {"source": "indicator", "name": "OBV", "metric": "trend", "condition": "equals", "value": "down"},
+    {"source": "smc", "metric": "liq_sweep_high", "condition": "is_not_nan", "value": null},
+    {"source": "smc", "metric": "fvg_bearish_nearby", "condition": "equals", "value": true}
+  ],
+  "Volatility Breakout Long": [
+    {"source": "macro", "metric": "vix_level", "condition": "<=", "value": 20},
+    {"source": "indicator", "name": "BB_Middle_20_2.0", "metric": "squeeze", "condition": "equals", "value": true},
+    {"source": "indicator", "name": "ATR_14", "metric": "is_rising", "condition": "equals", "value": true},
+    {"source": "price", "metric": "close", "condition": ">", "value": "BB_Upper_20_2.0"}
+  ],
+   "Volatility Breakout Short": [
+    {"source": "macro", "metric": "vix_level", "condition": "<=", "value": 20},
+    {"source": "indicator", "name": "BB_Middle_20_2.0", "metric": "squeeze", "condition": "equals", "value": true},
+    {"source": "indicator", "name": "ATR_14", "metric": "is_rising", "condition": "equals", "value": true},
+    {"source": "price", "metric": "close", "condition": "<", "value": "BB_Lower_20_2.0"}
+  ],
+  "Trend Continuation Long": [
+    {"source": "indicator", "name": "EMA_48", "metric": "is_above", "value": "EMA_200"},
+    {"source": "indicator", "name": "ADX_14", "metric": "value", "condition": ">=", "value": 25},
+    {"source": "macro", "metric": "risk_state", "condition": "equals", "value": "Risk ON"},
+    {"source": "price", "metric": "pullback_to_ema", "value": "EMA_21"}
+  ],
+  "Trend Continuation Short": [
+    {"source": "indicator", "name": "EMA_48", "metric": "is_below", "value": "EMA_200"},
+    {"source": "indicator", "name": "ADX_14", "metric": "value", "condition": ">=", "value": 25},
+    {"source": "macro", "metric": "risk_state", "condition": "equals", "value": "Risk OFF"},
+    {"source": "price", "metric": "pullback_to_ema", "value": "EMA_21"}
+  ],
+  "Mean Reversion Long": [
+    {"source": "indicator", "name": "BB_Lower_20_2.0", "metric": "price_below", "condition": "equals", "value": true},
+    {"source": "indicator", "name": "RSI_14", "metric": "is_oversold", "condition": "equals", "value": true},
+    {"source": "macro", "metric": "risk_state", "condition": "!=", "value": "Risk OFF"}
+  ],
+  "Mean Reversion Short": [
+    {"source": "indicator", "name": "BB_Upper_20_2.0", "metric": "price_above", "condition": "equals", "value": true},
+    {"source": "indicator", "name": "RSI_14", "metric": "is_overbought", "condition": "equals", "value": true},
+    {"source": "macro", "metric": "risk_state", "condition": "!=", "value": "Risk ON"}
+  ]
+}

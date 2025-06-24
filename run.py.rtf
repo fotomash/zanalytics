@@ -1,0 +1,230 @@
+{\rtf1\ansi\ansicpg1252\cocoartf2822
+\cocoatextscaling0\cocoaplatform0{\fonttbl\f0\fnil\fcharset0 Menlo-Regular;}
+{\colortbl;\red255\green255\blue255;\red236\green241\blue247;\red0\green0\blue0;\red144\green1\blue18;
+\red9\green60\blue148;\red164\green69\blue11;\red77\green80\blue85;}
+{\*\expandedcolortbl;;\cssrgb\c94118\c95686\c97647;\cssrgb\c0\c0\c0;\cssrgb\c63922\c8235\c8235;
+\cssrgb\c1569\c31765\c64706;\cssrgb\c70980\c34902\c3137;\cssrgb\c37255\c38824\c40784;}
+\paperw11900\paperh16840\margl1440\margr1440\vieww11520\viewh8400\viewkind0
+\deftab720
+\pard\pardeftab720\partightenfactor0
+
+\f0\fs28 \cf0 \cb2 \expnd0\expndtw0\kerning0
+\outl0\strokewidth0 \strokec3 \{\cb1 \
+\cb2   \cf4 \strokec4 "pipeline_name"\cf0 \strokec3 : \cf5 \strokec5 "XANFLOW_V11_ISPTS"\cf0 \strokec3 ,\cb1 \
+\cb2   \cf4 \strokec4 "description"\cf0 \strokec3 : \cf5 \strokec5 "State transformation map for the Inducement-Sweep-POI Trap System pipeline within the XanFlow v11 architecture. All module paths and configurations should reflect the consolidated '/xanflow/' structure."\cf0 \strokec3 ,\cb1 \
+\cb2   \cf4 \strokec4 "modules"\cf0 \strokec3 : [\cb1 \
+\cb2     \{\cb1 \
+\cb2       \cf4 \strokec4 "module_name"\cf0 \strokec3 : \cf5 \strokec5 "DataEnricher"\cf0 \strokec3 ,\cb1 \
+\cb2       \cf4 \strokec4 "ispts_stage"\cf0 \strokec3 : \cf6 \strokec6 0\cf0 \strokec3 ,\cb1 \
+\cb2       \cf4 \strokec4 "module_path"\cf0 \strokec3 : \cf5 \strokec5 "/xanflow/quarry_tools/data_enricher.py"\cf0 \strokec3 ,\cb1 \
+\cb2       \cf4 \strokec4 "description"\cf0 \strokec3 : \cf5 \strokec5 "Conceptual pre-ISPTS stage. Enriches initial data with calculated metrics like ATR, spread, active killzones, and Wyckoff phase, adding them to agent_state. Uses various quarry_tools."\cf0 \strokec3 ,\cb1 \
+\cb2       \cf4 \strokec4 "input_keys_from_state"\cf0 \strokec3 : [\cb1 \
+\cb2         \cf5 \strokec5 "raw_price_data_m1"\cf0 \strokec3 , \cf7 \strokec7 // e.g., pd.DataFrame\cf0 \cb1 \strokec3 \
+\cb2         \cf5 \strokec5 "raw_tick_data"\cf0 \strokec3 ,     \cf7 \strokec7 // Optional: e.g., pd.DataFrame with 'bid', 'ask'\cf0 \cb1 \strokec3 \
+\cb2         \cf5 \strokec5 "instrument_config"\cf0 \strokec3   \cf7 \strokec7 // Dict containing 'pip_precision', 'asset_name', etc.\cf0 \cb1 \strokec3 \
+\cb2       ],\cb1 \
+\cb2       \cf4 \strokec4 "input_args_structure"\cf0 \strokec3 : \cf5 \strokec5 "agent_config.data_enricher_config (Pydantic: DataEnricherConfig)"\cf0 \strokec3 ,\cb1 \
+\cb2       \cf4 \strokec4 "output_keys_to_state"\cf0 \strokec3 : [\cb1 \
+\cb2         \cf5 \strokec5 "price_df_m1_enriched"\cf0 \strokec3 , \cf7 \strokec7 // pd.DataFrame with base data + initial indicators\cf0 \cb1 \strokec3 \
+\cb2         \cf5 \strokec5 "current_spread_pips"\cf0 \strokec3 , \cb1 \
+\cb2         \cf5 \strokec5 "atr_value_pips"\cf0 \strokec3 ,       \cf7 \strokec7 // For a relevant/configured timeframe\cf0 \cb1 \strokec3 \
+\cb2         \cf5 \strokec5 "pip_precision"\cf0 \strokec3 ,        \cf7 \strokec7 // Extracted from instrument_config for common use\cf0 \cb1 \strokec3 \
+\cb2         \cf5 \strokec5 "active_killzone_name"\cf0 \strokec3 , \cf7 \strokec7 // Null or string (e.g., "London Open")\cf0 \cb1 \strokec3 \
+\cb2         \cf5 \strokec5 "current_wyckoff_phase"\cf0 \strokec3 ,\cf7 \strokec7 // Null or string (from WyckoffEngine)\cf0 \cb1 \strokec3 \
+\cb2         \cf5 \strokec5 "tick_density"\cf0 \strokec3 ,         \cf7 \strokec7 // Calculated if raw_tick_data provided\cf0 \cb1 \strokec3 \
+\cb2         \cf5 \strokec5 "spread_instability_score"\cf0 \strokec3  \cf7 \strokec7 // From SpreadTracker\cf0 \cb1 \strokec3 \
+\cb2       ],\cb1 \
+\cb2       \cf4 \strokec4 "pydantic_config_model"\cf0 \strokec3 : \cf5 \strokec5 "xanflow.schemas.predictive_schemas.DataEnricherConfig"\cf0 \strokec3 ,\cb1 \
+\cb2       \cf4 \strokec4 "can_early_abort"\cf0 \strokec3 : \cf5 \strokec5 false\cf0 \strokec3 ,\cb1 \
+\cb2       \cf4 \strokec4 "notes"\cf0 \strokec3 : \cf5 \strokec5 "This is a conceptual module orchestrating several utilities from xanflow_quarry_tools (TickProcessor, SpreadTracker, VolatilityEngine, TimeUtils, WyckoffEngine)."\cf0 \cb1 \strokec3 \
+\cb2     \},\cb1 \
+\cb2     \{\cb1 \
+\cb2       \cf4 \strokec4 "module_name"\cf0 \strokec3 : \cf5 \strokec5 "ContextAnalyzer"\cf0 \strokec3 ,\cb1 \
+\cb2       \cf4 \strokec4 "ispts_stage"\cf0 \strokec3 : \cf6 \strokec6 1\cf0 \strokec3 ,\cb1 \
+\cb2       \cf4 \strokec4 "module_path"\cf0 \strokec3 : \cf5 \strokec5 "/xanflow/core/context_analyzer.py"\cf0 \strokec3 ,\cb1 \
+\cb2       \cf4 \strokec4 "description"\cf0 \strokec3 : \cf5 \strokec5 "Establishes HTF bias, validates Wyckoff phase (from state), and identifies relevant POIs based on config."\cf0 \strokec3 ,\cb1 \
+\cb2       \cf4 \strokec4 "input_keys_from_state"\cf0 \strokec3 : [\cb1 \
+\cb2         \cf5 \strokec5 "htf_price_data_map"\cf0 \strokec3 ,   \cf7 \strokec7 // Dict of DFs: \{\\"H1\\": df, \\"H4\\": df\}\cf0 \cb1 \strokec3 \
+\cb2         \cf5 \strokec5 "current_wyckoff_phase"\cf0 \strokec3 ,\cf7 \strokec7 // From DataEnricher\cf0 \cb1 \strokec3 \
+\cb2         \cf5 \strokec5 "htf_pois_raw_list"\cf0 \strokec3 ,    \cf7 \strokec7 // Optional: List[Dict] - pre-identified POIs to be filtered\cf0 \cb1 \strokec3 \
+\cb2         \cf5 \strokec5 "trace_id"\cf0 \cb1 \strokec3 \
+\cb2       ],\cb1 \
+\cb2       \cf4 \strokec4 "input_args_structure"\cf0 \strokec3 : \cf5 \strokec5 "price_df_htf_map (or htf_data from state), agent_state, raw_cfg.context_analyzer (Pydantic: ContextAnalyzerConfig)"\cf0 \strokec3 ,\cb1 \
+\cb2       \cf4 \strokec4 "output_keys_to_state"\cf0 \strokec3 : [\cb1 \
+\cb2         \cf5 \strokec5 "status"\cf0 \strokec3 , \cf5 \strokec5 "reason"\cf0 \strokec3 , \cb1 \
+\cb2         \cf5 \strokec5 "htf_bias"\cf0 \strokec3 ,             \cf7 \strokec7 // "bullish", "bearish", "neutral"\cf0 \cb1 \strokec3 \
+\cb2         \cf5 \strokec5 "direction"\cf0 \strokec3 ,            \cf7 \strokec7 // Alias for htf_bias\cf0 \cb1 \strokec3 \
+\cb2         \cf5 \strokec5 "wyckoff_phase_validated"\cf0 \strokec3 , \cf7 \strokec7 // Boolean or specific phase string\cf0 \cb1 \strokec3 \
+\cb2         \cf5 \strokec5 "validated_pois"\cf0 \strokec3 ,       \cf7 \strokec7 // List[POI_PydanticModel]\cf0 \cb1 \strokec3 \
+\cb2         \cf5 \strokec5 "HTF_Context_OK"\cf0 \strokec3         \cf7 \strokec7 // Boolean\cf0 \cb1 \strokec3 \
+\cb2       ],\cb1 \
+\cb2       \cf4 \strokec4 "pydantic_config_model"\cf0 \strokec3 : \cf5 \strokec5 "xanflow.schemas.module_configs.ContextAnalyzerConfig"\cf0 \strokec3 ,\cb1 \
+\cb2       \cf4 \strokec4 "can_early_abort"\cf0 \strokec3 : \cf5 \strokec5 true\cf0 \strokec3 ,\cb1 \
+\cb2       \cf4 \strokec4 "notes"\cf0 \strokec3 : \cf5 \strokec5 "Receives htf_price_data and current_wyckoff_phase. Filters htf_pois_raw_list."\cf0 \cb1 \strokec3 \
+\cb2     \},\cb1 \
+\cb2     \{\cb1 \
+\cb2       \cf4 \strokec4 "module_name"\cf0 \strokec3 : \cf5 \strokec5 "LiquidityEngine"\cf0 \strokec3 ,\cb1 \
+\cb2       \cf4 \strokec4 "ispts_stage"\cf0 \strokec3 : \cf6 \strokec6 2\cf0 \strokec3 ,\cb1 \
+\cb2       \cf4 \strokec4 "module_path"\cf0 \strokec3 : \cf5 \strokec5 "/xanflow/core/liquidity_engine.py"\cf0 \strokec3 ,\cb1 \
+\cb2       \cf4 \strokec4 "description"\cf0 \strokec3 : \cf5 \strokec5 "Detects inducement and liquidity sweeps at a selected POI from validated_pois."\cf0 \strokec3 ,\cb1 \
+\cb2       \cf4 \strokec4 "input_keys_from_state"\cf0 \strokec3 : [\cb1 \
+\cb2         \cf5 \strokec5 "price_df_ltf"\cf0 \strokec3 ,         \cf7 \strokec7 // e.g., M1 or M5 pd.DataFrame for sweep detection\cf0 \cb1 \strokec3 \
+\cb2         \cf5 \strokec5 "selected_poi"\cf0 \strokec3 ,         \cf7 \strokec7 // A single POI_PydanticModel from ContextAnalyzer's validated_pois\cf0 \cb1 \strokec3 \
+\cb2         \cf5 \strokec5 "direction"\cf0 \strokec3 ,            \cf7 \strokec7 // From ContextAnalyzer\cf0 \cb1 \strokec3 \
+\cb2         \cf5 \strokec5 "trace_id"\cf0 \cb1 \strokec3 \
+\cb2       ],\cb1 \
+\cb2       \cf4 \strokec4 "input_args_structure"\cf0 \strokec3 : \cf5 \strokec5 "price_df_ltf (or data from state), agent_state, raw_cfg.liquidity_engine (Pydantic: LiquidityEngineConfig)"\cf0 \strokec3 ,\cb1 \
+\cb2       \cf4 \strokec4 "output_keys_to_state"\cf0 \strokec3 : [\cb1 \
+\cb2         \cf5 \strokec5 "status"\cf0 \strokec3 , \cf5 \strokec5 "reason"\cf0 \strokec3 ,\cb1 \
+\cb2         \cf5 \strokec5 "sweep_confirmed_timestamp"\cf0 \strokec3 , \cf7 \strokec7 // pd.Timestamp\cf0 \cb1 \strokec3 \
+\cb2         \cf5 \strokec5 "sweep_candle"\cf0 \strokec3 ,         \cf7 \strokec7 // Candle_PydanticModel or Dict\cf0 \cb1 \strokec3 \
+\cb2         \cf5 \strokec5 "inducement_detected"\cf0 \strokec3 ,  \cf7 \strokec7 // Boolean\cf0 \cb1 \strokec3 \
+\cb2         \cf5 \strokec5 "reversal_confirmed"\cf0 \strokec3 ,   \cf7 \strokec7 // Boolean\cf0 \cb1 \strokec3 \
+\cb2         \cf5 \strokec5 "swept_level_details"\cf0 \strokec3    \cf7 \strokec7 // Dict\cf0 \cb1 \strokec3 \
+\cb2       ],\cb1 \
+\cb2       \cf4 \strokec4 "pydantic_config_model"\cf0 \strokec3 : \cf5 \strokec5 "xanflow.schemas.module_configs.LiquidityEngineConfig"\cf0 \strokec3 ,\cb1 \
+\cb2       \cf4 \strokec4 "can_early_abort"\cf0 \strokec3 : \cf5 \strokec5 true\cf0 \strokec3 ,\cb1 \
+\cb2       \cf4 \strokec4 "notes"\cf0 \strokec3 : \cf5 \strokec5 "Operates on LTF data around the 'selected_poi'."\cf0 \cb1 \strokec3 \
+\cb2     \},\cb1 \
+\cb2     \{\cb1 \
+\cb2       \cf4 \strokec4 "module_name"\cf0 \strokec3 : \cf5 \strokec5 "StructureValidator"\cf0 \strokec3 ,\cb1 \
+\cb2       \cf4 \strokec4 "ispts_stage"\cf0 \strokec3 : \cf6 \strokec6 3\cf0 \strokec3 ,\cb1 \
+\cb2       \cf4 \strokec4 "module_path"\cf0 \strokec3 : \cf5 \strokec5 "/xanflow/core/structure_validator.py"\cf0 \strokec3 ,\cb1 \
+\cb2       \cf4 \strokec4 "description"\cf0 \strokec3 : \cf5 \strokec5 "Confirms BoS/CHoCH after a liquidity sweep using SwingEngine."\cf0 \strokec3 ,\cb1 \
+\cb2       \cf4 \strokec4 "input_keys_from_state"\cf0 \strokec3 : [\cb1 \
+\cb2         \cf5 \strokec5 "price_df_validation_tf"\cf0 \strokec3 , \cf7 \strokec7 // pd.DataFrame for structure break validation\cf0 \cb1 \strokec3 \
+\cb2         \cf5 \strokec5 "direction"\cf0 \strokec3 ,                \cf7 \strokec7 // From ContextAnalyzer\cf0 \cb1 \strokec3 \
+\cb2         \cf5 \strokec5 "sweep_confirmed_timestamp"\cf0 \strokec3 ,\cf7 \strokec7 // From LiquidityEngine\cf0 \cb1 \strokec3 \
+\cb2         \cf5 \strokec5 "atr_value_pips"\cf0 \strokec3 ,           \cf7 \strokec7 // From DataEnricher (for impulse validation)\cf0 \cb1 \strokec3 \
+\cb2         \cf5 \strokec5 "pip_precision"\cf0 \strokec3 ,            \cf7 \strokec7 // From DataEnricher (for distance validation)\cf0 \cb1 \strokec3 \
+\cb2         \cf5 \strokec5 "trace_id"\cf0 \cb1 \strokec3 \
+\cb2       ],\cb1 \
+\cb2       \cf4 \strokec4 "input_args_structure"\cf0 \strokec3 : \cf5 \strokec5 "price_df_validation_tf, agent_state, raw_cfg.structure_validator (Pydantic: StructureValidatorConfig)"\cf0 \strokec3 ,\cb1 \
+\cb2       \cf4 \strokec4 "output_keys_to_state"\cf0 \strokec3 : [\cb1 \
+\cb2         \cf5 \strokec5 "status"\cf0 \strokec3 , \cf5 \strokec5 "reason"\cf0 \strokec3 ,\cb1 \
+\cb2         \cf5 \strokec5 "Structural_Shift_Detected"\cf0 \strokec3 , \cf7 \strokec7 // Boolean\cf0 \cb1 \strokec3 \
+\cb2         \cf5 \strokec5 "structure_break_type"\cf0 \strokec3 ,      \cf7 \strokec7 // "BoS" or "CHoCH" (enum value)\cf0 \cb1 \strokec3 \
+\cb2         \cf5 \strokec5 "structure_break_details"\cf0 \strokec3 ,   \cf7 \strokec7 // StructureBreak_PydanticModel\cf0 \cb1 \strokec3 \
+\cb2         \cf5 \strokec5 "origin"\cf0 \strokec3 ,                    \cf7 \strokec7 // Broken SwingPoint_PydanticModel\cf0 \cb1 \strokec3 \
+\cb2         \cf5 \strokec5 "breaking_candle"\cf0 \strokec3             \cf7 \strokec7 // Candle_PydanticModel or Dict\cf0 \cb1 \strokec3 \
+\cb2       ],\cb1 \
+\cb2       \cf4 \strokec4 "pydantic_config_model"\cf0 \strokec3 : \cf5 \strokec5 "xanflow.schemas.module_configs.StructureValidatorConfig"\cf0 \strokec3 ,\cb1 \
+\cb2       \cf4 \strokec4 "can_early_abort"\cf0 \strokec3 : \cf5 \strokec5 true\cf0 \strokec3 ,\cb1 \
+\cb2       \cf4 \strokec4 "notes"\cf0 \strokec3 : \cf5 \strokec5 "Uses SwingEngine internally. Requires pip_precision and atr_value_pips from state."\cf0 \cb1 \strokec3 \
+\cb2     \},\cb1 \
+\cb2     \{\cb1 \
+\cb2       \cf4 \strokec4 "module_name"\cf0 \strokec3 : \cf5 \strokec5 "FVGLocator"\cf0 \strokec3 ,\cb1 \
+\cb2       \cf4 \strokec4 "ispts_stage"\cf0 \strokec3 : \cf6 \strokec6 4\cf0 \strokec3 ,\cb1 \
+\cb2       \cf4 \strokec4 "module_path"\cf0 \strokec3 : \cf5 \strokec5 "/xanflow/core/fvg_locator.py"\cf0 \strokec3 ,\cb1 \
+\cb2       \cf4 \strokec4 "description"\cf0 \strokec3 : \cf5 \strokec5 "Identifies actionable FVGs created by the structure-breaking impulse."\cf0 \strokec3 ,\cb1 \
+\cb2       \cf4 \strokec4 "input_keys_from_state"\cf0 \strokec3 : [\cb1 \
+\cb2         \cf5 \strokec5 "price_df_entry_tf"\cf0 \strokec3 ,        \cf7 \strokec7 // pd.DataFrame for FVG scan\cf0 \cb1 \strokec3 \
+\cb2         \cf5 \strokec5 "Structural_Shift_Detected"\cf0 \strokec3 ,\cf7 \strokec7 // From StructureValidator\cf0 \cb1 \strokec3 \
+\cb2         \cf5 \strokec5 "direction"\cf0 \strokec3 ,                \cf7 \strokec7 // From ContextAnalyzer\cf0 \cb1 \strokec3 \
+\cb2         \cf5 \strokec5 "breaking_candle"\cf0 \strokec3 ,          \cf7 \strokec7 // From StructureValidator (to anchor FVG search)\cf0 \cb1 \strokec3 \
+\cb2         \cf5 \strokec5 "pip_precision"\cf0 \strokec3 ,            \cf7 \strokec7 // From DataEnricher\cf0 \cb1 \strokec3 \
+\cb2         \cf5 \strokec5 "trace_id"\cf0 \cb1 \strokec3 \
+\cb2       ],\cb1 \
+\cb2       \cf4 \strokec4 "input_args_structure"\cf0 \strokec3 : \cf5 \strokec5 "price_df_entry_tf, agent_state, raw_cfg.fvg_locator (Pydantic: FVGLocatorConfig)"\cf0 \strokec3 ,\cb1 \
+\cb2       \cf4 \strokec4 "output_keys_to_state"\cf0 \strokec3 : [\cb1 \
+\cb2         \cf5 \strokec5 "status"\cf0 \strokec3 , \cf5 \strokec5 "reason"\cf0 \strokec3 ,\cb1 \
+\cb2         \cf5 \strokec5 "entry_price"\cf0 \strokec3 ,\cb1 \
+\cb2         \cf5 \strokec5 "relevant_fvg"\cf0 \strokec3 ,             \cf7 \strokec7 // FVG_PydanticModel (contains bounds, midpoint, etc.)\cf0 \cb1 \strokec3 \
+\cb2         \cf5 \strokec5 "fvg_details"\cf0 \strokec3                \cf7 \strokec7 // Alias or more detailed FVG_PydanticModel\cf0 \cb1 \strokec3 \
+\cb2       ],\cb1 \
+\cb2       \cf4 \strokec4 "pydantic_config_model"\cf0 \strokec3 : \cf5 \strokec5 "xanflow.schemas.module_configs.FVGLocatorConfig"\cf0 \strokec3 ,\cb1 \
+\cb2       \cf4 \strokec4 "can_early_abort"\cf0 \strokec3 : \cf5 \strokec5 true\cf0 \strokec3 ,\cb1 \
+\cb2       \cf4 \strokec4 "notes"\cf0 \strokec3 : \cf5 \strokec5 "Uses FVGHelper utility. Requires pip_precision from state for size filtering."\cf0 \cb1 \strokec3 \
+\cb2     \},\cb1 \
+\cb2     \{\cb1 \
+\cb2       \cf4 \strokec4 "module_name"\cf0 \strokec3 : \cf5 \strokec5 "RiskManager"\cf0 \strokec3 ,\cb1 \
+\cb2       \cf4 \strokec4 "ispts_stage"\cf0 \strokec3 : \cf6 \strokec6 5\cf0 \strokec3 ,\cb1 \
+\cb2       \cf4 \strokec4 "module_path"\cf0 \strokec3 : \cf5 \strokec5 "/xanflow/core/risk_manager.py"\cf0 \strokec3 ,\cb1 \
+\cb2       \cf4 \strokec4 "description"\cf0 \strokec3 : \cf5 \strokec5 "Defines SL/TP, validates R:R, considering structure, volatility, spread, FVG."\cf0 \strokec3 ,\cb1 \
+\cb2       \cf4 \strokec4 "input_keys_from_state"\cf0 \strokec3 : [\cb1 \
+\cb2         \cf5 \strokec5 "entry_price"\cf0 \strokec3 ,             \cf7 \strokec7 // From FVGLocator\cf0 \cb1 \strokec3 \
+\cb2         \cf5 \strokec5 "direction"\cf0 \strokec3 ,               \cf7 \strokec7 // From ContextAnalyzer\cf0 \cb1 \strokec3 \
+\cb2         \cf5 \strokec5 "origin"\cf0 \strokec3 ,                  \cf7 \strokec7 // Structural origin (broken swing as SwingPoint_PydanticModel) from StructureValidator\cf0 \cb1 \strokec3 \
+\cb2         \cf5 \strokec5 "sweep_candle"\cf0 \strokec3 ,            \cf7 \strokec7 // Optional[Candle_PydanticModel] From LiquidityEngine\cf0 \cb1 \strokec3 \
+\cb2         \cf5 \strokec5 "relevant_fvg"\cf0 \strokec3 ,            \cf7 \strokec7 // Optional[FVG_PydanticModel] From FVGLocator\cf0 \cb1 \strokec3 \
+\cb2         \cf5 \strokec5 "atr_value_pips"\cf0 \strokec3 ,          \cf7 \strokec7 // From DataEnricher\cf0 \cb1 \strokec3 \
+\cb2         \cf5 \strokec5 "current_spread_pips"\cf0 \strokec3 ,     \cf7 \strokec7 // From DataEnricher\cf0 \cb1 \strokec3 \
+\cb2         \cf5 \strokec5 "pip_precision"\cf0 \strokec3 ,           \cf7 \strokec7 // From DataEnricher\cf0 \cb1 \strokec3 \
+\cb2         \cf5 \strokec5 "trace_id"\cf0 \cb1 \strokec3 \
+\cb2       ],\cb1 \
+\cb2       \cf4 \strokec4 "input_args_structure"\cf0 \strokec3 : \cf5 \strokec5 "agent_state, raw_cfg.risk_manager (Pydantic: RiskManagerConfig)"\cf0 \strokec3 ,\cb1 \
+\cb2       \cf4 \strokec4 "output_keys_to_state"\cf0 \strokec3 : [\cb1 \
+\cb2         \cf5 \strokec5 "status"\cf0 \strokec3 , \cf5 \strokec5 "reason"\cf0 \strokec3 ,\cb1 \
+\cb2         \cf5 \strokec5 "stop_loss"\cf0 \strokec3 , \cb1 \
+\cb2         \cf5 \strokec5 "take_profit"\cf0 \strokec3 ,             \cf7 \strokec7 // Primary TP\cf0 \cb1 \strokec3 \
+\cb2         \cf5 \strokec5 "rr"\cf0 \strokec3 ,                      \cf7 \strokec7 // Calculated R:R\cf0 \cb1 \strokec3 \
+\cb2         \cf5 \strokec5 "risk_validated"\cf0 \strokec3 ,          \cf7 \strokec7 // Boolean\cf0 \cb1 \strokec3 \
+\cb2         \cf5 \strokec5 "method_trace"\cf0 \strokec3 ,            \cf7 \strokec7 // Details of SL/TP calculation\cf0 \cb1 \strokec3 \
+\cb2         \cf5 \strokec5 "calculated_position_size"\cf0 \strokec3  \cf7 \strokec7 // Optional, if position sizing is done here\cf0 \cb1 \strokec3 \
+\cb2       ],\cb1 \
+\cb2       \cf4 \strokec4 "pydantic_config_model"\cf0 \strokec3 : \cf5 \strokec5 "xanflow.schemas.module_configs.RiskManagerConfig"\cf0 \strokec3 ,\cb1 \
+\cb2       \cf4 \strokec4 "can_early_abort"\cf0 \strokec3 : \cf5 \strokec5 true\cf0 \strokec3 ,\cb1 \
+\cb2       \cf4 \strokec4 "notes"\cf0 \strokec3 : \cf5 \strokec5 "Uses RRCalculator utility. Input 'price_df' not typically needed if all info is in state."\cf0 \cb1 \strokec3 \
+\cb2     \},\cb1 \
+\cb2     \{\cb1 \
+\cb2       \cf4 \strokec4 "module_name"\cf0 \strokec3 : \cf5 \strokec5 "ConfluenceStacker"\cf0 \strokec3 ,\cb1 \
+\cb2       \cf4 \strokec4 "ispts_stage"\cf0 \strokec3 : \cf6 \strokec6 6\cf0 \strokec3 ,\cb1 \
+\cb2       \cf4 \strokec4 "module_path"\cf0 \strokec3 : \cf5 \strokec5 "/xanflow/core/confluence_stacker.py"\cf0 \strokec3 ,\cb1 \
+\cb2       \cf4 \strokec4 "description"\cf0 \strokec3 : \cf5 \strokec5 "Final gating via killzone/session confluence and other optional factors."\cf0 \strokec3 ,\cb1 \
+\cb2       \cf4 \strokec4 "input_keys_from_state"\cf0 \strokec3 : [\cb1 \
+\cb2         \cf5 \strokec5 "timestamp"\cf0 \strokec3 ,               \cf7 \strokec7 // Timestamp of the entry candle or current event (datetime object or ISO string)\cf0 \cb1 \strokec3 \
+\cb2         \cf5 \strokec5 "active_killzone_name"\cf0 \strokec3 ,    \cf7 \strokec7 // From DataEnricher\cf0 \cb1 \strokec3 \
+\cb2         # Potentially other state keys for advanced confluence logic from previous modules\cb1 \
+\cb2         \cf5 \strokec5 "trace_id"\cf0 \cb1 \strokec3 \
+\cb2       ],\cb1 \
+\cb2       \cf4 \strokec4 "input_args_structure"\cf0 \strokec3 : \cf5 \strokec5 "agent_state, raw_cfg.confluence_stacker (Pydantic: ConfluenceStackerConfig)"\cf0 \strokec3 ,\cb1 \
+\cb2       \cf4 \strokec4 "output_keys_to_state"\cf0 \strokec3 : [\cb1 \
+\cb2         \cf5 \strokec5 "status"\cf0 \strokec3 , \cf5 \strokec5 "reason"\cf0 \strokec3 ,\cb1 \
+\cb2         \cf5 \strokec5 "confluence_passed"\cf0 \strokec3 ,       \cf7 \strokec7 // Boolean\cf0 \cb1 \strokec3 \
+\cb2         \cf5 \strokec5 "killzone_match_name"\cf0 \strokec3 ,     \cf7 \strokec7 // Name of matched killzone from config\cf0 \cb1 \strokec3 \
+\cb2         \cf5 \strokec5 "confluence_score"\cf0 \strokec3          \cf7 \strokec7 // Optional score\cf0 \cb1 \strokec3 \
+\cb2       ],\cb1 \
+\cb2       \cf4 \strokec4 "pydantic_config_model"\cf0 \strokec3 : \cf5 \strokec5 "xanflow.schemas.module_configs.ConfluenceStackerConfig"\cf0 \strokec3 ,\cb1 \
+\cb2       \cf4 \strokec4 "can_early_abort"\cf0 \strokec3 : \cf5 \strokec5 true\cf0 \strokec3 ,\cb1 \
+\cb2       \cf4 \strokec4 "notes"\cf0 \strokec3 : \cf5 \strokec5 "Uses active_killzone_name from state (prepared by DataEnricher/TimeUtils)."\cf0 \cb1 \strokec3 \
+\cb2     \},\cb1 \
+\cb2     \{\cb1 \
+\cb2       \cf4 \strokec4 "module_name"\cf0 \strokec3 : \cf5 \strokec5 "Executor"\cf0 \strokec3 ,\cb1 \
+\cb2       \cf4 \strokec4 "ispts_stage"\cf0 \strokec3 : \cf5 \strokec5 "Post-Pipeline (Action)"\cf0 \strokec3 ,\cb1 \
+\cb2       \cf4 \strokec4 "module_path"\cf0 \strokec3 : \cf5 \strokec5 "/xanflow/core/executor.py"\cf0 \strokec3 ,\cb1 \
+\cb2       \cf4 \strokec4 "description"\cf0 \strokec3 : \cf5 \strokec5 "Prepares and (simulates/attempts) trade execution based on final validated state."\cf0 \strokec3 ,\cb1 \
+\cb2       \cf4 \strokec4 "input_keys_from_state"\cf0 \strokec3 : [ # Expects the final agent_state after ConfluenceStacker\cb1 \
+\cb2         \cf5 \strokec5 "status"\cf0 \strokec3 ,                  \cf7 \strokec7 // Final status from ConfluenceStacker (must be PASS)\cf0 \cb1 \strokec3 \
+\cb2         \cf5 \strokec5 "asset"\cf0 \strokec3 , \cf5 \strokec5 "direction"\cf0 \strokec3 , \cf5 \strokec5 "entry_price"\cf0 \strokec3 , \cf5 \strokec5 "stop_loss"\cf0 \strokec3 , \cf5 \strokec5 "take_profit"\cf0 \strokec3 , \cf5 \strokec5 "rr"\cf0 \strokec3 ,\cb1 \
+\cb2         \cf5 \strokec5 "killzone_match_name"\cf0 \strokec3 , \cb1 \
+\cb2         \cf5 \strokec5 "profile_name"\cf0 \strokec3 ,            \cf7 \strokec7 // Should be added by orchestrator to state\cf0 \cb1 \strokec3 \
+\cb2         \cf5 \strokec5 "calculated_position_size"\cf0 \strokec3 ,\cf7 \strokec7 // Optional from RiskManager\cf0 \cb1 \strokec3 \
+\cb2         \cf5 \strokec5 "trace_id"\cf0 \cb1 \strokec3 \
+\cb2       ],\cb1 \
+\cb2       \cf4 \strokec4 "input_args_structure"\cf0 \strokec3 : \cf5 \strokec5 "final_pipeline_state (full agent_state), raw_cfg.executor (Pydantic: ExecutorConfig)"\cf0 \strokec3 ,\cb1 \
+\cb2       \cf4 \strokec4 "output_keys_to_state"\cf0 \strokec3 : [ \cb1 \
+\cb2         \cf5 \strokec5 "execution_status"\cf0 \strokec3 ,        \cf7 \strokec7 // "SIMULATED_SUCCESS", "REJECTED", "EXECUTION_ATTEMPTED"\cf0 \cb1 \strokec3 \
+\cb2         \cf5 \strokec5 "reason"\cf0 \strokec3 ,                  \cf7 \strokec7 // If rejected by executor itself\cf0 \cb1 \strokec3 \
+\cb2         \cf5 \strokec5 "simulated_order_details"\cf0 \strokec3 , \cf7 \strokec7 // If simulated\cf0 \cb1 \strokec3 \
+\cb2         \cf5 \strokec5 "executed_order_id"\cf0 \strokec3         \cf7 \strokec7 // For live execution attempt\cf0 \cb1 \strokec3 \
+\cb2       ],\cb1 \
+\cb2       \cf4 \strokec4 "pydantic_config_model"\cf0 \strokec3 : \cf5 \strokec5 "xanflow.schemas.module_configs.ExecutorConfig"\cf0 \strokec3 ,\cb1 \
+\cb2       \cf4 \strokec4 "can_early_abort"\cf0 \strokec3 : \cf5 \strokec5 false\cf0 \strokec3 , \cb1 \
+\cb2       \cf4 \strokec4 "notes"\cf0 \strokec3 : \cf5 \strokec5 "Acts on the final state. Does not typically modify state for further ISPTS processing."\cf0 \cb1 \strokec3 \
+\cb2     \},\cb1 \
+\cb2     \{\cb1 \
+\cb2       \cf4 \strokec4 "module_name"\cf0 \strokec3 : \cf5 \strokec5 "JournalLogger"\cf0 \strokec3 ,\cb1 \
+\cb2       \cf4 \strokec4 "ispts_stage"\cf0 \strokec3 : \cf5 \strokec5 "Ongoing / Final"\cf0 \strokec3 ,\cb1 \
+\cb2       \cf4 \strokec4 "module_path"\cf0 \strokec3 : \cf5 \strokec5 "/xanflow/core/journal_logger.py"\cf0 \strokec3 ,\cb1 \
+\cb2       \cf4 \strokec4 "description"\cf0 \strokec3 : \cf5 \strokec5 "Records pipeline events, state, and decisions. Called by orchestrator or individual modules."\cf0 \strokec3 ,\cb1 \
+\cb2       \cf4 \strokec4 "input_keys_from_state"\cf0 \strokec3 : [\cf5 \strokec5 "ANY"\cf0 \strokec3 ], \cb1 \
+\cb2       \cf4 \strokec4 "input_args_structure"\cf0 \strokec3 : \cf5 \strokec5 "module_name_str (str), payload_to_log (Dict)"\cf0 \strokec3 ,\cb1 \
+\cb2       \cf4 \strokec4 "output_keys_to_state"\cf0 \strokec3 : [],\cb1 \
+\cb2       \cf4 \strokec4 "pydantic_config_model"\cf0 \strokec3 : \cf5 \strokec5 "xanflow.schemas.module_configs.JournalingConfig"\cf0 \strokec3 ,\cb1 \
+\cb2       \cf4 \strokec4 "can_early_abort"\cf0 \strokec3 : \cf5 \strokec5 false\cf0 \strokec3 ,\cb1 \
+\cb2       \cf4 \strokec4 "notes"\cf0 \strokec3 : \cf5 \strokec5 "Primarily performs a side-effect (writing logs). Does not alter trade decision state. Config from agent_profile.journaling."\cf0 \cb1 \strokec3 \
+\cb2     \}\cb1 \
+\cb2   ]\cb1 \
+\cb2 \}\cb1 \
+\
+}

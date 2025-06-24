@@ -1,0 +1,18 @@
+{
+  "setup_phases": {
+    "awaiting_pullback": "Price has broken out. Awaiting pullback confirmation. Should I watch for M15 retracement?",
+    "pullback_confirmed": "Pullback confirmed. Look for confluence or Heiken Ashi signal?",
+    "ha_signal_detected": "HA signal detected. Do you want to evaluate confluence?",
+    "entry_ready": "Entry validated. SL and position size calculated. Proceed to journal or track?"
+  },
+  "confluence_results": {
+    "strong": "Strong confluence detected (bias, RSI divergence, pin bar). Recommend tracking this setup.",
+    "moderate": "Moderate confluence. Some confirmation present. Review manually?",
+    "weak": "Weak or no confluence. Proceed with caution or skip this setup."
+  },
+  "trade_journal": {
+    "entry_prompt": "Log this trade with entry, SL, and R:R result?",
+    "log_confirmed": "Trade logged successfully.",
+    "log_skipped": "Trade logging skipped."
+  }
+}

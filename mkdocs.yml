@@ -1,0 +1,27 @@
+site_name: Copilot Framework Documentation
+env_file: .env
+nav:
+  - Home: index.md
+  - Getting Started: getting-started.md
+  - Startup Blueprint: startup_blueprint.md
+  - Architecture: architecture.md
+  - Agents: agents.md
+  - Workflows & Flows: flows.md
+  - Schemas: schemas.md
+  - System Prompt & Routing: system.md
+  - Persistence & Memory: persistence.md
+  - Security: security.md
+  - Deployment: deployment.md
+theme:
+  name: material
+  logo: images/logo.png
+  favicon: images/favicon.ico
+plugins:
+  - search
+  - mkdocs-techdocs-core
+  - macros
+  - dotenv
+extra:
+  repo_url: https://github.com/your-org/your-repo
+  hosting_options: "{{ ENV['HOSTING_OPTIONS'] | default('fastapi, railway, aws_lambda, azure_functions') }}"
+  edit_uri: "{{ ENV['EDIT_URI_PATH'] | default('blob/main/docs') }}"

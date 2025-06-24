@@ -1,0 +1,47 @@
+{
+  "_strategy_overview_notes": {
+    "_note": "This JSON defines the strategy variants used by the Zanzibar system.",
+    "_variants": {
+      "Inv": "Baseline - HTF inducement sweep + fib + CHoCH (confirmation entry)",
+      "Maz2": "Heiken Ashi + OB bias entry (minimal confluence, M15 POI)",
+      "TMC": "RSI divergence + DSS filter + aggressive M5 entry, no inducement required"
+    },
+    "_customization": "Each flag enables a strategy module. Agents may toggle per session or override with manual config."
+  },
+  "Inv": {
+    "description": "ZANZIBAR Inversion Strategy - Baseline",
+    "inducement_required": true,
+    "use_fibonacci_filter": true,
+    "enable_heiken_ashi": false,
+    "use_rsi_divergence": true,
+    "enable_ema_cross": true,
+    "enable_dss_filter": false,
+    "poi_timeframes": ["H4", "H1"],
+    "entry_timeframes": ["M15", "M1"],
+    "default_bias_source": "HTF (D1/H4)"
+  },
+  "Maz2": {
+    "description": "MAZ Class 2 Strategy Variant",
+    "inducement_required": true,
+    "use_fibonacci_filter": false,
+    "enable_heiken_ashi": true,
+    "use_rsi_divergence": false,
+    "enable_ema_cross": true,
+    "enable_dss_filter": false,
+    "poi_timeframes": ["H4", "M15"],
+    "entry_timeframes": ["M15"],
+    "default_bias_source": "H4"
+  },
+  "TMC": {
+    "description": "Theory Masterclass Strategy Variant",
+    "inducement_required": false,
+    "use_fibonacci_filter": true,
+    "enable_heiken_ashi": false,
+    "use_rsi_divergence": true,
+    "enable_ema_cross": false,
+    "enable_dss_filter": true,
+    "poi_timeframes": ["H1"],
+    "entry_timeframes": ["M15", "M5"],
+    "default_bias_source": "M15 Structure"
+  }
+}

@@ -1,0 +1,18 @@
+profiles:
+  - path: profiles/scalping.yaml
+    label: Scalping Agent
+    description: Intraday agent with tick-level filtering and M1 logic.
+  - path: profiles/swing.yaml
+    label: Swing Agent
+    description: Multi-day phase E and structural setups.
+  - path: profiles/base/default.yaml
+    label: Default Base
+    description: Inheritance scaffold for other profiles.
+  - path: profiles/macro.yaml
+    label: Macro Agent
+    description: Integrates macroeconomic regime scoring with execution filters.
+
+default_flags:
+  enable_tick_context: true
+  llm_contextualization: true
+  auto_generate_charts: true

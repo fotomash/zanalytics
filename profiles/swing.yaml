@@ -1,0 +1,19 @@
+profile_name: swing
+context_analyzer:
+  timeframes: ["H4", "H1"]
+  required_phase: "Phase E"
+liquidity_engine:
+  sweep_lookback_bars: 40
+  inducement_check: true
+structure_validator:
+  break_type: ["BoS"]
+  swing_lookback_bars: 12
+risk_manager:
+  min_rr: 2.5
+  sl_buffer_pips: 3
+journaling:
+  verbosity: "fails_only"
+  enable_zbar: true
+meta_agent:
+  llm_contextualization: false
+  memory_embed: true
