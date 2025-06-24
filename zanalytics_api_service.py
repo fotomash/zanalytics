@@ -309,12 +309,16 @@ async def process_data_event(event: DataFlowEvent):
     
     # Process through agents if orchestrator is available
     if api_state.agent_orchestrator:
-        agent_result = await api_state.agent_orchestrator.process_event({
-            'event_type': event.event_type,
-            'symbol': event.symbol,
-            'timeframe': event.timeframe,
-            'data': event.data
-        })
+        try:
+            agent_result = await api_state.agent_orchestrator.process_event({
+                'event_type': event.event_type,
+                'symbol': event.symbol,
+                'timeframe': event.timeframe,
+                'data': event.data
+            })
+        except Exception:
+            logging.exception("Agent orchestrator failed during event processing")
+            return
         
         # Update agent responses
         api_state.agent_responses = agent_result.get('agent_responses', {})
