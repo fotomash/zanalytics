@@ -111,3 +111,19 @@ pipeline = DataPipeline()
 pipeline.run_full()
 # Inspect logs/zanalytics.log for detailed output
 ```
+
+## Integrated Context–Catalyst Orchestrator
+
+`core/icc_orchestrator.py` coordinates trading logic across three layers:
+
+1. **Strategic** – runs Wyckoff regime detection and selects a playbook.
+2. **Operational** – executes a Context → Catalyst → Confirmation → Execution sequence.
+3. **Technical** – fetches data via `DataManager` and broadcasts events on a simple message bus.
+
+Run it from the CLI:
+
+```bash
+python -m core.icc_orchestrator --symbol OANDA:EUR_USD --json
+```
+
+The command prints a JSON summary describing each stage.
