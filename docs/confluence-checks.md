@@ -8,6 +8,7 @@ The table below lists the available keys.
 | `maz2.fvg_retest_required` | Require a candle body to re‑test the refined FVG before entry | `true` |
 | `maz2.allow_body_engulf` | Permit the mitigation candle to engulf the previous body | `false` |
 | `tmc_dss_slope_min` | Minimum DSS slope for a TMC entry | `0.05` |
+| `tmc_require_bos` | Require BOS confirmation after CHoCH for TMC entries | `true` |
 | `mentfx_dss_slope_min` | Minimum DSS slope for Mentfx variant | `0.1` |
 | `mentfx_rsi_overbought` | RSI threshold used for shorts | `70` |
 | `mentfx_rsi_oversold` | RSI threshold used for longs | `30` |
