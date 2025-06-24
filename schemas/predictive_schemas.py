@@ -1,4 +1,4 @@
-# /xanflow/schemas/predictive_schemas.py
+# /zanalytics/schemas/predictive_schemas.py
 
 from __future__ import annotations
 from typing import Dict, Any, Optional, List, Literal
