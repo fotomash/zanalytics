@@ -11,6 +11,9 @@ import numpy as np
 from typing import Dict, Optional, Tuple
 import traceback
 
+# Default fractal length if config does not provide one
+DEFAULT_FRACTAL_N = 2
+
 # --- Helper Function for Fractals ---
 def _tag_fractals(high: pd.Series, low: pd.Series, n: int = 2) -> Tuple[pd.Series, pd.Series]:
     """
@@ -87,8 +90,9 @@ def tag_liquidity_sweeps(
         return df_out
 
     # --- Configuration ---
-    if config is None: config = {}
-    fractal_n = config.get('fractal_n', 2) # Default to 5-bar fractal (n=2)
+    if config is None:
+        config = {}
+    fractal_n = config.get('fractal_n', DEFAULT_FRACTAL_N)
 
     # --- Initialize Columns ---
     df_out['liq_sweep_fractal_high'] = np.nan

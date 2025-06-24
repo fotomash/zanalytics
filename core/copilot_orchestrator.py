@@ -425,8 +425,15 @@ def handle_price_check(pair: str, timestamp_str: str, tf: str = 'm15', strategy_
         # --- Data Enrichment --- ### UPDATED ###
         log_info("Task: Applying data enrichment tags...")
         enriched_tf_data = {}
-        indicator_config = {} # Load config if needed
-        liquidity_config = {} # Load config if needed
+        try:
+            import yaml
+            with open("profiles/base/default.yaml", "r") as f:
+                base_profile = yaml.safe_load(f) or {}
+        except Exception:
+            base_profile = {}
+        indicator_config = base_profile.get("vwap_liquidity_detector", {})
+        liquidity_config = base_profile.get("liquidity_sweep_detector", {})
+        micro_config = base_profile.get("micro_wyckoff_phase", {})
         for tf_key, df_orig in all_tf_data.items():
             if df_orig is None or df_orig.empty:
                 enriched_tf_data[tf_key] = df_orig
@@ -474,7 +481,7 @@ def handle_price_check(pair: str, timestamp_str: str, tf: str = 'm15', strategy_
             scalp_tf = 'm1'
             if scalp_tf in enriched_tf_data and not enriched_tf_data[scalp_tf].empty:
                 df_micro = enriched_tf_data[scalp_tf].copy()
-                wyckoff_signal = detect_micro_wyckoff_phase(df_micro)
+                wyckoff_signal = detect_micro_wyckoff_phase(df_micro, config=micro_config)
                 if wyckoff_signal and wyckoff_signal.get("trigger") == "micro_spring":
                     print(f"[AUTO MICRO-WYCKOFF] Spring detected — suggesting scalp trigger at {wyckoff_signal['entry_zone']}")
                     context = {"suggested_scalp_mode": True, "micro_wyckoff": wyckoff_signal}

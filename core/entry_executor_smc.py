@@ -7,6 +7,8 @@ import logging
 from typing import Optional, Dict, Any
 from telegram_alert_engine import send_simple_summary_alert
 
+# Default SL buffer in pips if profile does not override
+DEFAULT_SL_BUFFER_PIPS = 1.0
 # --- Import production implementations ---
 from core.execution import calculate_trade_risk
 from core.pine_connector import generate_pine_payload
@@ -250,7 +252,7 @@ def execute_smc_entry(
         result["adjusted_risk_percent"] = risk_percent
     # SL buffer needs careful handling - pips vs points vs absolute value
     # Assuming sl_buffer_pips needs conversion based on instrument
-    sl_buffer_pips = risk_model_config.get('sl_buffer_pips', 1.0) # e.g., 1 pip
+    sl_buffer_pips = risk_model_config.get('sl_buffer_pips', DEFAULT_SL_BUFFER_PIPS)
     instrument_point_value = 0.0001 # Example for EURUSD 5-decimal
     sl_buffer_price = sl_buffer_pips * instrument_point_value * 10 # Convert pips to price value
 

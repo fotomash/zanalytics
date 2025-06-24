@@ -5,6 +5,11 @@
 import pandas as pd
 from typing import Optional, Dict, Any
 
+# Default parameters if configuration not supplied
+DEFAULT_MICRO_WINDOW = 5
+DEFAULT_MICRO_BUFFER_PIPS = 5
+DEFAULT_PIP_SIZE = 0.0001
+
 
 def detect_micro_wyckoff_phase(
     ticks_df: pd.DataFrame,
@@ -39,8 +44,8 @@ def detect_micro_wyckoff_phase(
     """
     if config is None:
         config = {}
-    window = config.get('micro_window', 5)
-    buffer = config.get('micro_buffer_pips', 5)
+    window = config.get('micro_window', DEFAULT_MICRO_WINDOW)
+    buffer = config.get('micro_buffer_pips', DEFAULT_MICRO_BUFFER_PIPS)
 
     if len(ticks_df) < window:
         return {"phase": None, "reason": "Not enough tick data"}
@@ -63,7 +68,7 @@ def detect_micro_wyckoff_phase(
     last_swing_low = recent_ticks['Mid'].min()
     entry_zone = [
         last_swing_low,
-        last_swing_low + buffer * config.get('pip_size', 0.0001)
+        last_swing_low + buffer * config.get('pip_size', DEFAULT_PIP_SIZE)
     ]
 
     atr_col = next((col for col in ticks_df.columns if col.startswith('ATR_')), None)

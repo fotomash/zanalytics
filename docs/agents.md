@@ -64,3 +64,15 @@ class ExampleAgent(BaseAgent):
 - **zbar**: Behavioral journaling
 
 > **Note:** Drop any new agent module into `modules/<agent_key>/agent.py` and register it via `@register_agent("<agent_key>")`. The orchestrator will automatically load it based on the `business_type`.
+
+### Example Profile Snippet
+
+```yaml
+# profiles/base/default.yaml
+liquidity_sweep_detector:
+  fractal_n: 2
+micro_wyckoff_phase:
+  micro_window: 5
+  micro_buffer_pips: 5
+  pip_size: 0.0001
+```
