@@ -37,4 +37,8 @@ This bundle is your **modular trading logic engine**. It’s structured for use 
 4. Skip any module where config is missing/empty
 5. Log outcome using `journaling` block
 
+- `advanced_stoploss_lots_engine` now supports non-USD account currencies.
+  Point values are automatically converted using live FX rates via
+  `get_live_fx_rate`.
+
 *Multi-agent. Schema-driven. LLM-interpretable. Fully portable.*
