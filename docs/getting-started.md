@@ -23,7 +23,7 @@ pip install -r requirements.txt
 
 # Copy example environment variables
 cp .env.example .env
-# Edit .env to include your OPENAI_API_KEY and other settings
+# Edit .env to include your OPENAI_API_KEY, ZANALYTICS_API_KEY, and other settings
 
 # (Optional) Start the FastAPI server for local development
 uvicorn main:app --reload --env-file .env
@@ -39,9 +39,10 @@ vercel --prod
 ```
 
 ## Configure Environment Variables
-Rename and edit your `.env` file to include the following keys:
+- Rename and edit your `.env` file to include the following keys:
 
 - `OPENAI_API_KEY` — Your OpenAI API key.
+- `ZANALYTICS_API_KEY` — Key required by the FastAPI server.
 - `FASTAPI_HOST` — Hostname or IP for FastAPI (default: `0.0.0.0`).
 - `FASTAPI_PORT` — Port number for FastAPI (default: `8000`).
 - `RAILWAY_API_URL` — (Optional) Railway deployment URL.
