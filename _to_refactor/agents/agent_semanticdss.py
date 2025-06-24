@@ -1,6 +1,4 @@
 
-
-
 class SemanticDecisionSupportAgent:
     def __init__(self, context=None):
         self.context = context or {}
@@ -13,7 +11,7 @@ class SemanticDecisionSupportAgent:
             "symbol": symbol,
             "wyckoff_phase": wyckoff_phase,
             "macro_bias": macro_bias,
-            "combined_interpretation": f"{symbol} is in Wyckoff phase {wyckoff_phase} with macro bias {macro_bias}."
+            "combined_interpretation": f"{symbol} is in Wyckoff phase {wyckoff_phase} with macro bias {macro_bias}.",
         }
 
     def __repr__(self):

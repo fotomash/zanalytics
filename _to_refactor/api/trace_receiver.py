@@ -19,6 +19,5 @@ async def upload_trace(request: Request):
             json.dump(trace_data, f, indent=2)
 
         return JSONResponse(content={"status": "success", "saved_to": filename}, status_code=200)
-
     except Exception as e:
         return JSONResponse(content={"status": "error", "message": str(e)}, status_code=500)
