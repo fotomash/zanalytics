@@ -12,7 +12,12 @@
 from datetime import datetime
 VERSION = "5.2.1"
 STARTED_AT = datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S")
-print(f"[DataPipeline] Zanzibar {VERSION} initialized at {STARTED_AT} UTC")
+
+import logging
+from .exceptions import DataUnavailableError
+
+logger = logging.getLogger(__name__)
+logger.info("[DataPipeline] Zanzibar %s initialized at %s UTC", VERSION, STARTED_AT)
 
 from concurrent.futures import ThreadPoolExecutor  # Still useful for fetching
 import os
@@ -30,7 +35,7 @@ try:
     from core import massive_macro_fetcher
     MACRO_FETCHER_AVAILABLE = True
 except ImportError:
-    print("[WARN][DataPipeline] massive_macro_fetcher.py not found. Macro fetching disabled.")
+    logger.warning("massive_macro_fetcher.py not found. Macro fetching disabled.")
     massive_macro_fetcher = None
     MACRO_FETCHER_AVAILABLE = False
 
@@ -39,10 +44,10 @@ except ImportError:
 # Helper: simple timestamped logger
 # ----------------------------------------------------------------------------
 
-def _log(msg: str):
-    """Logs messages with a timestamp."""
-    stamp = datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S")
-    print(f"[DataPipeline] {stamp} | {msg}")
+def _log(msg: str, level: str = "info"):
+    """Helper to log messages with UTC timestamp."""
+    log_fn = getattr(logger, level, logger.info)
+    log_fn(msg)
 
 # ----------------------------------------------------------------------------
 # DataPipeline class
@@ -99,9 +104,11 @@ class DataPipeline:
                     df.to_csv(filepath)
                     _log(f"Saved raw M1 data to {filepath}")
                 else:
-                    _log(f"No data returned for {symbol}")
+                    _log(f"No data returned for {symbol}", level="warning")
+            except DataUnavailableError as e:
+                _log(f"Data unavailable for {symbol}: {e}", level="error")
             except Exception as e:
-                _log(f"Exception during fetch for {symbol}: {e}")
+                _log(f"Exception during fetch for {symbol}: {e}", level="error")
                 traceback.print_exc()
 
         _log(f"M1 Pair fetching complete. Successful fetches: {successful_fetches}/{len(self.symbols_m1)}")
@@ -113,7 +120,7 @@ class DataPipeline:
     def fetch_macro(self):
         """Fetches macro asset data using massive_macro_fetcher."""
         if not MACRO_FETCHER_AVAILABLE:
-            _log("Skipping macro fetching: massive_macro_fetcher not available.")
+            _log("Skipping macro fetching: massive_macro_fetcher not available.", level="warning")
             return
 
         _log(f"Fetching macro assets (Interval: {self.macro_interval})...")
@@ -129,7 +136,7 @@ class DataPipeline:
             massive_macro_fetcher.batch_fetch_macro(interval=self.macro_interval)
             _log("Macro asset fetching complete.")
         except Exception as e:
-            _log(f"Error during macro fetching: {e}")
+            _log(f"Error during macro fetching: {e}", level="error")
             traceback.print_exc()
 
     # --------------------------------------
@@ -145,7 +152,7 @@ class DataPipeline:
             )
             _log("HTF resampling complete.")
         except Exception as e:
-            _log(f"Error during HTF resampling: {e}")
+            _log(f"Error during HTF resampling: {e}", level="error")
             traceback.print_exc()
 
     # --------------------------------------
@@ -154,9 +161,9 @@ class DataPipeline:
     def run_full(self):
         """Runs the full data pipeline: Fetch Pairs -> Fetch Macro -> Resample HTF."""
         _log("--- Starting Full Data Pipeline Run ---")
-        self.fetch_pairs() # Assumes this step results in M1 CSVs being saved
+        self.fetch_pairs()  # Assumes this step results in M1 CSVs being saved
         self.fetch_macro()
-        self.resample_htf() # Resamples the saved M1 CSVs
+        self.resample_htf()  # Resamples the saved M1 CSVs
         _log("--- DataPipeline Full Run Complete ✅ ---")
 
 # ----------------------------------------------------------------------------

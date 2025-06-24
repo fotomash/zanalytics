@@ -4,14 +4,17 @@
 # Implements the logic defined in FibonacciFilter.json (v2 - Timeframe Aware).
 
 import math
-import inspect # For logging helper
+import inspect  # For logging helper
+import logging
+from core.exceptions import InvalidSignalError
+
+logger = logging.getLogger(__name__)
 
 # --- Logging Helper ---
-def log_info(message):
+def log_info(message, level: str = "info"):
     """Prepends module name to log messages."""
-    # This basic version assumes the module name is fibonacci_filter
-    # A more robust logger could be passed in or configured globally.
-    print(f"[FIBONACCI_FILTER] {message}")
+    log_fn = getattr(logger, level, logger.info)
+    log_fn(message)
 
 # --- Core Filter Function ---
 
@@ -60,32 +63,32 @@ def apply_fibonacci_filter(swing_range_data, poi_data, htf_bias, parameters=None
     # --- Input Validation ---
     required_swing_keys = ['swing_high_price', 'swing_low_price', 'source_timeframe']
     if not isinstance(swing_range_data, dict) or not all(k in swing_range_data for k in required_swing_keys):
-        log_info(f"ERROR: Invalid swing_range_data input. Missing keys: {required_swing_keys}")
-        return {'is_valid_poi': False, 'filter_reason': 'Invalid swing_range_data input'}
+        log_info(f"ERROR: Invalid swing_range_data input. Missing keys: {required_swing_keys}", level="error")
+        raise InvalidSignalError('Invalid swing_range_data input')
 
     required_poi_keys = ['poi_level_top', 'poi_level_bottom']
     if not isinstance(poi_data, dict) or not all(k in poi_data for k in required_poi_keys):
-        log_info(f"ERROR: Invalid poi_data input. Missing keys: {required_poi_keys}")
-        return {'is_valid_poi': False, 'filter_reason': 'Invalid poi_data input'}
+        log_info(f"ERROR: Invalid poi_data input. Missing keys: {required_poi_keys}", level="error")
+        raise InvalidSignalError('Invalid poi_data input')
 
     if htf_bias not in ['Bullish', 'Bearish']:
-        log_info(f"ERROR: Invalid htf_bias input: {htf_bias}. Must be 'Bullish' or 'Bearish'.")
-        return {'is_valid_poi': False, 'filter_reason': 'Invalid htf_bias input'}
+        log_info(f"ERROR: Invalid htf_bias input: {htf_bias}. Must be 'Bullish' or 'Bearish'.", level="error")
+        raise InvalidSignalError('Invalid htf_bias input')
 
     range_high = swing_range_data['swing_high_price']
     range_low = swing_range_data['swing_low_price']
     range_tf = swing_range_data['source_timeframe']
 
     if not isinstance(range_high, (int, float)) or not isinstance(range_low, (int, float)) or range_high <= range_low:
-        log_info(f"ERROR: Invalid swing range prices: High={range_high}, Low={range_low}")
-        return {'is_valid_poi': False, 'filter_reason': 'Invalid swing range prices'}
+        log_info(f"ERROR: Invalid swing range prices: High={range_high}, Low={range_low}", level="error")
+        raise InvalidSignalError('Invalid swing range prices')
 
     poi_top = poi_data['poi_level_top']
     poi_bottom = poi_data['poi_level_bottom']
 
     if not isinstance(poi_top, (int, float)) or not isinstance(poi_bottom, (int, float)) or poi_top < poi_bottom:
-        log_info(f"ERROR: Invalid POI levels: Top={poi_top}, Bottom={poi_bottom}")
-        return {'is_valid_poi': False, 'filter_reason': 'Invalid POI levels'}
+        log_info(f"ERROR: Invalid POI levels: Top={poi_top}, Bottom={poi_bottom}", level="error")
+        raise InvalidSignalError('Invalid POI levels')
 
     log_info(f"Inputs: Range TF={range_tf}, Range=[{range_low:.5f} - {range_high:.5f}], POI=[{poi_bottom:.5f} - {poi_top:.5f}], Bias={htf_bias}")
 
@@ -166,10 +169,10 @@ def apply_fibonacci_filter(swing_range_data, poi_data, htf_bias, parameters=None
 
 # --- Example Usage Block ---
 if __name__ == '__main__':
-    print("\n--- Testing Fibonacci Filter ---")
+    logger.info("--- Testing Fibonacci Filter ---")
 
     # --- Scenario 1: Bullish Bias, POI in Discount & Golden Zone (Should Pass) ---
-    print("\n--- Scenario 1: Bullish Bias, POI should PASS ---")
+    logger.info("--- Scenario 1: Bullish Bias, POI should PASS ---")
     swing_data_1 = {'swing_high_price': 1.25000, 'swing_low_price': 1.23000, 'source_timeframe': 'H4'}
     # POI Midpoint = 1.23700 (Discount), Range = 0.02000
     # 50% = 1.24000, 61.8% = 1.23000 + 0.02*0.618 = 1.24236 (Incorrect calc for discount)
@@ -184,23 +187,29 @@ if __name__ == '__main__':
         "discount_premium_threshold": 0.50,
         "poi_check_level": "midpoint"
     }
-    result_1 = apply_fibonacci_filter(swing_data_1, poi_data_1, bias_1, params_1)
-    print("Scenario 1 Result:", result_1)
+    try:
+        result_1 = apply_fibonacci_filter(swing_data_1, poi_data_1, bias_1, params_1)
+        logger.info("Scenario 1 Result: %s", result_1)
+    except InvalidSignalError as e:
+        logger.error("Scenario 1 failed: %s", e)
     assert result_1['is_valid_poi'] == True
 
     # --- Scenario 2: Bullish Bias, POI in Discount but NOT Golden Zone (Should Fail) ---
-    print("\n--- Scenario 2: Bullish Bias, POI should FAIL (Not GZ) ---")
+    logger.info("--- Scenario 2: Bullish Bias, POI should FAIL (Not GZ) ---")
     swing_data_2 = swing_data_1 # Same range
     # POI Midpoint = 1.23900 (Discount), but outside GZ [1.23428 - 1.23764]
     poi_data_2 = {'poi_level_top': 1.23950, 'poi_level_bottom': 1.23850}
     bias_2 = 'Bullish'
-    result_2 = apply_fibonacci_filter(swing_data_2, poi_data_2, bias_2, params_1)
-    print("Scenario 2 Result:", result_2)
+    try:
+        result_2 = apply_fibonacci_filter(swing_data_2, poi_data_2, bias_2, params_1)
+        logger.info("Scenario 2 Result: %s", result_2)
+    except InvalidSignalError as e:
+        logger.error("Scenario 2 failed: %s", e)
     assert result_2['is_valid_poi'] == False
     assert "Outside Golden Zone" in result_2['filter_reason']
 
     # --- Scenario 3: Bullish Bias, POI in Golden Zone but NOT Discount (Should Fail) ---
-    print("\n--- Scenario 3: Bullish Bias, POI should FAIL (Not Discount) ---")
+    logger.info("--- Scenario 3: Bullish Bias, POI should FAIL (Not Discount) ---")
     swing_data_3 = swing_data_1 # Same range
     # POI Midpoint = 1.24100 (Premium), within GZ [1.23428 - 1.23764] - Wait, GZ calc needs fix for direction
     # Let's recalculate GZ based on 0-100% scale from low:
@@ -219,37 +228,46 @@ if __name__ == '__main__':
     # Re-running with updated understanding of GZ check in code (absolute levels)
     # POI Midpoint 1.24300 > 1.24000 (Premium: FAIL)
     # POI Midpoint 1.24300 is between 1.24236 and 1.24572 (GZ: PASS) -> Overall FAIL
-    result_3 = apply_fibonacci_filter(swing_data_3, poi_data_3, bias_3, params_1)
-    print("Scenario 3 Result:", result_3)
+    try:
+        result_3 = apply_fibonacci_filter(swing_data_3, poi_data_3, bias_3, params_1)
+        logger.info("Scenario 3 Result: %s", result_3)
+    except InvalidSignalError as e:
+        logger.error("Scenario 3 failed: %s", e)
     assert result_3['is_valid_poi'] == False
     assert "Wrong D/P Zone" in result_3['filter_reason']
 
 
     # --- Scenario 4: Bearish Bias, POI in Premium & Golden Zone (Should Pass) ---
-    print("\n--- Scenario 4: Bearish Bias, POI should PASS ---")
+    logger.info("--- Scenario 4: Bearish Bias, POI should PASS ---")
     swing_data_4 = swing_data_1 # Same range
     # POI Midpoint = 1.24300 (Premium: PASS)
     # GZ Lower Abs = 1.24236, GZ Upper Abs = 1.24572
     # POI Midpoint 1.24300 is between GZ bounds (GZ: PASS) -> Overall PASS
     poi_data_4 = {'poi_level_top': 1.24350, 'poi_level_bottom': 1.24250}
     bias_4 = 'Bearish'
-    result_4 = apply_fibonacci_filter(swing_data_4, poi_data_4, bias_4, params_1)
-    print("Scenario 4 Result:", result_4)
+    try:
+        result_4 = apply_fibonacci_filter(swing_data_4, poi_data_4, bias_4, params_1)
+        logger.info("Scenario 4 Result: %s", result_4)
+    except InvalidSignalError as e:
+        logger.error("Scenario 4 failed: %s", e)
     assert result_4['is_valid_poi'] == True
 
 
     # --- Scenario 5: Bearish Bias, POI in Premium but NOT Golden Zone (Should Fail) ---
-    print("\n--- Scenario 5: Bearish Bias, POI should FAIL (Not GZ) ---")
+    logger.info("--- Scenario 5: Bearish Bias, POI should FAIL (Not GZ) ---")
     swing_data_5 = swing_data_1 # Same range
     # POI Midpoint = 1.24700 (Premium: PASS)
     # GZ Lower Abs = 1.24236, GZ Upper Abs = 1.24572
     # POI Midpoint 1.24700 is outside GZ bounds (GZ: FAIL) -> Overall FAIL
     poi_data_5 = {'poi_level_top': 1.24750, 'poi_level_bottom': 1.24650}
     bias_5 = 'Bearish'
-    result_5 = apply_fibonacci_filter(swing_data_5, poi_data_5, bias_5, params_1)
-    print("Scenario 5 Result:", result_5)
+    try:
+        result_5 = apply_fibonacci_filter(swing_data_5, poi_data_5, bias_5, params_1)
+        logger.info("Scenario 5 Result: %s", result_5)
+    except InvalidSignalError as e:
+        logger.error("Scenario 5 failed: %s", e)
     assert result_5['is_valid_poi'] == False
     assert "Outside Golden Zone" in result_5['filter_reason']
 
-    print("\n--- Fibonacci Filter Test Complete ---")
+    logger.info("--- Fibonacci Filter Test Complete ---")
 

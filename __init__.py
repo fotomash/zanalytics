@@ -5,6 +5,10 @@ __version__ = "5.2.1"
 __author__ = "ZANALYTICS AI Stack"
 
 import logging
+from .logger import setup_logging
+
+# Initialize global logging using config/logging.json
+setup_logging()
 logging.getLogger(__name__).info("ZANALYTICS package initialized.")
 
 # Expose core agent APIs
