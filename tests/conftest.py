@@ -1,17 +1,17 @@
 # tests/conftest.py - Set test mode immediately
 import os
-import pytest
 
-<<<<<<< HEAD
-# Set test mode BEFORE any imports
+# Ensure test mode is active for all imports
 os.environ['ZANALYTICS_TEST_MODE'] = '1'
 
+import pytest
+
+
 def pytest_configure(config):
-    """pytest configuration hook"""
-    # Test mode already set above
+    """Pytest configuration hook."""
     pass
 
+
 def pytest_unconfigure(config):
-    """Clean up after tests"""
-    if 'ZANALYTICS_TEST_MODE' in os.environ:
-        del os.environ['ZANALYTICS_TEST_MODE']
+    """Cleanup after tests."""
+    os.environ.pop('ZANALYTICS_TEST_MODE', None)
