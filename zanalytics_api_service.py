@@ -349,7 +349,7 @@ def setup_data_integration():
     # Initialize data flow manager
     api_state.data_flow_manager = DataFlowManager(
         watch_directories=config['watch_directories'],
-        event_callback=lambda event: asyncio.create_task(process_data_event(event))
+        zanalytics_callback=lambda event: asyncio.create_task(process_data_event(event))
     )
     
     # Start monitoring
