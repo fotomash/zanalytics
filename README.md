@@ -62,6 +62,23 @@ risk_manager:
 
 These keys replace hardcoded values inside `core/*` modules so behavior can be tuned without editing code.
 
+### Dynamic Lookback Windows
+
+Enable adaptive window sizing by toggling `dynamic_lookback` in your config. The
+helper `core/lookback_adapter.py` shortens lookbacks in explosive markets and
+lengthens them during quiet regimes based on `volatility_engine` output.
+
+```yaml
+liquidity_engine:
+  dynamic_lookback: true
+  min_lookback: 3
+  max_lookback: 8
+phase_detection_config:
+  dynamic_lookback: true
+  min_lookback: 15
+  max_lookback: 40
+```
+
 ## 📈 Risk Calculation Example
 
 ```python
