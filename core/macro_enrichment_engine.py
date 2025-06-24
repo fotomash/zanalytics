@@ -13,18 +13,13 @@ from pathlib import Path
 import json
 import traceback
 
-# Assuming finnhub_data_fetcher can fetch these symbols
+# Unified data provider
 try:
-    # Use the main fetcher if possible, otherwise fallback to a simple one
-    from core.finnhub_data_fetcher import load_and_aggregate_m1 as fetch_data
-    print("[INFO][MacroEngine] Using main finnhub_data_fetcher.")
-except ImportError:
-    print("[WARN][MacroEngine] Main fetcher not found. Using simple fetch_live_tail as fallback.")
-    try:
-        from core.fetch_live_tail import fetch_m1_tail as fetch_data # Needs adaptation for different symbols/TFs
-    except ImportError:
-        print("[ERROR][MacroEngine] Cannot import any data fetcher. Macro context unavailable.")
-        fetch_data = None
+    from core.data_manager import DataManager
+    data_manager = DataManager()
+except Exception as e:
+    data_manager = None
+    print(f"[ERROR][MacroEngine] DataManager init failed: {e}")
 
 # Load Copilot config for asset mapping
 COPILOT_CONFIG_PATH = Path("config/copilot_config.json")
@@ -99,8 +94,8 @@ def fetch_macro_context(asset_symbol: str) -> Dict:
     """
     print(f"[INFO][MacroEngine] Fetching macro context for asset: {asset_symbol}")
     context = {"risk_state": "Neutral", "macro_data": {}}
-    if not fetch_data:
-        print("[ERROR][MacroEngine] Data fetcher unavailable. Cannot fetch macro context.")
+    if not data_manager:
+        print("[ERROR][MacroEngine] DataManager unavailable. Cannot fetch macro context.")
         return context
 
     asset_class = detect_asset_class(asset_symbol)
@@ -110,28 +105,21 @@ def fetch_macro_context(asset_symbol: str) -> Dict:
 
     macro_raw_data = {}
     # Fetch data for each macro symbol (e.g., last day's worth of H1 or D1)
-    # NOTE: Assumes fetch_data can handle these symbols and returns a dict for aggregation
-    # This part needs careful implementation based on fetcher capabilities
+    # DataManager handles resampling internally
     end_dt = datetime.now(timezone.utc)
     start_dt = end_dt - timedelta(days=2) # Fetch last 2 days for context
 
     for symbol in macro_symbols_to_fetch:
         print(f"[DEBUG][MacroEngine] Fetching macro symbol: {symbol}")
         try:
-            # Use load_and_aggregate_m1, but we likely only need D1 or H4 for macro context
-            # This highlights a need for the fetcher to handle different resolutions efficiently
-            # For now, we'll fetch M1 and assume the fetcher returns aggregated data including D1/H4
-            result = fetch_data(symbol, start_dt, end_dt)
-            if result['status'] == 'ok' and isinstance(result['data'], dict):
-                 # Get Daily or H4 data if available for analysis
-                 df_context = result['data'].get('d1') or result['data'].get('h4') or result['data'].get('h1')
-                 if df_context is not None and not df_context.empty:
-                      macro_raw_data[symbol] = df_context
-                      print(f"[DEBUG][MacroEngine] Successfully fetched context data for {symbol}")
-                 else:
-                      print(f"[WARN][MacroEngine] No suitable context data (D1/H4/H1) found for {symbol} in aggregated result.")
+            df_context = data_manager.get_data(symbol, 'd1', days_back=2)
+            if df_context.empty:
+                df_context = data_manager.get_data(symbol, 'h4', days_back=2)
+            if not df_context.empty:
+                macro_raw_data[symbol] = df_context
+                print(f"[DEBUG][MacroEngine] Successfully fetched context data for {symbol}")
             else:
-                print(f"[WARN][MacroEngine] Failed to fetch macro symbol {symbol}: {result.get('message')}")
+                print(f"[WARN][MacroEngine] No suitable context data found for {symbol}")
         except Exception as e:
             print(f"[ERROR][MacroEngine] Exception fetching {symbol}: {e}")
             traceback.print_exc()
@@ -155,11 +143,11 @@ if __name__ == '__main__':
     if 'FINNHUB_API_KEY' not in os.environ:
          print("WARNING: FINNHUB_API_KEY environment variable not set. Using default/dummy key.")
 
-    if fetch_data:
+    if data_manager:
         macro_info = fetch_macro_context(test_asset)
         print("\n--- Macro Context Result ---")
         print(json.dumps(macro_info, indent=2, default=str))
     else:
-        print("\nCannot run test: Data fetcher is unavailable.")
+        print("\nCannot run test: DataManager is unavailable.")
 
     print("\n--- Test Complete ---")

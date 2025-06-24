@@ -40,13 +40,20 @@ try:
         if "default_chart_settings" in chart_config_content: default_chart_config_settings = chart_config_content["default_chart_settings"]; log_info(f"Loaded default chart settings from {DEFAULT_CHART_CONFIG_PATH}")
         else: log_info(f"WARN: {DEFAULT_CHART_CONFIG_PATH} missing 'default_chart_settings'.")
     else: log_info(f"WARN: Default chart config not found at {DEFAULT_CHART_CONFIG_PATH}")
-except Exception as cfg_err: log_info(f"WARN: Failed loading {DEFAULT_CHART_CONFIG_PATH}: {cfg_err}", "WARN")
+# except handling remains
+except Exception as cfg_err:
+    log_info(f"WARN: Failed loading {DEFAULT_CHART_CONFIG_PATH}: {cfg_err}", "WARN")
 
+# --- Unified Data Manager ---
+try:
+    from core.data_manager import DataManager
+    DATA_MANAGER = DataManager()
+except Exception as e:
+    DATA_MANAGER = None
+    log_info(f"DataManager init failed: {e}", "ERROR")
 
 # --- Dynamic Imports ---
 # (Imports remain the same, including the new liquidity_sweep_detector)
-try: from core.finnhub_data_fetcher import load_and_aggregate_m1; FETCHER_AVAILABLE = True
-except ImportError: log_info("CRITICAL ERROR: core/finnhub_data_fetcher.py not found.", "ERROR"); load_and_aggregate_m1 = None; FETCHER_AVAILABLE = False
 try: from core.market_structure_analyzer_smc import analyze_market_structure
 except ImportError: log_info("ERROR: core/market_structure_analyzer_smc.py not found.", "ERROR"); analyze_market_structure = None
 try: from core.liquidity_engine_smc import detect_inducement_from_structure
@@ -346,14 +353,21 @@ def handle_price_check(pair: str, timestamp_str: str, tf: str = 'm15', strategy_
         except Exception as e: return {"status": "error", "message": f"Invalid timestamp format: '{timestamp_str}'."}
 
         # --- Data Fetching & Aggregation ---
-        fetch_window_delta = timedelta(days=30); start_dt = target_dt_utc - fetch_window_delta; end_dt = target_dt_utc + timedelta(hours=1)
-        log_info(f"Task: Fetching data using load_and_aggregate_m1."); log_info(f"Parameters: Symbol={pair}, Start={start_dt}, End={end_dt}")
-        if not FETCHER_AVAILABLE or not load_and_aggregate_m1: return {"status": "error", "message": "Data fetcher module not loaded."}
-        fetch_agg_result = load_and_aggregate_m1(pair, start_dt, end_dt)
-        if fetch_agg_result.get('status') != 'ok': return {"status": "error_live_data", "message": fetch_agg_result.get('message', 'Data fetch/aggregation failed.'), "source": fetch_agg_result.get('source', 'finnhub/aggregator')}
-        all_tf_data = fetch_agg_result.get("data")
-        if not all_tf_data or not isinstance(all_tf_data, dict): return {"status": "error", "message": "No aggregated TF data returned."}
-        log_info(f"Result: Data fetch and aggregation successful. TFs: {list(all_tf_data.keys())}")
+        if not DATA_MANAGER:
+            return {"status": "error", "message": "DataManager unavailable"}
+        fetch_window_delta = timedelta(days=30)
+        start_dt = target_dt_utc - fetch_window_delta
+        end_dt = target_dt_utc + timedelta(hours=1)
+        log_info(f"Task: Fetching data via DataManager. Symbol={pair}")
+        tfs = ['m1', 'm5', 'm15', 'h1', 'h4']
+        all_tf_data = {}
+        for tf_needed in tfs:
+            df = DATA_MANAGER.get_data(pair, tf_needed, days_back=30)
+            if not df.empty:
+                all_tf_data[tf_needed] = df
+        if not all_tf_data:
+            return {"status": "error_live_data", "message": "No data returned"}
+        log_info(f"Result: Data fetch successful. TFs: {list(all_tf_data.keys())}")
 
         # --- Data Enrichment --- ### UPDATED ###
         log_info("Task: Applying data enrichment tags...")

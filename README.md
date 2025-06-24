@@ -53,3 +53,10 @@ except ValueError as e:
 ```
 
 *Multi-agent. Schema-driven. LLM-interpretable. Fully portable.*
+
+## Data Pipeline
+
+`core/data_manager.DataManager` provides a single interface for retrieving OHLCV
+data. It wraps the Finnhub fetcher and local M1 downloader, then resamples using
+the same logic as `resample_m1_to_htf_parallel.py`. Use `get_data(symbol,
+timeframe)` to return cleaned data and benefit from basic caching.
