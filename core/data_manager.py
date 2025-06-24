@@ -2,6 +2,8 @@ import pandas as pd
 from pathlib import Path
 from datetime import datetime, timedelta, timezone
 
+from .exceptions import DataUnavailableError
+
 try:
     from core.finnhub_data_fetcher import load_and_aggregate_m1
 except Exception:
@@ -82,14 +84,14 @@ class DataManager:
         if data is None:
             data, err = self._fetch_via_local(symbol, start_dt, end_dt)
             if data is None:
-                print(f"[DataManager] Failed fetching {symbol}: {err}")
-                return pd.DataFrame()
+                raise DataUnavailableError(f"Failed fetching {symbol}: {err}")
         if timeframe not in data:
             if 'm1' in data:
                 data = self._resample_all(data['m1'])
             else:
-                print(f"[DataManager] Timeframe {timeframe} not available for {symbol}")
-                return pd.DataFrame()
+                raise DataUnavailableError(
+                    f"Timeframe {timeframe} not available for {symbol}"
+                )
         df = data.get(timeframe, pd.DataFrame()).copy()
         if not isinstance(df, pd.DataFrame):
             df = pd.DataFrame()

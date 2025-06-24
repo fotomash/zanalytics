@@ -81,3 +81,16 @@ except ValueError as e:
 data. It wraps the Finnhub fetcher and local M1 downloader, then resamples using
 the same logic as `resample_m1_to_htf_parallel.py`. Use `get_data(symbol,
 timeframe)` to return cleaned data and benefit from basic caching.
+
+### Logging
+
+Logging is configured via `config/logging.json`. Running the pipeline writes
+messages to `logs/zanalytics.log` and the console.
+
+```python
+from core.data_pipeline import DataPipeline
+
+pipeline = DataPipeline()
+pipeline.run_full()
+# Inspect logs/zanalytics.log for detailed output
+```
