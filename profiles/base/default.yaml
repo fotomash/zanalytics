@@ -2,6 +2,19 @@ profile_name: default
 context_analyzer: {}
 liquidity_engine: {}
 structure_validator: {}
-risk_manager: {}
+risk_manager:
+  atr_period: 14
+  atr_multiplier: 1.5
 journaling: {}
 meta_agent: {}
+
+# Strategy parameter defaults
+liquidity_sweep_detector:
+  fractal_n: 2
+vwap_liquidity_detector:
+  std_window: 30
+  threshold_factor: 1.5
+micro_wyckoff_phase:
+  micro_window: 5
+  micro_buffer_pips: 5
+  pip_size: 0.0001

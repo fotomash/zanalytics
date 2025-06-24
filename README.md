@@ -41,6 +41,27 @@ This bundle is your **modular trading logic engine**. It’s structured for use 
   Point values are automatically converted using live FX rates via
   `get_live_fx_rate`.
 
+## 🔧 Strategy Parameters
+
+Key engines pull defaults from `profiles/base/default.yaml`. Adjust values per profile as needed:
+
+```yaml
+liquidity_sweep_detector:
+  fractal_n: 2
+vwap_liquidity_detector:
+  std_window: 30
+  threshold_factor: 1.5
+micro_wyckoff_phase:
+  micro_window: 5
+  micro_buffer_pips: 5
+  pip_size: 0.0001
+risk_manager:
+  atr_period: 14
+  atr_multiplier: 1.5
+```
+
+These keys replace hardcoded values inside `core/*` modules so behavior can be tuned without editing code.
+
 ## 📈 Risk Calculation Example
 
 ```python
