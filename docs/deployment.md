@@ -12,7 +12,7 @@ Define all sensitive configuration in environment variables, not in code. Exampl
 ```dotenv
 # Core
 APP_ENV=development               # development | staging | production
-API_KEY=your_global_api_key
+ZANALYTICS_API_KEY=your_global_api_key
 SECRET_KEY=your_jwt_signing_key
 
 # Database
