@@ -6,7 +6,7 @@ various external sources like MT5, CSV files, or real-time APIs.
 """
 
 from typing import Dict, Any, List, Optional
-from datetime import datetime
+from datetime import datetime, timedelta
 from loguru import logger
 import pandas as pd
 
