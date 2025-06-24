@@ -13,6 +13,7 @@ import traceback
 import math # For ceiling function in lot size calculation
 from datetime import datetime, timezone # Added timezone for awareness
 import re # For cleaning symbols
+import httpx  # For live FX rate fetch
 from core.microstructure_filter import MicrostructureFilter
 from core.advanced_stoploss_lots_engine import calculate_atr  # or adjust import if calculate_atr is in this module
 
@@ -84,6 +85,29 @@ def calculate_atr(high: pd.Series, low: pd.Series, close: pd.Series, period: int
     return atr
 
 # --- Helper Functions ---
+
+def get_live_fx_rate(pair: str) -> Optional[float]:
+    """Fetch a live FX rate for the given currency pair using exchangerate.host.
+
+    Args:
+        pair: Currency pair as FROMTO (e.g. "JPYEUR").
+
+    Returns:
+        The latest conversion rate or ``None`` if unavailable.
+    """
+    if not pair or len(pair) != 6:
+        return None
+    frm, to = pair[:3], pair[3:]
+    url = f"https://api.exchangerate.host/latest?base={frm}&symbols={to}"
+    try:
+        resp = httpx.get(url, timeout=5)
+        resp.raise_for_status()
+        data = resp.json()
+        return float(data.get("rates", {}).get(to))
+    except Exception as exc:  # pragma: no cover - network errors
+        print(f"[WARN][AdvSLRiskEngine] Failed fetching FX rate {pair}: {exc}")
+        return None
+
 
 # --- ### START PIP/POINT MAP FINALIZATION ### ---
 # Incorporating the user-provided function structure and map
@@ -212,18 +236,14 @@ def get_pip_point_value(symbol: str, account_currency: str = "USD") -> Optional[
         # --- Apply Conversion if Needed ---
         value_acct_ccy = value_quote_ccy
         if account_currency.upper() != quote_currency.upper():
-            print(f"[WARN][AdvSLRiskEngine] Account currency ({account_currency}) differs from quote currency ({quote_currency}) for {symbol}. Point value requires live rate conversion for accuracy. Using approximate value.")
-            # --- TODO: Implement Live Rate Conversion ---
-            # Example:
-            # try:
-            #     rate = get_live_fx_rate(f"{quote_currency}{account_currency}") # e.g., get_live_fx_rate("JPYUSD")
-            #     if rate is not None and rate > 0:
-            #         value_acct_ccy = value_quote_ccy * rate
-            #     else:
-            #         print(f"[ERROR] Invalid rate received for {quote_currency}{account_currency}")
-            # except Exception as rate_err:
-            #     print(f"[ERROR] Failed rate conversion for {symbol}: {rate_err}")
-            # --- End TODO ---
+            pair = f"{quote_currency.upper()}{account_currency.upper()}"
+            rate = get_live_fx_rate(pair)
+            if rate:
+                value_acct_ccy = value_quote_ccy * rate
+            else:
+                print(
+                    f"[WARN][AdvSLRiskEngine] Using unconverted point value for {symbol}; live rate {pair} unavailable."
+                )
 
         # --- Final Warnings ---
         if any(cmd in cleaned_symbol for cmd in ["WTI", "BRENT", "XAGUSD"]):
