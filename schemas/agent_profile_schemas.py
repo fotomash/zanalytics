@@ -1,4 +1,4 @@
-# /xanflow/schemas/agent_profile_schemas.py
+# /zanalytics/schemas/agent_profile_schemas.py
 """
 Master Pydantic Schema for XanFlow v11 Agent Profiles.
 This schema validates the structure and content of agent YAML configuration files,
@@ -11,7 +11,7 @@ from typing import List, Dict, Any, Optional, Literal
 from pydantic import BaseModel, Field, validator # type: ignore
 
 # --- Import Individual Module Config Schemas ---
-# These should be defined in separate files within xanflow.schemas and imported here.
+# These should be defined in separate files within zanalytics.schemas and imported here.
 
 try:
     # Core ISPTS Module Configs (assuming they are in module_configs.py)
@@ -31,26 +31,62 @@ except ImportError:
     # Fallback Mocks if actual schema files are not yet fully structured/importable
     # These should be replaced by actual imports once module_configs.py and predictive_schemas.py are populated.
     print("WARNING: agent_profile_schemas.py using MOCK Config models. Ensure actual schema files are created and importable.")
-    class BaseModuleConfig(BaseModel): enabled: bool = True; class Config: extra = "allow" # Loose for mock
+    class BaseModuleConfig(BaseModel):
+        enabled: bool = True
+
+        class Config:
+            extra = "allow"  # Loose for mock
     class ContextAnalyzerConfig(BaseModuleConfig): pass
     class LiquidityEngineConfig(BaseModuleConfig): pass
-    class SwingEngineSubConfig(BaseModel): swing_n: int = 1; break_on_close: bool = True; class Config: extra = "forbid" # From StructureValidatorConfig
+    class SwingEngineSubConfig(BaseModel):
+        swing_n: int = 1
+        break_on_close: bool = True
+
+        class Config:
+            extra = "forbid"  # From StructureValidatorConfig
     class StructureValidatorConfig(BaseModuleConfig): swing_engine_config: SwingEngineSubConfig = Field(default_factory=SwingEngineSubConfig)
     class FVGLocatorConfig(BaseModuleConfig): pass
     class RiskManagerConfig(BaseModuleConfig): pass
     class ConfluenceStackerConfig(BaseModuleConfig): pass
     class ExecutorConfig(BaseModuleConfig): default_order_type: str = "MARKET"; simulation_mode: bool = True
-    class JournalingConfig(BaseModel): verbosity: str = "detailed"; enable_zbar_format: bool = True; log_directory: Optional[str] = None; class Config: extra = "forbid"
+    class JournalingConfig(BaseModel):
+        verbosity: str = "detailed"
+        enable_zbar_format: bool = True
+        log_directory: Optional[str] = None
+
+        class Config:
+            extra = "forbid"
     
-    class FactorWeights(BaseModel): htf_bias_alignment: float = 0.2; class Config: extra = "allow"
+    class FactorWeights(BaseModel):
+        htf_bias_alignment: float = 0.2
+
+        class Config:
+            extra = "allow"
     class GradeThresholds(BaseModel): A: float = 0.85; B: float = 0.70; C: float = 0.55
     class ConflictDetectionSubConfig(BaseModel): enabled: bool = False; min_new_setup_maturity_for_conflict_alert: float = 0.70; suggest_review_trade_if_new_setup_maturity_above: float = 0.80
     class PredictiveScorerConfig(BaseModel): enabled: bool = True; factor_weights: FactorWeights = Field(default_factory=FactorWeights); grade_thresholds: GradeThresholds = Field(default_factory=GradeThresholds); min_score_to_emit_potential_entry: float = 0.65; conflict_detection_settings: ConflictDetectionSubConfig = Field(default_factory=ConflictDetectionSubConfig)
     class FeatureExtractorConfig(BaseModel): enabled: bool = True
     class SpreadTrackerConfig(BaseModel): enabled: bool = True; window_size: int = 25; high_vol_baseline: float = 0.0008
-    class TickContextConfig(BaseModel): enable_tick_merge: bool = True; journal_tick_context: bool = True; class Config: extra = "forbid"
-    class DataEnricherConfig(BaseModel): enabled: bool = True; spread_settings: Optional[SpreadTrackerConfig] = None; tick_context_settings: Optional[TickContextConfig] = None; class Config: extra = "forbid"
-    class PredictiveJournalingGlobalConfig(BaseModel): enabled: bool = False; feature_extraction_settings: FeatureExtractorConfig = Field(default_factory=FeatureExtractorConfig); predictive_scoring_settings: PredictiveScorerConfig = Field(default_factory=PredictiveScorerConfig); class Config: extra = "forbid"
+    class TickContextConfig(BaseModel):
+        enable_tick_merge: bool = True
+        journal_tick_context: bool = True
+
+        class Config:
+            extra = "forbid"
+    class DataEnricherConfig(BaseModel):
+        enabled: bool = True
+        spread_settings: Optional[SpreadTrackerConfig] = None
+        tick_context_settings: Optional[TickContextConfig] = None
+
+        class Config:
+            extra = "forbid"
+    class PredictiveJournalingGlobalConfig(BaseModel):
+        enabled: bool = False
+        feature_extraction_settings: FeatureExtractorConfig = Field(default_factory=FeatureExtractorConfig)
+        predictive_scoring_settings: PredictiveScorerConfig = Field(default_factory=PredictiveScorerConfig)
+
+        class Config:
+            extra = "forbid"
 
 
 # --- MetaAgent Configuration ---
@@ -86,7 +122,7 @@ class AgentProfileSchema(BaseModel):
     )
     code_map: Dict[str, str] = Field(
         ...,
-        description="Maps conceptual module names in execution_sequence to their full Python import paths (e.g., 'context_analyzer': 'xanflow.core.context_analyzer.ContextAnalyzer')."
+        description="Maps conceptual module names in execution_sequence to their full Python import paths (e.g., 'context_analyzer': 'zanalytics.core.context_analyzer.ContextAnalyzer')."
     )
     meta_agent: MetaAgentConfig = Field(
         default_factory=MetaAgentConfig,
@@ -181,15 +217,15 @@ execution_sequence:
   # Executor & JournalLogger are typically invoked by the orchestrator based on pipeline outcome
 
 code_map:
-  data_enricher: xanflow.quarry_tools.data_enricher.DataEnricher # Conceptual
-  context_analyzer: xanflow.core.context_analyzer.ContextAnalyzer
-  liquidity_engine: xanflow.core.liquidity_engine.LiquidityEngine
-  structure_validator: xanflow.core.structure_validator.StructureValidator
-  fvg_locator: xanflow.core.fvg_locator.FVGLocator
-  risk_manager: xanflow.core.risk_manager.RiskManager
-  confluence_stacker: xanflow.core.confluence_stacker.ConfluenceStacker
-  executor: xanflow.core.executor.Executor
-  journal_logger: xanflow.core.journal_logger.JournalLogger
+  data_enricher: zanalytics.quarry_tools.data_enricher.DataEnricher # Conceptual
+  context_analyzer: zanalytics.core.context_analyzer.ContextAnalyzer
+  liquidity_engine: zanalytics.core.liquidity_engine.LiquidityEngine
+  structure_validator: zanalytics.core.structure_validator.StructureValidator
+  fvg_locator: zanalytics.core.fvg_locator.FVGLocator
+  risk_manager: zanalytics.core.risk_manager.RiskManager
+  confluence_stacker: zanalytics.core.confluence_stacker.ConfluenceStacker
+  executor: zanalytics.core.executor.Executor
+  journal_logger: zanalytics.core.journal_logger.JournalLogger
 
 meta_agent:
   agent_id: "XF_DemoAgent_001"
@@ -258,5 +294,5 @@ structure_validator:
 journaling:
   verbosity: "all_stages"
   enable_zbar_format: true
-  log_directory: "/var/log/xanflow_agents/XF_DemoAgent_001/"
+  log_directory: "/var/log/zanalytics_agents/XF_DemoAgent_001/"
 """
