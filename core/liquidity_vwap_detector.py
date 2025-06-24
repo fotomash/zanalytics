@@ -2,15 +2,21 @@
 # Production-grade VWAP-based liquidity sweep detection
 
 import pandas as pd
+from typing import Optional, Dict
 
 class LiquidityVWAPDetector:
     ABOVE_SWEEP = "Above VWAP Sweep"
     BELOW_SWEEP = "Below VWAP Sweep"
     NO_SWEEP = "None"
-    
-    def __init__(self, std_window=30, threshold_factor=1.5):
-        self.std_window = std_window
-        self.threshold_factor = threshold_factor
+
+    DEFAULT_STD_WINDOW = 30
+    DEFAULT_THRESHOLD_FACTOR = 1.5
+
+    def __init__(self, config: Optional[Dict] = None):
+        if config is None:
+            config = {}
+        self.std_window = config.get("std_window", self.DEFAULT_STD_WINDOW)
+        self.threshold_factor = config.get("threshold_factor", self.DEFAULT_THRESHOLD_FACTOR)
 
     def compute_vwap(self, df):
         # Check for empty or malformed DataFrame input

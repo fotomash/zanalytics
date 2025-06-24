@@ -17,6 +17,9 @@ import httpx  # For live FX rate fetch
 from core.microstructure_filter import MicrostructureFilter
 from core.advanced_stoploss_lots_engine import calculate_atr  # or adjust import if calculate_atr is in this module
 
+# Default ATR stop parameters
+DEFAULT_ATR_PERIOD = 14
+DEFAULT_ATR_MULTIPLIER = 1.5
 # --- Define Dummy Fallback Functions ---
 # These are defined first, outside the try/except blocks.
 
@@ -292,7 +295,8 @@ def calculate_sl_and_risk(
     if risk_config is None: risk_config = {}
     if volatility_config is None: volatility_config = {}
     # --- End Parameter Defaults ---
-    atr_period = atr_config.get('period', 14); atr_multiplier = atr_config.get('multiplier', 1.5)
+    atr_period = atr_config.get('period', DEFAULT_ATR_PERIOD)
+    atr_multiplier = atr_config.get('multiplier', DEFAULT_ATR_MULTIPLIER)
     try:
         # Validate Inputs
         if not isinstance(entry_time, datetime) or entry_time.tzinfo is None:
