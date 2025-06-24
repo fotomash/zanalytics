@@ -8,7 +8,7 @@ from datetime import datetime
 @dataclass
 class VectorAgent:
     """Base class for ncOS vector-native agents"""
-    agent_id: str
+    agent_id: str = ""
     vector_dim: int = 1536
     weights: Dict[str, float] = field(default_factory=dict)
     session_state: Dict[str, Any] = field(default_factory=dict)
@@ -31,10 +31,10 @@ class VectorAgent:
 
 class BozenkaAgent(VectorAgent):
     """Microstructure Signal Validator - Vector Native"""
-    
-    def __init__(self):
+
+    def __init__(self, agent_id: str = "bozenka"):
         super().__init__(
-            agent_id="bozenka",
+            agent_id=agent_id,
             weights={
                 "spring": 1.2,
                 "choch_trap": 0.9,
@@ -82,9 +82,9 @@ class BozenkaAgent(VectorAgent):
 
 class StefaniaAgent(VectorAgent):
     """Reputation Auditor - Trust Scoring via Embeddings"""
-    
-    def __init__(self):
-        super().__init__(agent_id="stefania")
+
+    def __init__(self, agent_id: str = "stefania"):
+        super().__init__(agent_id=agent_id)
         self.trust_memory = []  # Session-only memory
         
     async def process_event(self, event: Dict[str, Any]) -> Dict[str, Any]:
@@ -228,10 +228,7 @@ class ncOSAgentOrchestrator:
         agents = {}
         for agent_name, agent_class in agent_map.items():
             if self.config.get('agents', {}).get(agent_name, {}).get('active', True):
-                try:
-                    agents[agent_name] = agent_class(agent_id=agent_name)
-                except TypeError:
-                    agents[agent_name] = agent_class()
+                agents[agent_name] = agent_class(agent_id=agent_name)
                 
         return agents
         
