@@ -244,6 +244,7 @@ def upload_data():
 
 async def process_data_event(event: DataFlowEvent):
     """Process incoming data events and update API state"""
+<<<<<<< HEAD
     try:
         # Update cached data
         api_state.update_data(event.symbol, event.timeframe, event.data)
@@ -298,6 +299,7 @@ def setup_data_integration():
             'rysiek': {'active': True}
         }
     }
+<<<<<<< HEAD
 
     # Create directories if they don't exist
     for directory in config['watch_directories']:
