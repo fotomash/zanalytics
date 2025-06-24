@@ -2,6 +2,7 @@
 import os
 import pytest
 
+<<<<<<< HEAD
 # Set test mode BEFORE any imports
 os.environ['ZANALYTICS_TEST_MODE'] = '1'
 
