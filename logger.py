@@ -10,6 +10,13 @@ def setup_logging(config_path: str = "config/logging.json", default_level: int =
     if path.is_file():
         with open(path, "r") as f:
             config = json.load(f)
+
+        # Ensure directories for file handlers exist
+        file_handler = config.get("handlers", {}).get("file", {})
+        filename = file_handler.get("filename")
+        if filename:
+            Path(filename).parent.mkdir(parents=True, exist_ok=True)
+
         logging.config.dictConfig(config)
     else:
         logging.basicConfig(
