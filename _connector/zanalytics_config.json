@@ -1,0 +1,101 @@
+{
+  "watch_directories": [
+    "./",
+    "./data",
+    "./exports",
+    "./csv_files"
+  ],
+  "agents": {
+    "micro_strategist": {
+      "active": true,
+      "symbols": [
+        "EURUSD",
+        "GBPUSD",
+        "XAUUSD",
+        "USDJPY"
+      ],
+      "timeframes": [
+        "M1",
+        "M5",
+        "M15",
+        "H1"
+      ]
+    },
+    "macro_analyzer": {
+      "active": true,
+      "symbols": [
+        "EURUSD",
+        "GBPUSD",
+        "XAUUSD"
+      ],
+      "timeframes": [
+        "H1",
+        "H4",
+        "D1"
+      ]
+    },
+    "risk_manager": {
+      "active": true,
+      "symbols": [
+        "EURUSD",
+        "GBPUSD",
+        "XAUUSD",
+        "USDJPY"
+      ],
+      "timeframes": [
+        "all"
+      ]
+    },
+    "trade_journalist": {
+      "active": true,
+      "symbols": [
+        "EURUSD",
+        "GBPUSD",
+        "XAUUSD"
+      ],
+      "timeframes": [
+        "all"
+      ]
+    },
+    "smc_orchestrator": {
+      "active": true,
+      "symbols": [
+        "EURUSD",
+        "GBPUSD",
+        "XAUUSD"
+      ],
+      "timeframes": [
+        "M1",
+        "M5",
+        "M15",
+        "H1"
+      ]
+    }
+  },
+  "data_triggers": {
+    "new_csv_data": [
+      "process_ohlc",
+      "update_indicators",
+      "generate_signals"
+    ],
+    "new_analysis_data": [
+      "update_agents",
+      "generate_signals"
+    ],
+    "tick_data": [
+      "microstructure_analysis",
+      "spread_analysis"
+    ]
+  },
+  "real_time": {
+    "enable": true,
+    "update_interval": 1.0,
+    "batch_size": 100,
+    "max_cache_size": 1000
+  },
+  "output": {
+    "signals_directory": "./signals",
+    "analysis_directory": "./analysis_output",
+    "logs_directory": "./logs"
+  }
+}
