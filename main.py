@@ -2,6 +2,7 @@
 from fastapi import FastAPI, Depends, HTTPException, Request, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security.api_key import APIKeyHeader
+from core.orchestrator import handle_user_input
 
 API_KEY_NAME = "X-API-Key"
 api_key_header = APIKeyHeader(name=API_KEY_NAME, auto_error=False)
@@ -33,8 +34,6 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
-from fastapi import HTTPException, Request
-from core.orchestrator import handle_user_input
 
 @app.post("/log", tags=["intents"], dependencies=[Depends(verify_api_key)])
 async def log_intent(request: Request):
