@@ -287,9 +287,71 @@ class WyckoffStateMachine:
                 if self.trading_range["resistance"] is not None and self.zbars_context[index].high > self.trading_range["resistance"]:
                     next_phase_candidate = WyckoffPhase.ACCUMULATION_D
                 else: log.warning(f"SOS at {index} did not clearly break TR resistance for ACC_D.")
-        
-        # TODO: Implement transitions for ACC_D -> ACC_E
-        # TODO: Implement all Distribution phase transitions (DIST_A -> E)
+
+        elif self.current_phase == WyckoffPhase.ACCUMULATION_D:
+            # Phase E typically begins after a successful breakout and backup
+            # to the original resistance (Creek).  Either a strong SOS that
+            # closes well above resistance or a Back-Up (BU) that retests the
+            # breakout level can trigger the trend phase.
+            if event_type == "BU":
+                if (
+                    self.trading_range.get("resistance") is not None
+                    and self.zbars_context[index].low
+                    >= self.trading_range["resistance"] * 0.98
+                ):
+                    next_phase_candidate = WyckoffPhase.ACCUMULATION_E
+                else:
+                    log.warning(
+                        f"BU at {index} did not retest breakout zone properly for ACC_E."
+                    )
+            elif event_type == "SOS":
+                if (
+                    self.trading_range.get("resistance") is not None
+                    and self.zbars_context[index].close
+                    > self.trading_range["resistance"]
+                ):
+                    next_phase_candidate = WyckoffPhase.ACCUMULATION_E
+                else:
+                    log.warning(
+                        f"SOS at {index} not a convincing breakout for ACC_E."
+                    )
+
+        elif self.current_phase == WyckoffPhase.DISTRIBUTION_A:
+            if event_type == "AR_dist" and self.trading_range.get("resistance") is not None:
+                # AR_dist should define the lower boundary of the TR
+                self.last_significant_low_idx = index
+                next_phase_candidate = WyckoffPhase.DISTRIBUTION_B
+
+        elif self.current_phase == WyckoffPhase.DISTRIBUTION_B:
+            if event_type in ("UT", "UT_Weak"):
+                if (
+                    self.trading_range.get("resistance") is not None
+                    and index > 0
+                    and self.zbars_context[index - 1].high > self.trading_range["resistance"]
+                    and self.zbars_context[index].close < self.trading_range["resistance"]
+                ):
+                    next_phase_candidate = WyckoffPhase.DISTRIBUTION_C
+                else:
+                    log.warning(
+                        f"{event_type} at {index} failed breakout criteria for DIST_C."
+                    )
+            elif event_type == "ST_dist":
+                # remain in B while testing upper range
+                if self.trading_range.get("resistance") is not None:
+                    next_phase_candidate = WyckoffPhase.DISTRIBUTION_B
+
+        elif self.current_phase == WyckoffPhase.DISTRIBUTION_C:
+            if event_type in ("UTAD", "Test_UTAD", "LPSY", "SOW"):
+                next_phase_candidate = WyckoffPhase.DISTRIBUTION_D
+
+        elif self.current_phase == WyckoffPhase.DISTRIBUTION_D:
+            if event_type == "SOW_break" and self.trading_range.get("support") is not None:
+                if self.zbars_context[index].close < self.trading_range["support"]:
+                    next_phase_candidate = WyckoffPhase.DISTRIBUTION_E
+                else:
+                    log.warning(
+                        f"SOW_break at {index} did not close below support for DIST_E."
+                    )
 
         # Fallback to basic rule if no specific contextual logic matched but event is in rules
         if next_phase_candidate is None and self.current_phase in self.rules:
