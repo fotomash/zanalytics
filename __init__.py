@@ -5,30 +5,45 @@ __version__ = "5.2.1"
 __author__ = "ZANALYTICS AI Stack"
 
 import logging
+import os
 from .logger import setup_logging
 
-# Initialize global logging using config/logging.json
-setup_logging()
-logging.getLogger(__name__).info("ZANALYTICS package initialized.")
+# Initialize logging. In lightweight test mode we avoid loading the JSON
+# configuration and simply set up basic logging to STDOUT.
+if os.environ.get("ZANALYTICS_TEST_MODE") == "1":
+    logging.basicConfig(
+        level=logging.INFO,
+        format="%(asctime)s - %(levelname)s - [%(name)s:%(lineno)d] - %(message)s",
+    )
+else:
+    setup_logging()
+    logging.getLogger(__name__).info("ZANALYTICS package initialized.")
 
-# Expose core agent APIs
-from .agent_initializer import initialize_agents
-from .agent_microstrategist import MicroStrategistAgent
-from .agent_macroanalyser import MacroAnalyzerAgent
-from .agent_riskmanager import RiskManagerAgent
-from .agent_tradejournalist import TradeJournalistAgent
-from .agent_wyckoffspecialist import WyckoffSpecialistAgent
-from .agent_semanticdss import SemanticDecisionSupportAgent
+# During lightweight test runs we avoid importing heavy modules that may
+# introduce additional dependencies. Set `ZANALYTICS_TEST_MODE=1` in the
+# environment to enable this behavior.
+if os.environ.get("ZANALYTICS_TEST_MODE") != "1":
+    # Expose core agent APIs
+    from .agent_initializer import initialize_agents
+    from .agent_microstrategist import MicroStrategistAgent
+    from .agent_macroanalyser import MacroAnalyzerAgent
+    from .agent_riskmanager import RiskManagerAgent
+    from .agent_tradejournalist import TradeJournalistAgent
+    from .agent_wyckoffspecialist import WyckoffSpecialistAgent
+    from .agent_semanticdss import SemanticDecisionSupportAgent
 
-__all__ = [
-    "initialize_agents",
-    "MicroStrategistAgent",
-    "MacroAnalyzerAgent",
-    "RiskManagerAgent",
-    "TradeJournalistAgent",
-    "WyckoffSpecialistAgent",
-    "SemanticDecisionSupportAgent"
-]
+    __all__ = [
+        "initialize_agents",
+        "MicroStrategistAgent",
+        "MacroAnalyzerAgent",
+        "RiskManagerAgent",
+        "TradeJournalistAgent",
+        "WyckoffSpecialistAgent",
+        "SemanticDecisionSupportAgent",
+    ]
+else:
+    __all__ = []
+
 
 # YAML-first orchestration:
 # All agents above are controlled via YAML profiles located in /profiles/.
