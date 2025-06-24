@@ -1,6 +1,5 @@
-
 #!/usr/bin/env python3
-# start_zanalytics_awareness.py - One-click startup for ZANALYTICS Data Awareness
+# start_zanalytics_awareness.py - v2 (Robust Startup)
 
 import asyncio
 import sys
@@ -8,21 +7,15 @@ import os
 from pathlib import Path
 import logging
 import json
-from datetime import datetime
 
-# Add current directory to path for imports
-sys.path.append(str(Path(__file__).parent))
-
+# --- ROBUST PATH FIX ---
+# This ensures that no matter where you run it from, it finds the adapter
 try:
-    from zanalytics_adapter import ZAnalyticsDataBridge
-    from data_flow_manager import DataFlowManager
-except ImportError as e:
-    print(f"❌ Import Error: {e}")
-    print("Make sure all required files are in the same directory:")
-    print("  - zanalytics_adapter.py")
-    print("  - data_flow_manager.py")
-    print("  - zanalytics_config.json")
-    sys.exit(1)
+    script_dir = Path(__file__).resolve().parent
+except NameError:
+    script_dir = Path(os.getcwd())
+sys.path.insert(0, str(script_dir))
+# --- END PATH FIX ---
 
 def setup_logging():
     """Setup logging configuration"""
@@ -38,20 +31,17 @@ def setup_logging():
 
 def check_dependencies():
     """Check if required dependencies are installed"""
-    required_packages = [
-        'pandas', 'watchdog', 'asyncio', 'pathlib'
-    ]
-
+    required_packages = ['pandas', 'watchdog']
     missing = []
     for package in required_packages:
         try:
             __import__(package)
         except ImportError:
             missing.append(package)
-
+    
     if missing:
         print(f"❌ Missing dependencies: {', '.join(missing)}")
-        print("Install with: pip install " + " ".join(missing))
+        print(f"   Install with: pip install {' '.join(missing)}")
         return False
     return True
 
@@ -70,61 +60,47 @@ def print_banner():
     """
     print(banner)
 
-def print_status_dashboard():
-    """Print current system status"""
-    try:
-        if os.path.exists('zanalytics_config.json'):
-            with open('zanalytics_config.json', 'r') as f:
-                config = json.load(f)
-
-            print("\n📋 CURRENT CONFIGURATION:")
-            print(f"   📁 Watch Directories: {', '.join(config.get('watch_directories', []))}")
-            print(f"   🤖 Active Agents: {len([a for a in config.get('agents', {}).values() if a.get('active')])}")
-            print(f"   📈 Symbols: {len(set().union(*[a.get('symbols', []) for a in config.get('agents', {}).values()]))}")
-            print(f"   ⏱️  Update Interval: {config.get('real_time', {}).get('update_interval', 1.0)}s")
-    except Exception as e:
-        print(f"   ⚠️  Could not load config: {e}")
-
 async def main():
     """Main startup function"""
     print_banner()
-
-    # Check dependencies
+    
     if not check_dependencies():
         return
-
-    # Setup logging
+    
     setup_logging()
     logger = logging.getLogger(__name__)
-
-    # Print current status
-    print_status_dashboard()
-
+    
     print("\n🔧 INITIALIZING SYSTEM...")
-
+    
     try:
-        # Initialize the bridge
-        bridge = ZAnalyticsDataBridge()
+        # --- MODIFICATION HERE ---
+        # We now import and initialize inside the try block for better error handling
+        from zanalytics_adapter import ZAnalyticsDataBridge, ZANALYTICS_FOUND
+        
+        if not ZANALYTICS_FOUND:
+             logger.error("ZANALYTICS core package not found. Please ensure 'zanalytics_main' exists.")
+             return
 
+        bridge = ZAnalyticsDataBridge()
+        
         print("✅ ZANALYTICS Bridge initialized")
         print("✅ Agents loaded and ready")
         print("✅ Data flow manager configured")
-
+        
         print("\n🚀 STARTING DATA AWARENESS...")
         print("   Press Ctrl+C to stop")
         print("   Check 'zanalytics_awareness.log' for detailed logs")
         print("\n" + "="*60)
-
-        # Start the data awareness system
+        
         await bridge.start_data_awareness()
-
+        
     except KeyboardInterrupt:
         print("\n\n🛑 SHUTDOWN INITIATED...")
         print("✅ System stopped gracefully")
         logger.info("ZANALYTICS Data Awareness stopped by user")
     except Exception as e:
-        print(f"\n❌ ERROR: {e}")
-        logger.error(f"System error: {e}")
+        print(f"\n❌ CRITICAL ERROR DURING STARTUP: {e}")
+        logger.critical(f"System could not start: {e}", exc_info=True)
         sys.exit(1)
 
 if __name__ == "__main__":
