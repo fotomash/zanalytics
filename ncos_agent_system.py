@@ -239,11 +239,16 @@ class ncOSAgentOrchestrator:
         """Process event through all agents and compute consensus"""
         self.session_state['event_count'] += 1
         
-        # Gather all agent responses
+        # Gather all agent responses concurrently
         agent_responses = {}
-        for agent_name, agent in self.agents.items():
-            response = await agent.process_event(event)
-            agent_responses[agent_name] = response
+        tasks = [agent.process_event(event) for agent in self.agents.values()]
+        results = await asyncio.gather(*tasks, return_exceptions=True)
+
+        for agent_name, result in zip(self.agents.keys(), results):
+            if isinstance(result, Exception):
+                agent_responses[agent_name] = {"error": str(result)}
+            else:
+                agent_responses[agent_name] = result
             
         # Compute consensus vector
         consensus_vector = np.zeros(1536)
