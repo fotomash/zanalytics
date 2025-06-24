@@ -24,6 +24,11 @@ try: from confirmation_engine_smc import confirm_smc_entry
 except ImportError: confirm_smc_entry = None; print("[ERROR][AdvSMCOrch] confirmation_engine_smc.py not found!")
 try: from entry_executor_smc import execute_smc_entry
 except ImportError: execute_smc_entry = None; print("[ERROR][AdvSMCOrch] entry_executor_smc.py not found!")
+try:
+    from core.volatility_engine import get_volatility_profile
+except Exception:
+    get_volatility_profile = None
+    print("[WARN][AdvSMCOrch] volatility_engine not available.")
 
 # --- Import the POI Tap Checker --- ### MODIFICATION START ###
 try: from poi_hit_watcher_smc import check_poi_tap_smc
@@ -85,6 +90,7 @@ def run_advanced_smc_strategy(
         "target_timestamp": target_timestamp.strftime('%Y-%m-%d %H:%M:%S'), # Keep for reference
         "steps": [],
         "final_entry_result": None,
+        "context": {},
         "error": None
     }
 
@@ -229,6 +235,23 @@ def run_advanced_smc_strategy(
         if not phase_check_passed:
             continue
 
+        # --- Volatility Profile Check ---
+        vol_regime = "Normal"
+        if get_volatility_profile:
+            try:
+                vol_profile = get_volatility_profile(
+                    all_tf_data[execution_tf],
+                    config=variant_config.get("volatility_config", {})
+                )
+                orchestration_result["steps"].append({"step": "Volatility Profile", "result": vol_profile})
+                vol_regime = vol_profile.get("volatility_regime", "Normal") or "Normal"
+            except Exception as e:
+                orchestration_result["steps"].append({"step": "Volatility Profile", "status": "Failed", "error": str(e)})
+                print(f"[WARN][AdvSMCOrch] Volatility profile check failed: {e}")
+        else:
+            orchestration_result["steps"].append({"step": "Volatility Profile", "status": "Skipped", "reason": "volatility_engine not available"})
+
+        orchestration_result["context"]["volatility_regime"] = vol_regime
 
         # --- 5. Run Confirmation Engine (using sliced data) --- ### MODIFICATION START ###
         confirmation_result = None
