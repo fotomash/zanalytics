@@ -1,0 +1,42 @@
+# ncOS Agent System Configuration
+ncos_agents:
+  vector_dim: 1536
+  session_mode: single
+  orchestration: vector_native
+  
+  agent_profiles:
+    bozenka:  # Microstructure Signal Validator
+      vector_operations:
+        - microstructure_embedding
+        - wyckoff_phase_projection
+        - spread_compression_vector
+      trigger_weights:
+        spring: 1.2
+        choch_trap: 0.9
+        bos_confirm: 0.5
+        spread_compression: 0.3
+        reversal_tick: 0.2
+      
+    stefania:  # Reputation/Trust Scoring
+      vector_operations:
+        - historical_performance_embedding
+        - trust_score_projection
+        - journal_sentiment_vector
+      
+    lusia:  # Semantic Confluence Engine
+      vector_operations:
+        - indicator_alignment_embedding
+        - dss_slope_vector
+        - confluence_projection
+        
+    zdzisiek:  # Risk Monitor
+      vector_operations:
+        - volatility_embedding
+        - spread_risk_vector
+        - position_size_projection
+        
+    rysiek:  # HTF Phase Tracker
+      vector_operations:
+        - htf_structure_embedding
+        - wyckoff_phase_vector
+        - trend_strength_projection
