@@ -107,6 +107,57 @@ def check_engulfing_pattern(candle: pd.Series, previous_candle: pd.Series, direc
         return False # Error during check
 
 
+def verify_fvg_retest(df: pd.DataFrame, poi_range: List[float], poi_timestamp: pd.Timestamp) -> bool:
+    """Return True if a candle body retests the FVG zone after it formed."""
+    try:
+        low, high = min(poi_range), max(poi_range)
+        df_slice = df[df.index > poi_timestamp]
+        if df_slice.empty:
+            return False
+        body_mask = (
+            df_slice['Open'].between(low, high) |
+            df_slice['Close'].between(low, high)
+        )
+        return body_mask.any()
+    except Exception:
+        return False
+
+
+def check_no_body_engulf(curr: pd.Series, prev: pd.Series) -> bool:
+    """Ensures the current candle body does not engulf the previous body."""
+    if curr is None or prev is None:
+        return False
+    try:
+        curr_high = max(curr['Open'], curr['Close'])
+        curr_low = min(curr['Open'], curr['Close'])
+        prev_high = max(prev['Open'], prev['Close'])
+        prev_low = min(prev['Open'], prev['Close'])
+        return not (curr_low <= prev_low and curr_high >= prev_high)
+    except Exception:
+        return False
+
+
+def check_pinbar(candle: pd.Series, direction: str, body_ratio: float = 0.3) -> bool:
+    """Simple pinbar check used by Mentfx variant."""
+    if candle is None:
+        return False
+    try:
+        high, low = candle['High'], candle['Low']
+        open_, close = candle['Open'], candle['Close']
+        body = abs(close - open_)
+        rng = high - low
+        if rng == 0 or body / rng > body_ratio:
+            return False
+        upper = high - max(open_, close)
+        lower = min(open_, close) - low
+        if direction == 'buy':
+            return lower > upper * 2
+        else:
+            return upper > lower * 2
+    except Exception:
+        return False
+
+
 def execute_smc_entry(
     ltf_data: pd.DataFrame,
     confirmation_data: Dict,
@@ -304,18 +355,21 @@ def execute_smc_entry(
 
         elif strategy_variant == 'MAZ2':
             # "Must re-test refined FVG (no body engulf allowed)"
-            # TODO: MAZ2 - Implement FVG re-test check. Placeholder assumes simple mitigation is ok for now.
-            # TODO: MAZ2 - Implement 'no body engulf' check.
             if confirmation_data.get("ltf_poi_type") == 'FVG':
-                 mitigation_valid = True # Placeholder: Assume FVG mitigation is valid
-                 entry_price = (ltf_poi_low + ltf_poi_high) / 2 # Enter FVG midpoint
-                 sl_price = ltf_poi_low - sl_buffer_price if direction == 'buy' else ltf_poi_high + sl_buffer_price # SL outside FVG
-                 entry_type_detail = "MAZ2: FVG Mitigation (Checks Pending)"
-                 print(f"[DEBUG] MAZ2 Logic: FVG mitigation accepted (placeholder). Entry={entry_price}, SL={sl_price}")
-                 print("[WARN] MAZ2 specific checks (FVG re-test, no body engulf) not implemented.")
+                fvg_ok = verify_fvg_retest(execution_ltf_data, ltf_poi_range, ltf_poi_ts)
+                body_ok = check_no_body_engulf(mitigation_candle, prev_mitigation_candle)
+                if fvg_ok and body_ok:
+                    mitigation_valid = True
+                    entry_price = (ltf_poi_low + ltf_poi_high) / 2
+                    sl_price = ltf_poi_low - sl_buffer_price if direction == 'buy' else ltf_poi_high + sl_buffer_price
+                    entry_type_detail = "MAZ2: FVG retest confirmed"
+                    print(f"[DEBUG] MAZ2 Logic: FVG retest + body check passed. Entry={entry_price}, SL={sl_price}")
+                else:
+                    result["error"] = "MAZ2 confluence failed: FVG retest or body engulf invalid"
+                    print(f"[DEBUG] {result['error']}")
             else:
-                 result["error"] = "MAZ2 variant requires FVG type LTF POI (based on summary)."
-                 print(f"[DEBUG] {result['error']}")
+                result["error"] = "MAZ2 variant requires FVG type LTF POI."
+                print(f"[DEBUG] {result['error']}")
 
 
         elif strategy_variant == 'TMC':
@@ -325,42 +379,54 @@ def execute_smc_entry(
                  result["error"] = "TMC variant requires BOS confirmation."
                  print(f"[DEBUG] {result['error']}")
             else:
-                 # TODO: TMC - Implement actual confluence check using confluence_data
-                 tmc_confluence_check = True # Placeholder
-                 if tmc_confluence_check:
-                     mitigation_valid = True
-                     entry_price = mitigation_candle['Close'] # Example: Enter on close of mitigation candle
-                     sl_price = mitigation_candle['Low'] - sl_buffer_price if direction == 'buy' else mitigation_candle['High'] + sl_buffer_price # SL below/above mitigation candle
-                     entry_type_detail = "TMC: BOS Confirmed + Mitigation (Confluence Placeholder)"
-                     print(f"[DEBUG] TMC Logic: BOS confirmed, mitigation accepted (confluence placeholder). Entry={entry_price}, SL={sl_price}")
-                     print("[WARN] TMC confluence check not implemented.")
+                 dss_min = risk_model_config.get('tmc_dss_slope_min', 0.05)
+                 dss_ok = confluence_data and confluence_data.get('dss_slope', 0) >= dss_min
+                 rsi_sig = confluence_data.get('rsi_divergence') if confluence_data else None
+                 if direction == 'buy':
+                     rsi_ok = rsi_sig in ['Bullish', 'HiddenBullish']
                  else:
-                     result["error"] = "TMC variant confluence check failed (placeholder)."
+                     rsi_ok = rsi_sig in ['Bearish', 'HiddenBearish']
+                 if dss_ok and rsi_ok:
+                     mitigation_valid = True
+                     entry_price = mitigation_candle['Close']
+                     sl_price = mitigation_candle['Low'] - sl_buffer_price if direction == 'buy' else mitigation_candle['High'] + sl_buffer_price
+                     entry_type_detail = "TMC: BOS + indicator confluence"
+                     print(f"[DEBUG] TMC Logic: Confluence passed. Entry={entry_price}, SL={sl_price}")
+                 else:
+                     result["error"] = "TMC confluence check failed"
                      print(f"[DEBUG] {result['error']}")
 
 
         elif strategy_variant == 'Mentfx':
             # "Requires DSS/RSI + Pinbar or engulfing confirmation"
-            # TODO: Mentfx - Implement actual confluence check (DSS/RSI) using confluence_data
-            mentfx_confluence_check = True # Placeholder
+            dss_thr = risk_model_config.get('mentfx_dss_slope_min', 0.1)
+            rsi_ob = risk_model_config.get('mentfx_rsi_overbought', 70)
+            rsi_os = risk_model_config.get('mentfx_rsi_oversold', 30)
+            dss_val = confluence_data.get('dss_slope', 0) if confluence_data else 0
+            rsi_val = confluence_data.get('rsi_value') if confluence_data else None
+            dss_ok = dss_val >= dss_thr if direction == 'buy' else dss_val <= -dss_thr
+            if rsi_val is not None:
+                if direction == 'buy':
+                    rsi_ok = rsi_val <= rsi_os
+                else:
+                    rsi_ok = rsi_val >= rsi_ob
+            else:
+                rsi_ok = True
+            mentfx_confluence_check = dss_ok and rsi_ok
             if not mentfx_confluence_check:
-                 result["error"] = "Mentfx variant confluence check failed (placeholder)."
+                 result["error"] = "Mentfx variant confluence check failed"
                  print(f"[DEBUG] {result['error']}")
             else:
-                 # Check for engulfing pattern on mitigation candle
                  is_engulfing = check_engulfing_pattern(mitigation_candle, prev_mitigation_candle, direction)
-                 # TODO: Mentfx - Implement Pinbar check on mitigation candle
-                 is_pinbar = False # Placeholder
+                 is_pinbar = check_pinbar(mitigation_candle, direction)
 
                  if is_engulfing or is_pinbar:
                      mitigation_valid = True
-                     entry_price = mitigation_candle['Close'] # Enter on close of confirmation candle
-                     sl_price = mitigation_candle['Low'] - sl_buffer_price if direction == 'buy' else mitigation_candle['High'] + sl_buffer_price # SL below/above confirmation candle
+                     entry_price = mitigation_candle['Close']
+                     sl_price = mitigation_candle['Low'] - sl_buffer_price if direction == 'buy' else mitigation_candle['High'] + sl_buffer_price
                      pattern = "Engulfing" if is_engulfing else "Pinbar"
-                     entry_type_detail = f"Mentfx: Mitigation + {pattern} (Confluence Placeholder)"
-                     print(f"[DEBUG] Mentfx Logic: Mitigation + {pattern} ok (confluence placeholder). Entry={entry_price}, SL={sl_price}")
-                     print("[WARN] Mentfx confluence and pinbar checks not fully implemented.")
-
+                     entry_type_detail = f"Mentfx: Mitigation + {pattern}"
+                     print(f"[DEBUG] Mentfx Logic: Mitigation + {pattern} ok. Entry={entry_price}, SL={sl_price}")
                  else:
                      result["error"] = "Mentfx variant requires Engulfing or Pinbar at mitigation."
                      print(f"[DEBUG] {result['error']}")
