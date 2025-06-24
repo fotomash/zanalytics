@@ -53,6 +53,15 @@ def scan_confluences(
     dss_thr = thresholds.get('dss_slope_min', 0.0)
     dss_slope = confluence_data.get('dss_slope')
     report['dss_ok'] = dss_slope is not None and not pd.isna(dss_slope) and dss_slope >= dss_thr
+    # Variant-specific flags passed via confluence_data
+    if 'fvg_retest_ok' in confluence_data:
+        report['fvg_retest_ok'] = bool(confluence_data['fvg_retest_ok'])
+    if 'bos_confirmed' in confluence_data:
+        report['bos_confirmed'] = bool(confluence_data['bos_confirmed'])
+    if 'rsi_ok' in confluence_data:
+        report['rsi_ok'] = bool(confluence_data['rsi_ok'])
+    if 'pattern_ok' in confluence_data:
+        report['pattern_ok'] = bool(confluence_data['pattern_ok'])
     log.debug(f"Confluence report: {report}")
     return report
 
@@ -242,6 +251,19 @@ def execute_smc_entry(
     account_size = risk_model_config.get('account_size', 100000)
     risk_percent = risk_model_config.get('risk_percent', 1.0)
 
+    # Confluence options (nested dictionaries allowed)
+    maz2_cfg = risk_model_config.get('maz2', {})
+    maz2_fvg_required = maz2_cfg.get('fvg_retest_required', True)
+    maz2_allow_engulf = maz2_cfg.get('allow_body_engulf', False)
+
+    tmc_require_bos = risk_model_config.get('tmc_require_bos', True)
+    tmc_dss_min = risk_model_config.get('tmc_dss_slope_min', 0.05)
+
+    mentfx_dss_min = risk_model_config.get('mentfx_dss_slope_min', 0.1)
+    mentfx_rsi_ob = risk_model_config.get('mentfx_rsi_overbought', 70)
+    mentfx_rsi_os = risk_model_config.get('mentfx_rsi_oversold', 30)
+    mentfx_pinbar_ratio = risk_model_config.get('mentfx_pinbar_body_ratio', 0.3)
+
     # Dynamically adjust risk if entry is detected as counter-trend scalp
     is_scalp_mode = confirmation_data.get("suggested_scalp_mode", False)
     if is_scalp_mode:
@@ -327,6 +349,8 @@ def execute_smc_entry(
             result["error"] = "LTF POI was not mitigated in the provided LTF data."
             return result
 
+        variant_checks = {}
+
         print(f"[DEBUG] LTF POI Mitigation detected by candle at: {mitigation_candle.name}")
         result["entry_candle_timestamp"] = mitigation_candle.name.strftime('%Y-%m-%d %H:%M:%S')
 
@@ -358,14 +382,15 @@ def execute_smc_entry(
         elif strategy_variant == 'MAZ2':
             # "Must re-test refined FVG (no body engulf allowed)"
             if confirmation_data.get("ltf_poi_type") == 'FVG':
-                fvg_ok = verify_fvg_retest(execution_ltf_data, ltf_poi_range, ltf_poi_ts)
-                body_ok = check_no_body_engulf(mitigation_candle, prev_mitigation_candle)
+                fvg_ok = True if not maz2_fvg_required else verify_fvg_retest(execution_ltf_data, ltf_poi_range, ltf_poi_ts)
+                body_ok = True if maz2_allow_engulf else check_no_body_engulf(mitigation_candle, prev_mitigation_candle)
+                variant_checks['fvg_retest_ok'] = fvg_ok
                 if fvg_ok and body_ok:
                     mitigation_valid = True
                     entry_price = (ltf_poi_low + ltf_poi_high) / 2
                     sl_price = ltf_poi_low - sl_buffer_price if direction == 'buy' else ltf_poi_high + sl_buffer_price
-                    entry_type_detail = "MAZ2: FVG retest confirmed"
-                    print(f"[DEBUG] MAZ2 Logic: FVG retest + body check passed. Entry={entry_price}, SL={sl_price}")
+                    entry_type_detail = "MAZ2: FVG retest confirmed" if maz2_fvg_required else "MAZ2: Mitigation"
+                    print(f"[DEBUG] MAZ2 Logic: Retest check={fvg_ok}, body_ok={body_ok}. Entry={entry_price}, SL={sl_price}")
                 else:
                     result["error"] = "MAZ2 confluence failed: FVG retest or body engulf invalid"
                     print(f"[DEBUG] {result['error']}")
@@ -376,23 +401,25 @@ def execute_smc_entry(
 
         elif strategy_variant == 'TMC':
             # "Entry only valid after BOS + confluence"
-            # Check if confirmation included BOS
-            if confirmation_data.get("confirmation_type") != "CHoCH+BOS":
+            bos_ok = confirmation_data.get("confirmation_type") == "CHoCH+BOS"
+            variant_checks['bos_confirmed'] = bos_ok
+            if tmc_require_bos and not bos_ok:
                  result["error"] = "TMC variant requires BOS confirmation."
                  print(f"[DEBUG] {result['error']}")
             else:
-                 dss_min = risk_model_config.get('tmc_dss_slope_min', 0.05)
-                 dss_ok = confluence_data and confluence_data.get('dss_slope', 0) >= dss_min
+                 dss_ok = confluence_data and confluence_data.get('dss_slope', 0) >= tmc_dss_min
                  rsi_sig = confluence_data.get('rsi_divergence') if confluence_data else None
                  if direction == 'buy':
                      rsi_ok = rsi_sig in ['Bullish', 'HiddenBullish']
                  else:
                      rsi_ok = rsi_sig in ['Bearish', 'HiddenBearish']
-                 if dss_ok and rsi_ok:
+                 variant_checks['dss_ok'] = dss_ok
+                 variant_checks['rsi_ok'] = rsi_ok
+                 if (not tmc_require_bos or bos_ok) and dss_ok and rsi_ok:
                      mitigation_valid = True
                      entry_price = mitigation_candle['Close']
                      sl_price = mitigation_candle['Low'] - sl_buffer_price if direction == 'buy' else mitigation_candle['High'] + sl_buffer_price
-                     entry_type_detail = "TMC: BOS + indicator confluence"
+                     entry_type_detail = "TMC: BOS + indicator confluence" if bos_ok else "TMC: Indicator confluence"
                      print(f"[DEBUG] TMC Logic: Confluence passed. Entry={entry_price}, SL={sl_price}")
                  else:
                      result["error"] = "TMC confluence check failed"
@@ -401,26 +428,26 @@ def execute_smc_entry(
 
         elif strategy_variant == 'Mentfx':
             # "Requires DSS/RSI + Pinbar or engulfing confirmation"
-            dss_thr = risk_model_config.get('mentfx_dss_slope_min', 0.1)
-            rsi_ob = risk_model_config.get('mentfx_rsi_overbought', 70)
-            rsi_os = risk_model_config.get('mentfx_rsi_oversold', 30)
             dss_val = confluence_data.get('dss_slope', 0) if confluence_data else 0
             rsi_val = confluence_data.get('rsi_value') if confluence_data else None
-            dss_ok = dss_val >= dss_thr if direction == 'buy' else dss_val <= -dss_thr
+            dss_ok = dss_val >= mentfx_dss_min if direction == 'buy' else dss_val <= -mentfx_dss_min
             if rsi_val is not None:
                 if direction == 'buy':
-                    rsi_ok = rsi_val <= rsi_os
+                    rsi_ok = rsi_val <= mentfx_rsi_os
                 else:
-                    rsi_ok = rsi_val >= rsi_ob
+                    rsi_ok = rsi_val >= mentfx_rsi_ob
             else:
                 rsi_ok = True
             mentfx_confluence_check = dss_ok and rsi_ok
+            variant_checks['dss_ok'] = dss_ok
+            variant_checks['rsi_ok'] = rsi_ok
             if not mentfx_confluence_check:
                  result["error"] = "Mentfx variant confluence check failed"
                  print(f"[DEBUG] {result['error']}")
             else:
                  is_engulfing = check_engulfing_pattern(mitigation_candle, prev_mitigation_candle, direction)
-                 is_pinbar = check_pinbar(mitigation_candle, direction)
+                 is_pinbar = check_pinbar(mitigation_candle, direction, body_ratio=mentfx_pinbar_ratio)
+                 variant_checks['pattern_ok'] = is_engulfing or is_pinbar
 
                  if is_engulfing or is_pinbar:
                      mitigation_valid = True
@@ -540,12 +567,13 @@ def execute_smc_entry(
                         latest_atr = None
                 # micro_res may not be defined if microstructure validation not run
                 micro_res = locals().get('micro_res', None)
+                confluence_input = {**(confluence_data or {}), **variant_checks}
                 confluence_report = scan_confluences(
                     structure_break,
                     mitigation_candle,
                     micro_res if 'micro_res' in locals() else None,
                     latest_atr,
-                    confluence_data or {},
+                    confluence_input,
                     risk_model_config or {}
                 )
                 result['confluence_report'] = confluence_report
