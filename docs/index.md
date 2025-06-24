@@ -46,7 +46,7 @@ Use the sidebar to navigate, or jump directly to the [GitHub repo](https://githu
 
 ## Configuration
 This framework uses [Pydantic Settings](https://pydantic-docs.helpmanual.io/usage/settings/) and environment variables to centralize runtime configuration. Copy `.env.example` to `.env` and define:
-- `API_KEY`: Your global service authentication key
+- `ZANALYTICS_API_KEY`: Your global service authentication key
 - `ENVIRONMENT`: `development` or `production`
 - `DATABASE_URL`: Connection string for your persistence layer
 - `LOG_LEVEL`: `DEBUG`, `INFO`, `WARN`, or `ERROR`

@@ -43,7 +43,7 @@ DATABASE_URL=sqlite:///./data.db  # or postgres://... for scale dev
 AWS_REGION=us-east-1              # for AWS Lambda / DynamoDB
 
 # Security
-API_KEY=<your_api_key>            # required for all /invoke requests
+ZANALYTICS_API_KEY=<your_api_key> # required for all /invoke requests
 
 # Deployment
 RAILWAY_PROJECT=<railway_project_id>
@@ -65,7 +65,7 @@ Test the generic `/invoke` endpoint:
 ```bash
 curl -X POST http://localhost:${FASTAPI_PORT}/invoke \
   -H "Content-Type: application/json" \
-  -H "X-API-Key: ${API_KEY}" \
+  -H "X-API-Key: ${ZANALYTICS_API_KEY}" \
   -d '{
     "user_id": "demo_user",
     "business_type": "example",
