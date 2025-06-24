@@ -1,0 +1,17 @@
+{
+  "symbol": "XAUUSD",
+  "entry_price": 3305.91,
+  "breakeven_move": 3305.91,
+  "trail_sl_above": 3307.0,
+  "tp1_band": [
+    3311.2,
+    3311.5
+  ],
+  "final_tp": 3315.0,
+  "max_hold_condition": {
+    "exit_on_close_below": 3307.0,
+    "macd_histogram_rollover": true
+  },
+  "note": "Protective logic applied after HL recovery and MACD histogram flip on M1 timeframe.",
+  "timestamp": "2025-05-21T08:26:43.400994"
+}

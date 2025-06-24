@@ -1,0 +1,7 @@
+predictive_overlays:
+  maturity_score:
+    thresholds:
+      low: 0.4
+      medium: 0.7
+      high: 0.9
+    decay_model: tick_decay_v2

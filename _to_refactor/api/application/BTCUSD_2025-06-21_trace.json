@@ -1,0 +1,68 @@
+{
+  "asset": "BTCUSD",
+  "session_date": "2025-06-21",
+  "strategy_profile": {
+    "name": "ZANFLOW Compose Tracker",
+    "version": "v1.0",
+    "description": "Top-down signal trace using ZANFLOW logical blocks and market structure."
+  },
+  "timeframe_trace": [
+    {
+      "timeframe": "1D",
+      "description": "High Timeframe (HTF) anchor. Used to set overall market bias and identify major structure zones.",
+      "analysis": {
+        "bias": "neutral",
+        "structure": "no recent BOS or CHoCH",
+        "key_levels": [],
+        "volume_profile": "low activity, consistent spread",
+        "commentary": "Daily bars show sideways movement. No actionable trend structure. Ideal for awaiting structure break or catalyst."
+      }
+    },
+    {
+      "timeframe": "4H",
+      "description": "Intermediate anchor. Validates or challenges HTF view. Tracks liquidity sweep attempts, HTF POIs.",
+      "analysis": {
+        "bias": "neutral",
+        "structure": "no significant breakouts or retracements",
+        "poi_detected": false,
+        "commentary": "Market remains balanced within range. No active FVGs or OBs recently created. Watch for session volatility shifts."
+      }
+    },
+    {
+      "timeframe": "1H",
+      "description": "Mid-frame for setup confirmation. Tracks POI interaction, pre-entry structure shifts.",
+      "analysis": {
+        "bias": "neutral",
+        "structure": "no CHoCH or displacement moves",
+        "poi_detected": "old order block, not fresh",
+        "commentary": "One historical order block exists but lacks mitigation. Not a clean setup unless LTF confirms."
+      }
+    },
+    {
+      "timeframe": "15T",
+      "description": "Execution alignment layer. Confirms if price reacts with LTF trigger (e.g., wick rejections, CHoCH, FVG mitigations).",
+      "analysis": {
+        "confirmation": false,
+        "trigger_type": null,
+        "volume_spike": false,
+        "commentary": "No lower timeframe confirmation found. Volume and spread consistent. No rejection or mitigation."
+      }
+    }
+  ],
+  "final_conclusion": {
+    "setup_valid": false,
+    "confidence_score": 22,
+    "reasoning": "Market shows no dominant trend or volume thrust. All timeframes neutral. No POI is being interacted with cleanly.",
+    "next_steps": [
+      "Wait for BOS or CHoCH on 1H or 4H",
+      "Re-run scan after news or session open",
+      "Configure alert for volume spike at historical POI"
+    ]
+  },
+  "metadata": {
+    "generated_at": "2025-06-21T21:39:08.439886Z",
+    "author": "ZANFLOW v17 Compose Engine",
+    "trace_type": "JSON/strategy-trace",
+    "version": "1.0"
+  }
+}

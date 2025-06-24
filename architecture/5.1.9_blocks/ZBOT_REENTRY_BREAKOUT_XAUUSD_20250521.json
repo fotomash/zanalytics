@@ -1,0 +1,23 @@
+{
+  "symbol": "XAUUSD",
+  "strategy": "Phase D Spring \u2192 Breakout Retest",
+  "entry_price": 3309.6,
+  "stop_loss": 3306.4,
+  "take_profit_1": 3315.0,
+  "take_profit_2": 3322.8,
+  "confidence": 0.83,
+  "confirmation_signals": [
+    "MACD histogram flipped positive on M1",
+    "Price broke above prior failure level (3308.50)",
+    "Reclaim of mid-Bollinger band + squeeze release",
+    "Volatility rising on ATR and StdDev"
+  ],
+  "timeframe": "M1",
+  "protection_logic": {
+    "breakeven_trigger": 3311.0,
+    "trail_above": 3312.5,
+    "exit_on_macd_roll": true,
+    "exit_on_close_below": 3307.2
+  },
+  "note": "Re-entry after previous invalidation. Structure confirmed breakout with momentum shift."
+}

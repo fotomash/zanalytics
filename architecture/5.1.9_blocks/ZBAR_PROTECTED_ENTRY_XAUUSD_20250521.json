@@ -1,0 +1,18 @@
+{
+  "symbol": "XAUUSD",
+  "datetime_utc": "2025-05-21T08:26:57.878415",
+  "protection_strategy": {
+    "breakeven_activated": true,
+    "trail_sl_above": 3307.0,
+    "tp1_band": [
+      3311.2,
+      3311.5
+    ],
+    "exit_conditions": [
+      "Close below 3307 on M1",
+      "MACD histogram rollover from positive to negative"
+    ]
+  },
+  "status": "active-protected",
+  "notes": "Dynamic protection logic activated post-M1 bullish structure reclaim. Trailing SL and TP1 band defined for live management."
+}
