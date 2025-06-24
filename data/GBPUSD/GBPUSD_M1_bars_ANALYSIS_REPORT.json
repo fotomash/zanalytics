@@ -1,0 +1,176 @@
+{
+  "file_info": {
+    "original_file": "GBPUSD_M1_bars.csv",
+    "detected_pair": "GBPUSD",
+    "detected_timeframe": "1T",
+    "processed_at": "2025-06-24T23:30:19.782706"
+  },
+  "processing_config": {
+    "single_timeframe_mode": false,
+    "timeframes_processed": [
+      "1T",
+      "5T",
+      "15T",
+      "30T",
+      "1H"
+    ],
+    "total_indicators": 760
+  },
+  "timeframe_analysis": {
+    "1T": {
+      "data_info": {
+        "total_rows": 31460,
+        "date_range": {
+          "start": "2025-05-26 01:30:00",
+          "end": "2025-06-25 01:29:00"
+        },
+        "total_columns": 152
+      },
+      "price_stats": {
+        "price_range": {
+          "min": 1.34,
+          "max": 1.36
+        },
+        "volatility": 0.00020161546778604608,
+        "trend": "bullish"
+      },
+      "signal_summary": {
+        "strong_buy_signals": 25,
+        "strong_sell_signals": 20
+      },
+      "market_regime": {
+        "current": "trending_up",
+        "distribution": {
+          "trending_up": 14926,
+          "trending_down": 11909,
+          "ranging": 3236,
+          "volatile": 1389
+        }
+      }
+    },
+    "5T": {
+      "data_info": {
+        "total_rows": 6292,
+        "date_range": {
+          "start": "2025-05-26 01:30:00",
+          "end": "2025-06-25 01:25:00"
+        },
+        "total_columns": 152
+      },
+      "price_stats": {
+        "price_range": {
+          "min": 1.34,
+          "max": 1.36
+        },
+        "volatility": 0.00047945205459250603,
+        "trend": "bullish"
+      },
+      "signal_summary": {
+        "strong_buy_signals": 14,
+        "strong_sell_signals": 13
+      },
+      "market_regime": {
+        "current": "trending_up",
+        "distribution": {
+          "trending_up": 2960,
+          "trending_down": 2118,
+          "volatile": 619,
+          "ranging": 595
+        }
+      }
+    },
+    "15T": {
+      "data_info": {
+        "total_rows": 2112,
+        "date_range": {
+          "start": "2025-05-26 01:30:00",
+          "end": "2025-06-25 01:15:00"
+        },
+        "total_columns": 152
+      },
+      "price_stats": {
+        "price_range": {
+          "min": 1.34,
+          "max": 1.36
+        },
+        "volatility": 0.0008578885826383521,
+        "trend": "bullish"
+      },
+      "signal_summary": {
+        "strong_buy_signals": 3,
+        "strong_sell_signals": 4
+      },
+      "market_regime": {
+        "current": "trending_up",
+        "distribution": {
+          "trending_up": 766,
+          "trending_down": 714,
+          "volatile": 366,
+          "ranging": 266
+        }
+      }
+    },
+    "30T": {
+      "data_info": {
+        "total_rows": 1056,
+        "date_range": {
+          "start": "2025-05-26 01:30:00",
+          "end": "2025-06-25 01:00:00"
+        },
+        "total_columns": 152
+      },
+      "price_stats": {
+        "price_range": {
+          "min": 1.34,
+          "max": 1.36
+        },
+        "volatility": 0.0012167175162851878,
+        "trend": "bullish"
+      },
+      "signal_summary": {
+        "strong_buy_signals": 5,
+        "strong_sell_signals": 2
+      },
+      "market_regime": {
+        "current": "trending_up",
+        "distribution": {
+          "trending_up": 345,
+          "trending_down": 255,
+          "volatile": 250,
+          "ranging": 206
+        }
+      }
+    },
+    "1H": {
+      "data_info": {
+        "total_rows": 529,
+        "date_range": {
+          "start": "2025-05-26 01:00:00",
+          "end": "2025-06-25 01:00:00"
+        },
+        "total_columns": 152
+      },
+      "price_stats": {
+        "price_range": {
+          "min": 1.34,
+          "max": 1.36
+        },
+        "volatility": 0.0018077669075395328,
+        "trend": "bullish"
+      },
+      "signal_summary": {
+        "strong_buy_signals": 2,
+        "strong_sell_signals": 2
+      },
+      "market_regime": {
+        "current": "trending_up",
+        "distribution": {
+          "trending_down": 207,
+          "trending_up": 153,
+          "volatile": 94,
+          "ranging": 75
+        }
+      }
+    }
+  }
+}

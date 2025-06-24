@@ -1,0 +1,176 @@
+{
+  "file_info": {
+    "original_file": "BTCUSD_M1_bars.csv",
+    "detected_pair": "BTCUSD",
+    "detected_timeframe": "1T",
+    "processed_at": "2025-06-24T23:30:22.009971"
+  },
+  "processing_config": {
+    "single_timeframe_mode": false,
+    "timeframes_processed": [
+      "1T",
+      "5T",
+      "15T",
+      "30T",
+      "1H"
+    ],
+    "total_indicators": 760
+  },
+  "timeframe_analysis": {
+    "1T": {
+      "data_info": {
+        "total_rows": 40847,
+        "date_range": {
+          "start": "2025-05-26 01:30:00",
+          "end": "2025-06-25 01:29:00"
+        },
+        "total_columns": 152
+      },
+      "price_stats": {
+        "price_range": {
+          "min": 98107.71,
+          "max": 110662.47
+        },
+        "volatility": 55.6805991319896,
+        "trend": "bearish"
+      },
+      "signal_summary": {
+        "strong_buy_signals": 443,
+        "strong_sell_signals": 415
+      },
+      "market_regime": {
+        "current": "ranging",
+        "distribution": {
+          "ranging": 20246,
+          "volatile": 9296,
+          "trending_up": 5983,
+          "trending_down": 5322
+        }
+      }
+    },
+    "5T": {
+      "data_info": {
+        "total_rows": 8171,
+        "date_range": {
+          "start": "2025-05-26 01:30:00",
+          "end": "2025-06-25 01:25:00"
+        },
+        "total_columns": 152
+      },
+      "price_stats": {
+        "price_range": {
+          "min": 98107.71,
+          "max": 110662.47
+        },
+        "volatility": 146.21487918511232,
+        "trend": "bearish"
+      },
+      "signal_summary": {
+        "strong_buy_signals": 104,
+        "strong_sell_signals": 73
+      },
+      "market_regime": {
+        "current": "ranging",
+        "distribution": {
+          "ranging": 4162,
+          "volatile": 1883,
+          "trending_up": 1163,
+          "trending_down": 963
+        }
+      }
+    },
+    "15T": {
+      "data_info": {
+        "total_rows": 2745,
+        "date_range": {
+          "start": "2025-05-26 01:30:00",
+          "end": "2025-06-25 01:15:00"
+        },
+        "total_columns": 152
+      },
+      "price_stats": {
+        "price_range": {
+          "min": 98107.71,
+          "max": 110662.47
+        },
+        "volatility": 269.4318794577152,
+        "trend": "bearish"
+      },
+      "signal_summary": {
+        "strong_buy_signals": 37,
+        "strong_sell_signals": 26
+      },
+      "market_regime": {
+        "current": "ranging",
+        "distribution": {
+          "ranging": 1221,
+          "volatile": 740,
+          "trending_down": 411,
+          "trending_up": 373
+        }
+      }
+    },
+    "30T": {
+      "data_info": {
+        "total_rows": 1373,
+        "date_range": {
+          "start": "2025-05-26 01:30:00",
+          "end": "2025-06-25 01:00:00"
+        },
+        "total_columns": 152
+      },
+      "price_stats": {
+        "price_range": {
+          "min": 98107.71,
+          "max": 110662.47
+        },
+        "volatility": 386.6414685644967,
+        "trend": "bearish"
+      },
+      "signal_summary": {
+        "strong_buy_signals": 16,
+        "strong_sell_signals": 14
+      },
+      "market_regime": {
+        "current": "trending_up",
+        "distribution": {
+          "ranging": 597,
+          "volatile": 309,
+          "trending_up": 245,
+          "trending_down": 222
+        }
+      }
+    },
+    "1H": {
+      "data_info": {
+        "total_rows": 688,
+        "date_range": {
+          "start": "2025-05-26 01:00:00",
+          "end": "2025-06-25 01:00:00"
+        },
+        "total_columns": 152
+      },
+      "price_stats": {
+        "price_range": {
+          "min": 98107.71,
+          "max": 110662.47
+        },
+        "volatility": 556.0637745362719,
+        "trend": "bearish"
+      },
+      "signal_summary": {
+        "strong_buy_signals": 8,
+        "strong_sell_signals": 6
+      },
+      "market_regime": {
+        "current": "trending_up",
+        "distribution": {
+          "ranging": 311,
+          "volatile": 181,
+          "trending_down": 113,
+          "trending_up": 83
+        }
+      }
+    }
+  }
+}

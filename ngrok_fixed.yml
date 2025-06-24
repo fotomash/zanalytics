@@ -1,0 +1,19 @@
+authtoken: YOUR_NGROK_AUTH_TOKEN_HERE
+tunnels:
+  data-processor:
+    addr: '5011'
+    inspect: true
+    proto: http
+  streamlit-dashboard:
+    addr: '8501'
+    inspect: true
+    proto: http
+  websocket-stream:
+    addr: '8765'
+    inspect: true
+    proto: http
+  zanalytics-api:
+    addr: '5010'
+    inspect: true
+    proto: http
+version: '2'

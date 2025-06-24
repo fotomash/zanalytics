@@ -1,0 +1,14 @@
+{
+  "total_files_processed": 1,
+  "successful_analyses": 0,
+  "failed_analyses": 1,
+  "analysis_timestamp": "2025-06-24T23:29:31.546270",
+  "configuration": {
+    "tick_bars_limit": 1500,
+    "all_features_enabled": true,
+    "csv_and_json_processing": true
+  },
+  "files_processed": [
+    "XAUUSD_TICK.csv"
+  ]
+}

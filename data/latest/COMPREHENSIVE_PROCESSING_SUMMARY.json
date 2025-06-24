@@ -1,0 +1,25 @@
+{
+  "processing_summary": {
+    "total_files_found": 0,
+    "successful": 0,
+    "failed": 0,
+    "skipped": 0,
+    "success_rate": "0%"
+  },
+  "successful_files": [],
+  "failed_files": [],
+  "skipped_files": [],
+  "processed_at": "2025-06-24T23:30:22.120369",
+  "configuration": {
+    "timeframes": "['1T', '5T', '15T', '30T', '1H', '4H', '1D', '1W', '1M']",
+    "output_dir": "/Users/tom/Documents/GitHub/zanalytics/data/latest",
+    "parallel_processing": "True",
+    "max_workers": "11",
+    "use_tick_volume_for_volume_indicators": "True",
+    "process_single_timeframe": "False",
+    "calculate_signals": "True",
+    "include_market_structure": "True",
+    "include_pattern_detection": "True",
+    "include_risk_metrics": "True"
+  }
+}

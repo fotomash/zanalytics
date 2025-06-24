@@ -1,9 +1,9 @@
 {
   "data_info": {
-    "total_rows": 988,
+    "total_rows": 503,
     "date_range": {
       "start": "2025-05-26 01:00:00",
-      "end": "2025-06-24 16:30:00"
+      "end": "2025-06-25 01:00:00"
     },
     "total_columns": 152
   },
@@ -12,20 +12,20 @@
       "min": 3245.47,
       "max": 3451.19
     },
-    "volatility": 7.438370042747629,
+    "volatility": 10.672652946509412,
     "trend": "bearish"
   },
   "signal_summary": {
     "strong_buy_signals": 10,
-    "strong_sell_signals": 10
+    "strong_sell_signals": 4
   },
   "market_regime": {
     "current": "trending_down",
     "distribution": {
-      "ranging": 454,
-      "trending_down": 199,
-      "volatile": 194,
-      "trending_up": 141
+      "ranging": 242,
+      "volatile": 100,
+      "trending_down": 90,
+      "trending_up": 71
     }
   }
 }
