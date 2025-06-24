@@ -228,7 +228,10 @@ class ncOSAgentOrchestrator:
         agents = {}
         for agent_name, agent_class in agent_map.items():
             if self.config.get('agents', {}).get(agent_name, {}).get('active', True):
-                agents[agent_name] = agent_class()
+                try:
+                    agents[agent_name] = agent_class(agent_id=agent_name)
+                except TypeError:
+                    agents[agent_name] = agent_class()
                 
         return agents
         
