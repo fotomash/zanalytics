@@ -1,10 +1,17 @@
 profile_name: default
 context_analyzer: {}
-liquidity_engine: {}
+liquidity_engine:
+  dynamic_lookback: false
+  min_lookback: 3
+  max_lookback: 10
 structure_validator: {}
 risk_manager:
   atr_period: 14
   atr_multiplier: 1.5
+phase_detection_config:
+  dynamic_lookback: false
+  min_lookback: 15
+  max_lookback: 40
 journaling: {}
 meta_agent: {}
 

@@ -22,6 +22,7 @@ import pandas as pd
 import numpy as np
 from typing import Dict, Optional, Any
 import traceback
+from core.lookback_adapter import adapt_lookback
 # --- Multi-TF integration imports ---
 from core.indicators import add_indicators_multi_tf
 from core.micro_wyckoff_phase_engine import detect_micro_wyckoff_phase
@@ -373,7 +374,19 @@ def detect_wyckoff_phases_and_events(
               return result
 
 
-    if config is None: config = {} # Use default parameters if none provided
+    if config is None:
+        config = {}
+
+    if config.get("dynamic_lookback"):
+        base_lb = config.get("pivot_lookback", 20)
+        new_lb = adapt_lookback(
+            df,
+            base_lookback=base_lb,
+            min_lookback=config.get("min_lookback", base_lb),
+            max_lookback=config.get("max_lookback", base_lb),
+            vol_config=config.get("volatility_config", {}),
+        )
+        config["pivot_lookback"] = new_lb
 
     try:
         # 1. Detect Key Events

@@ -11,12 +11,19 @@ context_analyzer:
 liquidity_engine:
   sweep_lookback_bars: 25
   inducement_check: true
+  dynamic_lookback: true
+  min_lookback: 3
+  max_lookback: 7
 structure_validator:
   break_type: ["CHoCH", "BoS"]
   swing_lookback_bars: 6
 risk_manager:
   min_rr: 2.0
   sl_buffer_pips: 1.5
+phase_detection_config:
+  dynamic_lookback: true
+  min_lookback: 12
+  max_lookback: 25
 journaling:
   verbosity: "all"
   enable_zbar: true
