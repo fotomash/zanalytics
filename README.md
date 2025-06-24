@@ -41,4 +41,15 @@ This bundle is your **modular trading logic engine**. It’s structured for use 
   Point values are automatically converted using live FX rates via
   `get_live_fx_rate`.
 
+## 📈 Risk Calculation Example
+
+```python
+from risk_manager import calculate_risk
+
+try:
+    rr, risk, reward = calculate_risk(100, 100, 110)
+except ValueError as e:
+    print(f"Risk calc failed: {e}")
+```
+
 *Multi-agent. Schema-driven. LLM-interpretable. Fully portable.*
