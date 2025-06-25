@@ -1,0 +1,119 @@
+2025-06-25 01:28:46,184 - INFO - Found 6 CSV files and 0 JSON files to process
+2025-06-25 01:28:46,184 - INFO - 
+🔄 Processing: ./BTCUSD_TICK.csv
+2025-06-25 01:28:46,189 - INFO - ✓ Loaded 1500 ticks from: ./BTCUSD_TICK.csv
+2025-06-25 01:28:46,189 - INFO -    📊 Detected: BTCUSD | tick
+2025-06-25 01:28:46,189 - INFO -    🎯 Processing tick data...
+2025-06-25 01:28:46,455 - INFO - ✓ Saved tick data to /Users/tom/Documents/GitHub/zanalytics/data/BTCUSD/BTCUSD_TICK_tick_tick_processed.csv
+2025-06-25 01:28:46,506 - INFO - ✓ Saved 1min data to /Users/tom/Documents/GitHub/zanalytics/data/BTCUSD/BTCUSD_TICK_1min_csv_processed.csv
+2025-06-25 01:28:46,506 - INFO -    ✅ 1min: 65 rows with advanced analysis
+2025-06-25 01:28:46,526 - INFO - ✓ Saved 5min data to /Users/tom/Documents/GitHub/zanalytics/data/BTCUSD/BTCUSD_TICK_5min_csv_processed.csv
+2025-06-25 01:28:46,526 - INFO -    ✅ 5min: 14 rows with advanced analysis
+2025-06-25 01:28:46,542 - INFO - ✓ Saved 15min data to /Users/tom/Documents/GitHub/zanalytics/data/BTCUSD/BTCUSD_TICK_15min_csv_processed.csv
+2025-06-25 01:28:46,542 - INFO -    ✅ 15min: 5 rows with advanced analysis
+2025-06-25 01:28:46,556 - INFO - ✓ Saved 30min data to /Users/tom/Documents/GitHub/zanalytics/data/BTCUSD/BTCUSD_TICK_30min_csv_processed.csv
+2025-06-25 01:28:46,556 - INFO -    ✅ 30min: 3 rows with advanced analysis
+2025-06-25 01:28:46,570 - INFO - ✓ Saved 1H data to /Users/tom/Documents/GitHub/zanalytics/data/BTCUSD/BTCUSD_TICK_1H_csv_processed.csv
+2025-06-25 01:28:46,570 - INFO -    ✅ 1H: 2 rows with advanced analysis
+2025-06-25 01:28:46,583 - INFO - ✓ Saved 4H data to /Users/tom/Documents/GitHub/zanalytics/data/BTCUSD/BTCUSD_TICK_4H_csv_processed.csv
+2025-06-25 01:28:46,583 - INFO -    ✅ 4H: 1 rows with advanced analysis
+2025-06-25 01:28:46,597 - INFO - ✓ Saved 1D data to /Users/tom/Documents/GitHub/zanalytics/data/BTCUSD/BTCUSD_TICK_1D_csv_processed.csv
+2025-06-25 01:28:46,597 - INFO -    ✅ 1D: 1 rows with advanced analysis
+2025-06-25 01:28:46,597 - INFO - 
+🔄 Processing: ./GBPUSD_TICK.csv
+2025-06-25 01:28:46,599 - INFO - ✓ Loaded 1500 ticks from: ./GBPUSD_TICK.csv
+2025-06-25 01:28:46,599 - INFO -    📊 Detected: GBPUSD | tick
+2025-06-25 01:28:46,599 - INFO -    🎯 Processing tick data...
+2025-06-25 01:28:46,953 - INFO - ✓ Saved tick data to /Users/tom/Documents/GitHub/zanalytics/data/GBPUSD/GBPUSD_TICK_tick_tick_processed.csv
+2025-06-25 01:28:46,970 - INFO - ✓ Saved 1min data to /Users/tom/Documents/GitHub/zanalytics/data/GBPUSD/GBPUSD_TICK_1min_csv_processed.csv
+2025-06-25 01:28:46,971 - INFO -    ✅ 1min: 34 rows with advanced analysis
+2025-06-25 01:28:46,986 - INFO - ✓ Saved 5min data to /Users/tom/Documents/GitHub/zanalytics/data/GBPUSD/GBPUSD_TICK_5min_csv_processed.csv
+2025-06-25 01:28:46,986 - INFO -    ✅ 5min: 7 rows with advanced analysis
+2025-06-25 01:28:47,000 - INFO - ✓ Saved 15min data to /Users/tom/Documents/GitHub/zanalytics/data/GBPUSD/GBPUSD_TICK_15min_csv_processed.csv
+2025-06-25 01:28:47,000 - INFO -    ✅ 15min: 3 rows with advanced analysis
+2025-06-25 01:28:47,014 - INFO - ✓ Saved 30min data to /Users/tom/Documents/GitHub/zanalytics/data/GBPUSD/GBPUSD_TICK_30min_csv_processed.csv
+2025-06-25 01:28:47,014 - INFO -    ✅ 30min: 2 rows with advanced analysis
+2025-06-25 01:28:47,029 - INFO - ✓ Saved 1H data to /Users/tom/Documents/GitHub/zanalytics/data/GBPUSD/GBPUSD_TICK_1H_csv_processed.csv
+2025-06-25 01:28:47,029 - INFO -    ✅ 1H: 2 rows with advanced analysis
+2025-06-25 01:28:47,043 - INFO - ✓ Saved 4H data to /Users/tom/Documents/GitHub/zanalytics/data/GBPUSD/GBPUSD_TICK_4H_csv_processed.csv
+2025-06-25 01:28:47,043 - INFO -    ✅ 4H: 1 rows with advanced analysis
+2025-06-25 01:28:47,056 - INFO - ✓ Saved 1D data to /Users/tom/Documents/GitHub/zanalytics/data/GBPUSD/GBPUSD_TICK_1D_csv_processed.csv
+2025-06-25 01:28:47,056 - INFO -    ✅ 1D: 1 rows with advanced analysis
+2025-06-25 01:28:47,056 - INFO - 
+🔄 Processing: ./XAUUSD_TICK.csv
+2025-06-25 01:28:47,059 - INFO - ✓ Loaded 1500 ticks from: ./XAUUSD_TICK.csv
+2025-06-25 01:28:47,059 - INFO -    📊 Detected: XAUUSD | tick
+2025-06-25 01:28:47,059 - INFO -    🎯 Processing tick data...
+2025-06-25 01:28:47,339 - INFO - ✓ Saved tick data to /Users/tom/Documents/GitHub/zanalytics/data/XAUUSD/XAUUSD_TICK_tick_tick_processed.csv
+2025-06-25 01:28:47,368 - INFO - ✓ Saved 1min data to /Users/tom/Documents/GitHub/zanalytics/data/XAUUSD/XAUUSD_TICK_1min_csv_processed.csv
+2025-06-25 01:28:47,368 - INFO -    ✅ 1min: 32 rows with advanced analysis
+2025-06-25 01:28:47,385 - INFO - ✓ Saved 5min data to /Users/tom/Documents/GitHub/zanalytics/data/XAUUSD/XAUUSD_TICK_5min_csv_processed.csv
+2025-06-25 01:28:47,386 - INFO -    ✅ 5min: 7 rows with advanced analysis
+2025-06-25 01:28:47,401 - INFO - ✓ Saved 15min data to /Users/tom/Documents/GitHub/zanalytics/data/XAUUSD/XAUUSD_TICK_15min_csv_processed.csv
+2025-06-25 01:28:47,401 - INFO -    ✅ 15min: 3 rows with advanced analysis
+2025-06-25 01:28:47,416 - INFO - ✓ Saved 30min data to /Users/tom/Documents/GitHub/zanalytics/data/XAUUSD/XAUUSD_TICK_30min_csv_processed.csv
+2025-06-25 01:28:47,416 - INFO -    ✅ 30min: 2 rows with advanced analysis
+2025-06-25 01:28:47,429 - INFO - ✓ Saved 1H data to /Users/tom/Documents/GitHub/zanalytics/data/XAUUSD/XAUUSD_TICK_1H_csv_processed.csv
+2025-06-25 01:28:47,429 - INFO -    ✅ 1H: 2 rows with advanced analysis
+2025-06-25 01:28:47,443 - INFO - ✓ Saved 4H data to /Users/tom/Documents/GitHub/zanalytics/data/XAUUSD/XAUUSD_TICK_4H_csv_processed.csv
+2025-06-25 01:28:47,443 - INFO -    ✅ 4H: 1 rows with advanced analysis
+2025-06-25 01:28:47,457 - INFO - ✓ Saved 1D data to /Users/tom/Documents/GitHub/zanalytics/data/XAUUSD/XAUUSD_TICK_1D_csv_processed.csv
+2025-06-25 01:28:47,457 - INFO -    ✅ 1D: 1 rows with advanced analysis
+2025-06-25 01:28:47,457 - INFO - 
+🔄 Processing: ./XAUUSD_M1_bars.csv
+2025-06-25 01:28:47,479 - INFO - Limited to last 1440 bars for 1min
+2025-06-25 01:28:47,479 - INFO - ✓ Loaded 1440 rows from OHLC: ./XAUUSD_M1_bars.csv
+2025-06-25 01:28:47,479 - INFO -    📊 Detected: XAUUSD | 1min
+2025-06-25 01:28:48,497 - INFO - ✓ Saved 1min data to /Users/tom/Documents/GitHub/zanalytics/data/XAUUSD/XAUUSD_M1_bars_1min_csv_processed.csv
+2025-06-25 01:28:48,497 - INFO -    ✅ 1min: 1440 rows with advanced analysis
+2025-06-25 01:28:48,679 - INFO - ✓ Saved 5min data to /Users/tom/Documents/GitHub/zanalytics/data/XAUUSD/XAUUSD_M1_bars_5min_csv_processed.csv
+2025-06-25 01:28:48,679 - INFO -    ✅ 5min: 289 rows with advanced analysis
+2025-06-25 01:28:48,714 - INFO - ✓ Saved 15min data to /Users/tom/Documents/GitHub/zanalytics/data/XAUUSD/XAUUSD_M1_bars_15min_csv_processed.csv
+2025-06-25 01:28:48,714 - INFO -    ✅ 15min: 98 rows with advanced analysis
+2025-06-25 01:28:48,735 - INFO - ✓ Saved 30min data to /Users/tom/Documents/GitHub/zanalytics/data/XAUUSD/XAUUSD_M1_bars_30min_csv_processed.csv
+2025-06-25 01:28:48,735 - INFO -    ✅ 30min: 49 rows with advanced analysis
+2025-06-25 01:28:48,750 - INFO - ✓ Saved 1H data to /Users/tom/Documents/GitHub/zanalytics/data/XAUUSD/XAUUSD_M1_bars_1H_csv_processed.csv
+2025-06-25 01:28:48,750 - INFO -    ✅ 1H: 25 rows with advanced analysis
+2025-06-25 01:28:48,762 - INFO - ✓ Saved 4H data to /Users/tom/Documents/GitHub/zanalytics/data/XAUUSD/XAUUSD_M1_bars_4H_csv_processed.csv
+2025-06-25 01:28:48,762 - INFO -    ✅ 4H: 7 rows with advanced analysis
+2025-06-25 01:28:48,773 - INFO - ✓ Saved 1D data to /Users/tom/Documents/GitHub/zanalytics/data/XAUUSD/XAUUSD_M1_bars_1D_csv_processed.csv
+2025-06-25 01:28:48,773 - INFO -    ✅ 1D: 2 rows with advanced analysis
+2025-06-25 01:28:48,773 - INFO - 
+🔄 Processing: ./GBPUSD_M1_bars.csv
+2025-06-25 01:28:48,793 - INFO - Limited to last 1440 bars for 1min
+2025-06-25 01:28:48,793 - INFO - ✓ Loaded 1440 rows from OHLC: ./GBPUSD_M1_bars.csv
+2025-06-25 01:28:48,793 - INFO -    📊 Detected: GBPUSD | 1min
+2025-06-25 01:28:49,613 - INFO - ✓ Saved 1min data to /Users/tom/Documents/GitHub/zanalytics/data/GBPUSD/GBPUSD_M1_bars_1min_csv_processed.csv
+2025-06-25 01:28:49,613 - INFO -    ✅ 1min: 1440 rows with advanced analysis
+2025-06-25 01:28:49,758 - INFO - ✓ Saved 5min data to /Users/tom/Documents/GitHub/zanalytics/data/GBPUSD/GBPUSD_M1_bars_5min_csv_processed.csv
+2025-06-25 01:28:49,758 - INFO -    ✅ 5min: 289 rows with advanced analysis
+2025-06-25 01:28:49,782 - INFO - ✓ Saved 15min data to /Users/tom/Documents/GitHub/zanalytics/data/GBPUSD/GBPUSD_M1_bars_15min_csv_processed.csv
+2025-06-25 01:28:49,782 - INFO -    ✅ 15min: 97 rows with advanced analysis
+2025-06-25 01:28:49,798 - INFO - ✓ Saved 30min data to /Users/tom/Documents/GitHub/zanalytics/data/GBPUSD/GBPUSD_M1_bars_30min_csv_processed.csv
+2025-06-25 01:28:49,798 - INFO -    ✅ 30min: 49 rows with advanced analysis
+2025-06-25 01:28:49,811 - INFO - ✓ Saved 1H data to /Users/tom/Documents/GitHub/zanalytics/data/GBPUSD/GBPUSD_M1_bars_1H_csv_processed.csv
+2025-06-25 01:28:49,811 - INFO -    ✅ 1H: 25 rows with advanced analysis
+2025-06-25 01:28:49,823 - INFO - ✓ Saved 4H data to /Users/tom/Documents/GitHub/zanalytics/data/GBPUSD/GBPUSD_M1_bars_4H_csv_processed.csv
+2025-06-25 01:28:49,823 - INFO -    ✅ 4H: 7 rows with advanced analysis
+2025-06-25 01:28:49,834 - INFO - ✓ Saved 1D data to /Users/tom/Documents/GitHub/zanalytics/data/GBPUSD/GBPUSD_M1_bars_1D_csv_processed.csv
+2025-06-25 01:28:49,834 - INFO -    ✅ 1D: 2 rows with advanced analysis
+2025-06-25 01:28:49,834 - INFO - 
+🔄 Processing: ./BTCUSD_M1_bars.csv
+2025-06-25 01:28:49,862 - INFO - Limited to last 1440 bars for 1min
+2025-06-25 01:28:49,862 - INFO - ✓ Loaded 1440 rows from OHLC: ./BTCUSD_M1_bars.csv
+2025-06-25 01:28:49,862 - INFO -    📊 Detected: BTCUSD | 1min
+2025-06-25 01:28:50,966 - INFO - ✓ Saved 1min data to /Users/tom/Documents/GitHub/zanalytics/data/BTCUSD/BTCUSD_M1_bars_1min_csv_processed.csv
+2025-06-25 01:28:50,967 - INFO -    ✅ 1min: 1440 rows with advanced analysis
+2025-06-25 01:28:51,166 - INFO - ✓ Saved 5min data to /Users/tom/Documents/GitHub/zanalytics/data/BTCUSD/BTCUSD_M1_bars_5min_csv_processed.csv
+2025-06-25 01:28:51,166 - INFO -    ✅ 5min: 289 rows with advanced analysis
+2025-06-25 01:28:51,229 - INFO - ✓ Saved 15min data to /Users/tom/Documents/GitHub/zanalytics/data/BTCUSD/BTCUSD_M1_bars_15min_csv_processed.csv
+2025-06-25 01:28:51,229 - INFO -    ✅ 15min: 97 rows with advanced analysis
+2025-06-25 01:28:51,251 - INFO - ✓ Saved 30min data to /Users/tom/Documents/GitHub/zanalytics/data/BTCUSD/BTCUSD_M1_bars_30min_csv_processed.csv
+2025-06-25 01:28:51,251 - INFO -    ✅ 30min: 49 rows with advanced analysis
+2025-06-25 01:28:51,266 - INFO - ✓ Saved 1H data to /Users/tom/Documents/GitHub/zanalytics/data/BTCUSD/BTCUSD_M1_bars_1H_csv_processed.csv
+2025-06-25 01:28:51,266 - INFO -    ✅ 1H: 25 rows with advanced analysis
+2025-06-25 01:28:51,278 - INFO - ✓ Saved 4H data to /Users/tom/Documents/GitHub/zanalytics/data/BTCUSD/BTCUSD_M1_bars_4H_csv_processed.csv
+2025-06-25 01:28:51,279 - INFO -    ✅ 4H: 7 rows with advanced analysis
+2025-06-25 01:28:51,291 - INFO - ✓ Saved 1D data to /Users/tom/Documents/GitHub/zanalytics/data/BTCUSD/BTCUSD_M1_bars_1D_csv_processed.csv
+2025-06-25 01:28:51,291 - INFO -    ✅ 1D: 2 rows with advanced analysis
+2025-06-25 01:28:51,291 - INFO - ✓ Generated comprehensive processing journal: /Users/tom/Documents/GitHub/zanalytics/data/processing_journal.json

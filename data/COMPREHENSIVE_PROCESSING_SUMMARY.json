@@ -9,7 +9,7 @@
   "successful_files": [],
   "failed_files": [],
   "skipped_files": [],
-  "processed_at": "2025-06-25T01:22:50.340536",
+  "processed_at": "2025-06-25T01:42:50.020180",
   "configuration": {
     "timeframes": "['1T', '5T', '15T', '30T', '1H', '4H', '1D', '1W', '1M']",
     "output_dir": "/Users/tom/Documents/GitHub/zanalytics/data",

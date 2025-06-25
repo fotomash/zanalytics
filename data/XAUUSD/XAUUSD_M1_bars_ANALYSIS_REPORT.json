@@ -3,7 +3,7 @@
     "original_file": "XAUUSD_M1_bars.csv",
     "detected_pair": "XAUUSD",
     "detected_timeframe": "1T",
-    "processed_at": "2025-06-25T01:22:48.539173"
+    "processed_at": "2025-06-25T01:42:49.365646"
   },
   "processing_config": {
     "single_timeframe_mode": false,
@@ -11,164 +11,132 @@
       "1T",
       "5T",
       "15T",
-      "30T",
-      "1H"
+      "30T"
     ],
-    "total_indicators": 760
+    "total_indicators": 608
   },
   "timeframe_analysis": {
     "1T": {
       "data_info": {
-        "total_rows": 29750,
+        "total_rows": 6685,
         "date_range": {
-          "start": "2025-05-26 03:23:00",
-          "end": "2025-06-25 03:22:00"
+          "start": "2025-06-18 03:43:00",
+          "end": "2025-06-25 03:42:00"
         },
         "total_columns": 152
       },
       "price_stats": {
         "price_range": {
-          "min": 3245.47,
-          "max": 3451.19
+          "min": 3295.39,
+          "max": 3399.97
         },
-        "volatility": 1.2319779744927808,
+        "volatility": 1.1665261221864627,
         "trend": "bearish"
       },
       "signal_summary": {
-        "strong_buy_signals": 340,
-        "strong_sell_signals": 313
+        "strong_buy_signals": 70,
+        "strong_sell_signals": 71
       },
       "market_regime": {
         "current": "volatile",
         "distribution": {
-          "ranging": 15243,
-          "volatile": 7000,
-          "trending_up": 3847,
-          "trending_down": 3660
+          "ranging": 3313,
+          "volatile": 1564,
+          "trending_up": 996,
+          "trending_down": 812
         }
       }
     },
     "5T": {
       "data_info": {
-        "total_rows": 5951,
+        "total_rows": 1338,
         "date_range": {
-          "start": "2025-05-26 03:20:00",
-          "end": "2025-06-25 03:20:00"
+          "start": "2025-06-18 03:40:00",
+          "end": "2025-06-25 03:40:00"
         },
         "total_columns": 152
       },
       "price_stats": {
         "price_range": {
-          "min": 3245.47,
-          "max": 3451.19
+          "min": 3295.39,
+          "max": 3399.97
         },
-        "volatility": 2.927727494014893,
+        "volatility": 2.7990846866813066,
         "trend": "bearish"
       },
       "signal_summary": {
-        "strong_buy_signals": 59,
-        "strong_sell_signals": 60
+        "strong_buy_signals": 15,
+        "strong_sell_signals": 14
       },
       "market_regime": {
         "current": "trending_up",
         "distribution": {
-          "ranging": 2694,
-          "volatile": 1604,
-          "trending_down": 846,
-          "trending_up": 807
+          "ranging": 644,
+          "volatile": 331,
+          "trending_up": 207,
+          "trending_down": 156
         }
       }
     },
     "15T": {
       "data_info": {
-        "total_rows": 2005,
+        "total_rows": 451,
         "date_range": {
-          "start": "2025-05-26 03:15:00",
-          "end": "2025-06-25 03:15:00"
+          "start": "2025-06-18 03:30:00",
+          "end": "2025-06-25 03:30:00"
         },
         "total_columns": 152
       },
       "price_stats": {
         "price_range": {
-          "min": 3245.47,
-          "max": 3451.19
+          "min": 3295.39,
+          "max": 3399.97
         },
-        "volatility": 5.1773237600596635,
+        "volatility": 5.034920169321662,
         "trend": "bearish"
       },
       "signal_summary": {
-        "strong_buy_signals": 20,
-        "strong_sell_signals": 23
+        "strong_buy_signals": 6,
+        "strong_sell_signals": 4
       },
       "market_regime": {
         "current": "ranging",
         "distribution": {
-          "ranging": 884,
-          "volatile": 432,
-          "trending_down": 410,
-          "trending_up": 279
+          "ranging": 254,
+          "volatile": 82,
+          "trending_down": 82,
+          "trending_up": 33
         }
       }
     },
     "30T": {
       "data_info": {
-        "total_rows": 1003,
+        "total_rows": 226,
         "date_range": {
-          "start": "2025-05-26 03:00:00",
-          "end": "2025-06-25 03:00:00"
+          "start": "2025-06-18 03:30:00",
+          "end": "2025-06-25 03:30:00"
         },
         "total_columns": 152
       },
       "price_stats": {
         "price_range": {
-          "min": 3245.47,
-          "max": 3451.19
+          "min": 3295.39,
+          "max": 3399.97
         },
-        "volatility": 7.425140002216277,
+        "volatility": 7.23604976949838,
         "trend": "bearish"
       },
       "signal_summary": {
-        "strong_buy_signals": 10,
-        "strong_sell_signals": 10
+        "strong_buy_signals": 2,
+        "strong_sell_signals": 2
       },
       "market_regime": {
         "current": "trending_up",
         "distribution": {
-          "ranging": 456,
-          "trending_down": 208,
-          "volatile": 193,
-          "trending_up": 146
-        }
-      }
-    },
-    "1H": {
-      "data_info": {
-        "total_rows": 503,
-        "date_range": {
-          "start": "2025-05-26 03:00:00",
-          "end": "2025-06-25 03:00:00"
-        },
-        "total_columns": 152
-      },
-      "price_stats": {
-        "price_range": {
-          "min": 3245.47,
-          "max": 3451.19
-        },
-        "volatility": 10.662746673265769,
-        "trend": "bearish"
-      },
-      "signal_summary": {
-        "strong_buy_signals": 10,
-        "strong_sell_signals": 4
-      },
-      "market_regime": {
-        "current": "trending_down",
-        "distribution": {
-          "ranging": 242,
-          "volatile": 100,
-          "trending_down": 90,
-          "trending_up": 71
+          "ranging": 136,
+          "trending_down": 41,
+          "volatile": 40,
+          "trending_up": 9
         }
       }
     }
