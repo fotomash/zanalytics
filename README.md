@@ -127,3 +127,13 @@ python -m core.icc_orchestrator --symbol OANDA:EUR_USD --json
 ```
 
 The command prints a JSON summary describing each stage.
+
+## Local Quick Start
+
+Run the local engine without external API keys:
+
+```bash
+./start_local_ncos.sh
+```
+
+The script installs minimal requirements, launches `ncos_local_engine.py` on port 8000, and verifies the `/status` endpoint.
