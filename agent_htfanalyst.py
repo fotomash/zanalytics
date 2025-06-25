@@ -1,4 +1,3 @@
-<file name=agent_registry.py>
 AGENT_PROFILES = {
     "Rysiek": {
         "role": "HTF Wyckoff phase specialist",
@@ -9,4 +8,4 @@ AGENT_PROFILES = {
     },
     # ... other agent profiles ...
 }
-</file>
+

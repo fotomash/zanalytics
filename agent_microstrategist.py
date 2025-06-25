@@ -1,65 +1,88 @@
+from .base_agent import BaseAgent
+
+class MicroStrategistAgent(BaseAgent):
+    """Generate micro-level trading signals based on real-time data."""
+
+    def __init__(self, agent_id: str, config: dict, memory_manager):
+        super().__init__(agent_id, config, memory_manager)
+        self.symbol = config.get("symbol", "UNKNOWN")
+        self.phase_info = None
+
+    def set_phase_info(self, dataframe):
+        """Attach microstructure dataframe to the agent."""
+        self.phase_info = dataframe
+
+    async def process(self, data):
+        """Process incoming data and return a trading signal."""
+        return self.evaluate_microstructure_phase_trigger()
+
     def evaluate_microstructure_phase_trigger(self):
-        # agent_microstrategist.py - ncOS version
-        import numpy as np
-        import logging
-        from dataclasses import dataclass
-        from typing import Dict, Any, Optional
-        import asyncio
+        """Assess microstructure to decide if an entry signal is triggered."""
+        result = {
+            "entry_signal": False,
+            "trigger": None,
+            "confidence": 0.0,
+            "reason": "",
+            "symbol": self.symbol,
+            "phase_context": None,
+            "volatility": None,
+            "execution_mode": "scalp",
+        }
 
-        @dataclass
-        class MicroStrategistAgent:
-            """ncOS MicroStrategist - Vector-native microstructure analysis"""
+        if self.phase_info is None or getattr(self.phase_info, "empty", False):
+            result["reason"] = "No microstructure data available"
+            return result
 
-            def __init__(self):
-                self.logger = logging.getLogger(self.__class__.__name__)
-                self.vector_dim = 1536
-                self.session_state = {
-                    'tick_buffer': [],
-                    'spread_vectors': np.zeros(self.vector_dim),
-                    'microstructure_embedding': np.zeros(self.vector_dim),
-                    'confidence': 0.0
-                }
+        last = self.phase_info.iloc[-1]
+        spring = last.get("SPRING", False)
+        choch = last.get("CHoCH", False)
+        bos = last.get("BOS", False)
+        phase = last.get("PHASE", "")
+        spread = last.get("SPREAD", 0)
+        ret = last.get("RET", 0)
 
-            async def process_event(self, event: Any) -> Dict[str, Any]:
-                """Process data event and update vectors"""
-                try:
-                    if event.source == 'csv' and event.data.get('data_type') == 'tick':
-                        return await self._process_tick_data(event)
-                    elif event.source == 'csv' and event.data.get('data_type') == 'ohlc':
-                        return await self._process_ohlc_data(event)
-                    else:
-                        return {'status': 'ignored', 'reason': 'unsupported_data_type'}
-                except Exception as e:
-                    self.logger.error(f"Error processing event: {e}")
-                    return {'status': 'error', 'error': str(e)}
+        weights = {
+            "spring": 1.2,
+            "choch_trap": 0.9,
+            "bos_confirm": 0.5,
+            "spread_compression": 0.3,
+            "reversal_tick": 0.2,
+        }
 
-            async def _process_tick_data(self, event: Any) -> Dict[str, Any]:
-                """Convert tick data to microstructure vectors"""
-                # Update session state
-                self.session_state['tick_buffer'].append({
-                    'symbol': event.symbol,
-                    'timestamp': event.timestamp,
-                    'file': event.file_path
-                })
+        score = 0.0
+        reasons = []
 
-                # Generate microstructure embedding
-                embedding = np.random.randn(self.vector_dim) * 0.1  # Placeholder
-                self.session_state['microstructure_embedding'] = embedding
-                self.session_state['confidence'] = np.random.random()
+        if spring:
+            score += weights["spring"]
+            reasons.append("Spring detected")
+        if choch and not bos:
+            score += weights["choch_trap"]
+            reasons.append("CHoCH without BOS (trap zone)")
+        if bos:
+            score += weights["bos_confirm"]
+            reasons.append("BOS confirms structure shift")
+        if spread < 0.3:
+            score += weights["spread_compression"]
+            result["volatility"] = "compressed"
+        if abs(ret) > 0.0004:
+            score += weights["reversal_tick"]
+            reasons.append("strong reversal tick")
 
-                return {
-                    'status': 'processed',
-                    'agent': 'micro_strategist',
-                    'session_state': self.session_state,
-                    'vector_norm': np.linalg.norm(embedding)
-                }
+        if score >= 1.5:
+            result["entry_signal"] = True
+            result["confidence"] = min(score / sum(weights.values()), 1.0)
+            result["trigger"] = "+".join(reasons)
+            result["reason"] = " + ".join(reasons)
+            result["phase_context"] = phase
+        else:
+            result["reason"] = "Score too low: " + ", ".join(reasons)
 
-            async def _process_ohlc_data(self, event: Any) -> Dict[str, Any]:
-                """Process OHLC data for microstructure patterns"""
-                return {
-                    'status': 'processed',
-                    'agent': 'micro_strategist',
-                    'data_type': 'ohlc',
-                    'symbol': event.symbol,
-                    'timeframe': event.timeframe
-                }
+        result["raw_score"] = score
+        if ret > 0:
+            result["tick_bias"] = "bullish"
+        elif ret < 0:
+            result["tick_bias"] = "bearish"
+        else:
+            result["tick_bias"] = "neutral"
+
+        return result

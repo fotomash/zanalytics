@@ -2,7 +2,6 @@
 import os
 import pytest
 
-<<<<<<< HEAD
 # Set test mode BEFORE any imports
 os.environ['ZANALYTICS_TEST_MODE'] = '1'
 
@@ -15,3 +14,4 @@ def pytest_unconfigure(config):
     """Clean up after tests"""
     if 'ZANALYTICS_TEST_MODE' in os.environ:
         del os.environ['ZANALYTICS_TEST_MODE']
+

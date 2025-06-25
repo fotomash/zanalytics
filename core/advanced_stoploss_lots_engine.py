@@ -364,7 +364,12 @@ def calculate_sl_and_risk(
                  else: final_sl = max(structural_sl, atr_sl); sl_choice_reason = f"Wider (Max of Struct={structural_sl:.5f}, ATR={atr_sl:.5f})"
             elif blend_logic == "structural_priority": final_sl = structural_sl; sl_choice_reason = "Structural Priority"
             elif blend_logic == "atr_priority": final_sl = atr_sl; sl_choice_reason = "ATR Priority"
-            else: if trade_type == 'buy': final_sl = min(structural_sl, atr_sl); else: final_sl = max(structural_sl, atr_sl); sl_choice_reason = f"Wider (Unknown Blend Logic: {blend_logic})"
+            else:
+                if trade_type == 'buy':
+                    final_sl = min(structural_sl, atr_sl)
+                else:
+                    final_sl = max(structural_sl, atr_sl)
+                sl_choice_reason = f"Wider (Unknown Blend Logic: {blend_logic})"
         elif valid_structural: final_sl = structural_sl; sl_choice_reason = "Structural Only (ATR Invalid)"
         elif valid_atr: final_sl = atr_sl; sl_choice_reason = "ATR Only (Structural Invalid)"
         else: output["error"] = "Both Structural and ATR SL calculations failed."; print(f"[ERROR][AdvSLRiskEngine] {output['error']}"); return output
@@ -400,58 +405,58 @@ def calculate_sl_and_risk(
 
     return output
 
-
-    # --- Example Usage ---
-    if __name__ == '__main__':
-    # --- Example Usage ---
-    if __name__ == '__main__':
-    print("\n--- Testing Advanced StopLoss & Risk Engine (Volatility Aware + Patched Pip Map + Syntax Fix) ---")
-
-    # --- Create Dummy Data ---
-    ohlc_dates = pd.date_range(start='2024-04-28 10:00', periods=50, freq='15T', tz='UTC')
-    ohlc_data = pd.DataFrame({ 'Open': np.linspace(1.1000, 1.1050, 50), 'High': np.linspace(1.1005, 1.1055, 50) + np.random.rand(50)*0.001, 'Low': np.linspace(1.0995, 1.1045, 50) - np.random.rand(50)*0.001, 'Close': np.linspace(1.1003, 1.1053, 50) + np.random.randn(50)*0.0005, 'Volume': np.random.randint(100, 1000, 50).astype(float) }, index=ohlc_dates)
-    ohlc_data['High'] = ohlc_data[['Open','Close','High']].max(axis=1); ohlc_data['Low'] = ohlc_data[['Open','Close','Low']].min(axis=1)
-    tick_dates = pd.date_range(start=ohlc_dates[-1] - timedelta(minutes=5), periods=60, freq='5S', tz='UTC'); last_close = ohlc_data['Close'].iloc[-1]
-    tick_data = pd.DataFrame({'bid': last_close + np.random.randn(60)*0.00005 - 0.00005, 'ask': last_close + np.random.randn(60)*0.00005 + 0.00005,}, index=tick_dates)
-
-    # --- Test Parameters ---
-    test_account_balance = 100000; test_conviction = 4; test_entry_price = ohlc_data['Close'].iloc[-1]; test_entry_time = ohlc_data.index[-1]; test_trade_type = 'buy'; test_symbol = 'OANDA:EUR_USD'; test_strategy = 'Inv'
-    test_mentfx_config = {'min_buffer_base': 0.00020, 'max_buffer': 0.00150, 'spread_buffer_base': 0.00002, 'use_adaptive_buffer': False}
-    test_atr_config = {'period': 14, 'multiplier': 1.5}
-    test_volatility_config = {'atr_period': 14, 'bb_period': 20, 'bb_stddev': 2.0, 'atr_ma_period': 10, 'bbw_ma_period': 10}
-    test_risk_config = { 'max_risk_percent': 1.0, 'vol_adjustment_quiet': 1.10, 'vol_adjustment_normal': 1.00, 'vol_adjustment_explosive': 0.70, 'min_lot_step': 0.01, 'max_lot_size': 10.0, 'sl_blend_logic': 'wider', 'volatility_config': test_volatility_config }
-
-    print(f"\n--- Running Test Calculation (EURUSD - Normal Vol Expected) ---")
-    risk_result_eurusd = calculate_sl_and_risk( account_balance=test_account_balance, conviction_score=test_conviction, entry_price=test_entry_price, entry_time=test_entry_time, trade_type=test_trade_type, symbol=test_symbol, strategy_variant=test_strategy, ohlc_data=ohlc_data, tick_data=tick_data, mentfx_sl_config=test_mentfx_config, atr_config=test_atr_config, risk_config=test_risk_config, volatility_config=test_volatility_config )
-    print("\n--- Calculation Result (EURUSD) ---"); print(json.dumps(risk_result_eurusd, indent=2, default=str)); print("-" * 35)
-
-    # --- Test Gold ---
-    print(f"\n--- Running Test Calculation (XAUUSD) ---")
-    test_symbol_xau = "XAUUSD"; test_entry_price_xau = 2350.50; test_trade_type_xau = 'sell'; test_conviction_xau = 5
-    test_mentfx_config_xau = {'min_buffer_base': 0.30, 'max_buffer': 2.50, 'spread_buffer_base': 0.10, 'use_adaptive_buffer': False}
-    print("WARN: Using EURUSD OHLC/Tick data for XAUUSD test - ATR/Vol/Struct SL will be inaccurate.")
-    risk_result_xau = calculate_sl_and_risk( account_balance=test_account_balance, conviction_score=test_conviction_xau, entry_price=test_entry_price_xau, entry_time=test_entry_time, trade_type=test_trade_type_xau, symbol=test_symbol_xau, strategy_variant=test_strategy, ohlc_data=ohlc_data, tick_data=tick_data, mentfx_sl_config=test_mentfx_config_xau, atr_config=test_atr_config, risk_config=test_risk_config, volatility_config=test_volatility_config )
-    print("\n--- Calculation Result (XAUUSD) ---"); print(json.dumps(risk_result_xau, indent=2, default=str)); print("-" * 35)
-
-     # --- Test Index ---
-    print(f"\n--- Running Test Calculation (SPX500) ---")
-    test_symbol_spx = "SPX500"; test_entry_price_spx = 5100.50; test_trade_type_spx = 'buy'; test_conviction_spx = 3
-    test_mentfx_config_spx = {'min_buffer_base': 2.0, 'max_buffer': 15.0, 'spread_buffer_base': 0.5, 'use_adaptive_buffer': False}
-    print("WARN: Using EURUSD OHLC/Tick data for SPX500 test - ATR/Vol/Struct SL will be inaccurate.")
-    risk_result_spx = calculate_sl_and_risk( account_balance=test_account_balance, conviction_score=test_conviction_spx, entry_price=test_entry_price_spx, entry_time=test_entry_time, trade_type=test_trade_type_spx, symbol=test_symbol_spx, strategy_variant=test_strategy, ohlc_data=ohlc_data, tick_data=tick_data, mentfx_sl_config=test_mentfx_config_spx, atr_config=test_atr_config, risk_config=test_risk_config, volatility_config=test_volatility_config )
-    print("\n--- Calculation Result (SPX500) ---"); print(json.dumps(risk_result_spx, indent=2, default=str)); print("-" * 35)
-
-    # --- Test Unknown Symbol ---
-    print(f"\n--- Running Test Calculation (UNKNOWN:XYZ) ---")
-    test_symbol_unk = "UNKNOWN:XYZ"
-    risk_result_unk = calculate_sl_and_risk( account_balance=test_account_balance, conviction_score=3, entry_price=100.0, entry_time=test_entry_time, trade_type='buy', symbol=test_symbol_unk, strategy_variant=test_strategy, ohlc_data=ohlc_data, tick_data=tick_data, mentfx_sl_config={}, atr_config={}, risk_config=test_risk_config, volatility_config=test_volatility_config )
-    print("\n--- Calculation Result (UNKNOWN) ---"); print(json.dumps(risk_result_unk, indent=2, default=str)); print("-" * 35)
-
-
-    print("\n--- Engine Testing Complete ---")
-
-    # --- Example Usage ---
-    if __name__ == '__main__':
+# 
+#     # --- Example Usage ---
+#     if __name__ == '__main__':
+#     # --- Example Usage ---
+#     if __name__ == '__main__':
+#     print("\n--- Testing Advanced StopLoss & Risk Engine (Volatility Aware + Patched Pip Map + Syntax Fix) ---")
+# 
+#     # --- Create Dummy Data ---
+#     ohlc_dates = pd.date_range(start='2024-04-28 10:00', periods=50, freq='15T', tz='UTC')
+#     ohlc_data = pd.DataFrame({ 'Open': np.linspace(1.1000, 1.1050, 50), 'High': np.linspace(1.1005, 1.1055, 50) + np.random.rand(50)*0.001, 'Low': np.linspace(1.0995, 1.1045, 50) - np.random.rand(50)*0.001, 'Close': np.linspace(1.1003, 1.1053, 50) + np.random.randn(50)*0.0005, 'Volume': np.random.randint(100, 1000, 50).astype(float) }, index=ohlc_dates)
+#     ohlc_data['High'] = ohlc_data[['Open','Close','High']].max(axis=1); ohlc_data['Low'] = ohlc_data[['Open','Close','Low']].min(axis=1)
+#     tick_dates = pd.date_range(start=ohlc_dates[-1] - timedelta(minutes=5), periods=60, freq='5S', tz='UTC'); last_close = ohlc_data['Close'].iloc[-1]
+#     tick_data = pd.DataFrame({'bid': last_close + np.random.randn(60)*0.00005 - 0.00005, 'ask': last_close + np.random.randn(60)*0.00005 + 0.00005,}, index=tick_dates)
+# 
+#     # --- Test Parameters ---
+#     test_account_balance = 100000; test_conviction = 4; test_entry_price = ohlc_data['Close'].iloc[-1]; test_entry_time = ohlc_data.index[-1]; test_trade_type = 'buy'; test_symbol = 'OANDA:EUR_USD'; test_strategy = 'Inv'
+#     test_mentfx_config = {'min_buffer_base': 0.00020, 'max_buffer': 0.00150, 'spread_buffer_base': 0.00002, 'use_adaptive_buffer': False}
+#     test_atr_config = {'period': 14, 'multiplier': 1.5}
+#     test_volatility_config = {'atr_period': 14, 'bb_period': 20, 'bb_stddev': 2.0, 'atr_ma_period': 10, 'bbw_ma_period': 10}
+#     test_risk_config = { 'max_risk_percent': 1.0, 'vol_adjustment_quiet': 1.10, 'vol_adjustment_normal': 1.00, 'vol_adjustment_explosive': 0.70, 'min_lot_step': 0.01, 'max_lot_size': 10.0, 'sl_blend_logic': 'wider', 'volatility_config': test_volatility_config }
+# 
+#     print(f"\n--- Running Test Calculation (EURUSD - Normal Vol Expected) ---")
+#     risk_result_eurusd = calculate_sl_and_risk( account_balance=test_account_balance, conviction_score=test_conviction, entry_price=test_entry_price, entry_time=test_entry_time, trade_type=test_trade_type, symbol=test_symbol, strategy_variant=test_strategy, ohlc_data=ohlc_data, tick_data=tick_data, mentfx_sl_config=test_mentfx_config, atr_config=test_atr_config, risk_config=test_risk_config, volatility_config=test_volatility_config )
+#     print("\n--- Calculation Result (EURUSD) ---"); print(json.dumps(risk_result_eurusd, indent=2, default=str)); print("-" * 35)
+# 
+#     # --- Test Gold ---
+#     print(f"\n--- Running Test Calculation (XAUUSD) ---")
+#     test_symbol_xau = "XAUUSD"; test_entry_price_xau = 2350.50; test_trade_type_xau = 'sell'; test_conviction_xau = 5
+#     test_mentfx_config_xau = {'min_buffer_base': 0.30, 'max_buffer': 2.50, 'spread_buffer_base': 0.10, 'use_adaptive_buffer': False}
+#     print("WARN: Using EURUSD OHLC/Tick data for XAUUSD test - ATR/Vol/Struct SL will be inaccurate.")
+#     risk_result_xau = calculate_sl_and_risk( account_balance=test_account_balance, conviction_score=test_conviction_xau, entry_price=test_entry_price_xau, entry_time=test_entry_time, trade_type=test_trade_type_xau, symbol=test_symbol_xau, strategy_variant=test_strategy, ohlc_data=ohlc_data, tick_data=tick_data, mentfx_sl_config=test_mentfx_config_xau, atr_config=test_atr_config, risk_config=test_risk_config, volatility_config=test_volatility_config )
+#     print("\n--- Calculation Result (XAUUSD) ---"); print(json.dumps(risk_result_xau, indent=2, default=str)); print("-" * 35)
+# 
+#      # --- Test Index ---
+#     print(f"\n--- Running Test Calculation (SPX500) ---")
+#     test_symbol_spx = "SPX500"; test_entry_price_spx = 5100.50; test_trade_type_spx = 'buy'; test_conviction_spx = 3
+#     test_mentfx_config_spx = {'min_buffer_base': 2.0, 'max_buffer': 15.0, 'spread_buffer_base': 0.5, 'use_adaptive_buffer': False}
+#     print("WARN: Using EURUSD OHLC/Tick data for SPX500 test - ATR/Vol/Struct SL will be inaccurate.")
+#     risk_result_spx = calculate_sl_and_risk( account_balance=test_account_balance, conviction_score=test_conviction_spx, entry_price=test_entry_price_spx, entry_time=test_entry_time, trade_type=test_trade_type_spx, symbol=test_symbol_spx, strategy_variant=test_strategy, ohlc_data=ohlc_data, tick_data=tick_data, mentfx_sl_config=test_mentfx_config_spx, atr_config=test_atr_config, risk_config=test_risk_config, volatility_config=test_volatility_config )
+#     print("\n--- Calculation Result (SPX500) ---"); print(json.dumps(risk_result_spx, indent=2, default=str)); print("-" * 35)
+# 
+#     # --- Test Unknown Symbol ---
+#     print(f"\n--- Running Test Calculation (UNKNOWN:XYZ) ---")
+#     test_symbol_unk = "UNKNOWN:XYZ"
+#     risk_result_unk = calculate_sl_and_risk( account_balance=test_account_balance, conviction_score=3, entry_price=100.0, entry_time=test_entry_time, trade_type='buy', symbol=test_symbol_unk, strategy_variant=test_strategy, ohlc_data=ohlc_data, tick_data=tick_data, mentfx_sl_config={}, atr_config={}, risk_config=test_risk_config, volatility_config=test_volatility_config )
+#     print("\n--- Calculation Result (UNKNOWN) ---"); print(json.dumps(risk_result_unk, indent=2, default=str)); print("-" * 35)
+# 
+# 
+#     print("\n--- Engine Testing Complete ---")
+# 
+#     # --- Example Usage ---
+#     if __name__ == '__main__':
 
 
 # --- Example class containing calculate_stop method ---

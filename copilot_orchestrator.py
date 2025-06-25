@@ -333,10 +333,21 @@ def run_full_analysis(all_tf_data: dict, pair: str, timestamp_str: str, target_t
     else: log_info(f"Skipping Wyckoff analysis: Module or {wyckoff_tf.upper()} data not available.")
     legacy_bos = "N/A"; legacy_poi="N/A"; legacy_entry="N/A"
     analysis_results_for_chart = { "smc_structure": structure_data, "wyckoff_result": wyckoff_result, "legacy_bos": legacy_bos, "legacy_poi": legacy_poi, "legacy_entry": legacy_entry, }
-    chart_tf = target_tf_str.lower(); chart_data_to_plot = all_tf_data.get(chart_tf, pd.DataFrame())
-    if chart_data_to_plot.empty: chart_tf = 'm15'; chart_data_to_plot = all_tf_data.get(chart_tf, pd.DataFrame())
-    if chart_data_to_plot.empty and all_tf_data: first_available_tf = next((tf for tf in ['m1', 'm5', 'm15', 'h1', 'h4'] if tf in all_tf_data and not all_tf_data[tf].empty), None);
-    if first_available_tf: chart_data_to_plot = all_tf_data[first_available_tf].tail(100); chart_tf = first_available_tf; else: log_info("No suitable data found for plotting.", "WARN")
+    chart_tf = target_tf_str.lower()
+    chart_data_to_plot = all_tf_data.get(chart_tf, pd.DataFrame())
+    if chart_data_to_plot.empty:
+        chart_tf = 'm15'
+        chart_data_to_plot = all_tf_data.get(chart_tf, pd.DataFrame())
+    if chart_data_to_plot.empty and all_tf_data:
+        first_available_tf = next(
+            (tf for tf in ['m1', 'm5', 'm15', 'h1', 'h4'] if tf in all_tf_data and not all_tf_data[tf].empty),
+            None,
+        )
+        if first_available_tf:
+            chart_data_to_plot = all_tf_data[first_available_tf].tail(100)
+            chart_tf = first_available_tf
+        else:
+            log_info("No suitable data found for plotting.", "WARN")
     chart_json = None
     if not chart_data_to_plot.empty: chart_json = generate_analysis_chart_json( price_df=chart_data_to_plot.tail(200), chart_tf=chart_tf.upper(), pair=pair, target_time=timestamp_str, structure_data=structure_data, wyckoff_result=wyckoff_result, variant_name=variant_name, chart_options=chart_options )
     final_analysis_results = { "analysis": analysis_results_for_chart, "chart_json": chart_json, "journal": "Analysis pending (legacy)", "error": wyckoff_result.get('error') if wyckoff_result else None }
@@ -435,7 +446,7 @@ def handle_price_check(pair: str, timestamp_str: str, tf: str = 'm15', strategy_
 
 
 # --- (NLP Prompt Parser, Main Prompt Handler, Session Scanner Functions remain the same) ---
-def parse_user_prompt(...): # Collapsed
+def parse_user_prompt(prompt: str):
     # ... (Function body remains the same) ...
     prompt_lower = prompt.lower(); log_info(f"Parsing prompt: '{prompt}'")
     strategy_keywords = { "mentfx": "Mentfx", "mentfx logic": "Mentfx", "mentfx style": "Mentfx", "tmc": "TMC", "tmc logic": "TMC", "tmc style": "TMC", "tmc confirmation": "TMC", "theory masterclass": "TMC", "inv": "Inv", "inversion": "Inv", "inv setup": "Inv", "maz2": "MAZ2", "maz": "MAZ2", "maz setup": "MAZ2", "maz style": "MAZ2", "wyckoff": "Wyckoff", "smc": "SMC", "institutional": "Institutional", "default": None, "legacy": None }
@@ -450,25 +461,43 @@ def parse_user_prompt(...): # Collapsed
     parsed_dict = match.groupdict(); symbol_raw = parsed_dict.get('symbol')
     symbol_map = { "GBPUSD": "OANDA:GBP_USD", "EURUSD": "OANDA:EUR_USD", "BTC": "BINANCE:BTCUSDT", "BTCUSD": "BINANCE:BTCUSDT", "BTCUSDT": "BINANCE:BTCUSDT", "ETH": "BINANCE:ETHUSDT", "ETHUSD": "BINANCE:ETHUSDT", "ETHUSDT": "BINANCE:ETHUSDT", "XAUUSD": "OANDA:XAU_USD", "XAU": "OANDA:XAU_USD", "GOLD": "OANDA:XAU_USD", "GC": "COMEX:GC", "EUR": "OANDA:EUR_USD", "GBP": "OANDA:GBP_USD", "AAPL": "AAPL", "MSFT": "MSFT", "GOOGL": "GOOGL", "SPX": "^GSPC", "DXY": "DX-Y.NYB", "VIX": "^VIX", "US10Y": "^TNX", "OIL": "CL=F" }
     pair = symbol_map.get(symbol_raw.upper(), symbol_raw.upper()); target_timestamp_str = None
-    if parsed_dict.get('now'): target_dt = datetime.now(timezone.utc); target_timestamp_str = target_dt.strftime('%Y-%m-%d %H:%M:%S')
+    if parsed_dict.get('now'):
+        target_dt = datetime.now(timezone.utc)
+        target_timestamp_str = target_dt.strftime('%Y-%m-%d %H:%M:%S')
     elif parsed_dict.get('hour'):
-        try: hour = int(parsed_dict['hour']); minute = int(parsed_dict['minute']) if parsed_dict.get('minute') else 0; meridiem = parsed_dict.get('meridiem');
-        if meridiem: meridiem = meridiem.lower(); if meridiem == "pm" and 1 <= hour <= 11: hour += 12; elif meridiem == "am" and hour == 12: hour = 0
-        if not (0 <= hour <= 23 and 0 <= minute <= 59): raise ValueError("Invalid hour/minute range"); target_dt_naive = datetime.now().replace(hour=hour, minute=minute, second=0, microsecond=0); target_dt_utc = target_dt_naive.replace(tzinfo=timezone.utc); target_timestamp_str = target_dt_utc.strftime('%Y-%m-%d %H:%M:%S')
-        except Exception as e: log_info(f"Error parsing time: {e}", "ERROR"); return None
-    else: log_info("Could not determine target time.", "ERROR"); return None
+        try:
+            hour = int(parsed_dict['hour'])
+            minute = int(parsed_dict['minute']) if parsed_dict.get('minute') else 0
+            meridiem = parsed_dict.get('meridiem')
+            if meridiem:
+                meridiem = meridiem.lower()
+                if meridiem == "pm" and 1 <= hour <= 11:
+                    hour += 12
+                elif meridiem == "am" and hour == 12:
+                    hour = 0
+            if not (0 <= hour <= 23 and 0 <= minute <= 59):
+                raise ValueError("Invalid hour/minute range")
+            target_dt_naive = datetime.now().replace(hour=hour, minute=minute, second=0, microsecond=0)
+            target_dt_utc = target_dt_naive.replace(tzinfo=timezone.utc)
+            target_timestamp_str = target_dt_utc.strftime('%Y-%m-%d %H:%M:%S')
+        except Exception as e:
+            log_info(f"Error parsing time: {e}", "ERROR")
+            return None
+    else:
+        log_info("Could not determine target time.", "ERROR")
+        return None
     tf = "m15"; tf_raw = parsed_dict.get('tf'); tf_map_internal = {'m1':'m1', 'm5':'m5', 'm15':'m15', 'm30':'m30', 'h1':'h1', 'h4':'h4', 'd1':'d1', 'w1':'w1'}
     if tf_raw: tf = tf_map_internal.get(tf_raw.lower(), "m15")
     final_parsed_args = {"pair": pair, "timestamp_str": target_timestamp_str, "tf": tf, "strategy_variant": detected_variant}; log_info(f"Parsed prompt successfully: {final_parsed_args}"); return final_parsed_args
 
-def handle_prompt(...): # Collapsed
+def handle_prompt(prompt: str):
     # ... (Function body remains the same) ...
     log_info(f"Received prompt for handling: '{prompt}'")
     parsed_args = parse_user_prompt(prompt)
     if not parsed_args: log_info("Prompt parsing failed."); return {"status": "error", "message": "Could not parse the prompt. Use format 'SYMBOL at HH:MM [am/pm] [TF] [using VARIANT strategy]' or 'SYMBOL now [TF] [variant]'."}
     result = handle_price_check(**parsed_args); return result
 
-def send_webhook_alert(...): # Collapsed
+def send_webhook_alert(payload: dict):
     # ... (Function body remains the same) ...
     webhook_url = os.environ.get("SCANNER_WEBHOOK_URL");
     if not webhook_url: log_info("No webhook URL found in environment (SCANNER_WEBHOOK_URL). Skipping alert.", "WARN"); return
@@ -508,8 +537,11 @@ def run_session_scan(pairs: list, tf: str, log_dir: str, log_format: str, strate
         result = handle_price_check(pair, timestamp_str, tf, strategy_variant=strategy)
         if result.get("status") == "ok":
             log_info(f"Analysis OK for {pair}."); log_session_result(result, log_dir, log_format); entry_confirmed = result.get("final_entry_result", {}).get("entry_confirmed", False); confluence_strength = "weak" # Placeholder
-            alert_reason = None;
-            if entry_confirmed: alert_reason = "Confirmed Entry Signal"; elif confluence_strength == "strong": alert_reason = "Strong Confluence Detected"
+            alert_reason = None
+            if entry_confirmed:
+                alert_reason = "Confirmed Entry Signal"
+            elif confluence_strength == "strong":
+                alert_reason = "Strong Confluence Detected"
             if alert_reason:
                  log_info(f"ALERT condition met for {pair}: {alert_reason}");
                  alert_payload = {
