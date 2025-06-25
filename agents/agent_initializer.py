@@ -1,11 +1,11 @@
 # agent_initializer.py
 
-from agents.agent_microstrategist import MicroStrategistAgent
-from agents.agent_macroanalyser import MacroAnalyzerAgent
-from agents.agent_riskmanager import RiskManagerAgent
-from agents.agent_tradejournalist import TradeJournalistAgent
-from agents.agent_htfanalyst import HTFAnalystAgent
-from agents.agent_reputationauditor import ReputationAuditorAgent
+from .agent_microstrategist import MicroStrategistAgent
+from .agent_macroanalyser import MacroAnalyzerAgent
+from .agent_riskmanager import RiskManagerAgent
+from .agent_tradejournalist import TradeJournalistAgent
+from .agent_htfanalyst import HTFAnalystAgent
+from .agent_reputationauditor import ReputationAuditorAgent
 from core.agent_semanticdss import SemanticDecisionSupportAgent
 
 
