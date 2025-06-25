@@ -1,16 +1,15 @@
-# Create updated startup script for real data dashboard
-updated_startup = '''#!/bin/bash
+#!/bin/bash
 # start_real_zanalytics.sh - Startup script for REAL DATA ZANALYTICS system
 
 echo "🚀 ZANALYTICS REAL DATA SYSTEM STARTUP"
 echo "======================================"
 
 # Colors for output
-RED='\\033[0;31m'
-GREEN='\\033[0;32m'
-YELLOW='\\033[1;33m'
-BLUE='\\033[0;34m'
-NC='\\033[0m' # No Color
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+BLUE='\033[0;34m'
+NC='\033[0m' # No Color
 
 # Function to check if port is in use
 check_port() {
@@ -28,22 +27,22 @@ start_service() {
     local name=$1
     local command=$2
     local port=$3
-    
+
     echo -e "${BLUE}🔄 Starting $name...${NC}"
-    
+
     # Check if port is available
     if ! check_port $port; then
         echo -e "${RED}❌ Cannot start $name - port $port in use${NC}"
         return 1
     fi
-    
+
     # Start the service
     nohup $command > logs/${name}.log 2>&1 &
     local pid=$!
     echo $pid > pids/${name}.pid
-    
+
     sleep 2
-    
+
     # Check if service is running
     if ps -p $pid > /dev/null 2>&1; then
         echo -e "${GREEN}✅ $name started successfully (PID: $pid)${NC}"
@@ -145,7 +144,7 @@ ports=(8501 5010 5011 4040)
 for i in "${!services[@]}"; do
     service=${services[$i]}
     port=${ports[$i]}
-    
+
     if [ -f "pids/${service}.pid" ]; then
         pid=$(cat pids/${service}.pid 2>/dev/null)
         if [ -n "$pid" ] && ps -p $pid > /dev/null 2>&1; then
@@ -174,7 +173,7 @@ if command -v curl &> /dev/null; then
     if curl -s $ngrok_api > /dev/null 2>&1; then
         echo -e "${GREEN}🌐 Public ngrok URLs:${NC}"
         echo "   Check: http://localhost:4040 for live URLs"
-        
+
         # Try to extract URLs
         curl -s $ngrok_api 2>/dev/null | python3 -c "
 import sys, json
@@ -205,20 +204,3 @@ echo ""
 echo -e "${GREEN}🎉 REAL DATA ZANALYTICS system is ready!${NC}"
 echo -e "${BLUE}📊 Your dashboard shows ACTUAL XAUUSD trading data!${NC}"
 echo -e "${YELLOW}🔗 Access your real data dashboard at: http://localhost:8501${NC}"
-'''
-
-# Write the updated startup script
-with open('start_real_zanalytics.sh', 'w') as f:
-    f.write(updated_startup)
-
-# Make it executable
-import os
-os.chmod('start_real_zanalytics.sh', 0o755)
-
-print("✅ Created REAL DATA startup script: start_real_zanalytics.sh")
-print("\n🎯 This script will:")
-print("   ✅ Use the FIXED ngrok configuration (ngrok_fixed.yml)")
-print("   📊 Launch the REAL DATA dashboard")
-print("   🔍 Check for your actual data files")
-print("   🚀 Start all services with real data support")
-print("   🌐 Create ngrok tunnels for global access")

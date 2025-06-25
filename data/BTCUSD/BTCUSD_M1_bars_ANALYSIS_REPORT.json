@@ -3,7 +3,7 @@
     "original_file": "BTCUSD_M1_bars.csv",
     "detected_pair": "BTCUSD",
     "detected_timeframe": "1T",
-    "processed_at": "2025-06-24T23:30:22.009971"
+    "processed_at": "2025-06-25T01:22:50.248183"
   },
   "processing_config": {
     "single_timeframe_mode": false,
@@ -21,8 +21,8 @@
       "data_info": {
         "total_rows": 40847,
         "date_range": {
-          "start": "2025-05-26 01:30:00",
-          "end": "2025-06-25 01:29:00"
+          "start": "2025-05-26 03:23:00",
+          "end": "2025-06-25 03:22:00"
         },
         "total_columns": 152
       },
@@ -31,29 +31,29 @@
           "min": 98107.71,
           "max": 110662.47
         },
-        "volatility": 55.6805991319896,
+        "volatility": 55.55595783080891,
         "trend": "bearish"
       },
       "signal_summary": {
-        "strong_buy_signals": 443,
+        "strong_buy_signals": 444,
         "strong_sell_signals": 415
       },
       "market_regime": {
-        "current": "ranging",
+        "current": "volatile",
         "distribution": {
-          "ranging": 20246,
-          "volatile": 9296,
-          "trending_up": 5983,
-          "trending_down": 5322
+          "ranging": 20263,
+          "volatile": 9301,
+          "trending_up": 5971,
+          "trending_down": 5312
         }
       }
     },
     "5T": {
       "data_info": {
-        "total_rows": 8171,
+        "total_rows": 8172,
         "date_range": {
-          "start": "2025-05-26 01:30:00",
-          "end": "2025-06-25 01:25:00"
+          "start": "2025-05-26 03:20:00",
+          "end": "2025-06-25 03:20:00"
         },
         "total_columns": 152
       },
@@ -62,7 +62,7 @@
           "min": 98107.71,
           "max": 110662.47
         },
-        "volatility": 146.21487918511232,
+        "volatility": 145.97935107397728,
         "trend": "bearish"
       },
       "signal_summary": {
@@ -72,19 +72,19 @@
       "market_regime": {
         "current": "ranging",
         "distribution": {
-          "ranging": 4162,
+          "ranging": 4195,
           "volatile": 1883,
-          "trending_up": 1163,
-          "trending_down": 963
+          "trending_up": 1133,
+          "trending_down": 961
         }
       }
     },
     "15T": {
       "data_info": {
-        "total_rows": 2745,
+        "total_rows": 2746,
         "date_range": {
-          "start": "2025-05-26 01:30:00",
-          "end": "2025-06-25 01:15:00"
+          "start": "2025-05-26 03:15:00",
+          "end": "2025-06-25 03:15:00"
         },
         "total_columns": 152
       },
@@ -93,7 +93,7 @@
           "min": 98107.71,
           "max": 110662.47
         },
-        "volatility": 269.4318794577152,
+        "volatility": 268.9867103211312,
         "trend": "bearish"
       },
       "signal_summary": {
@@ -103,19 +103,19 @@
       "market_regime": {
         "current": "ranging",
         "distribution": {
-          "ranging": 1221,
+          "ranging": 1226,
           "volatile": 740,
           "trending_down": 411,
-          "trending_up": 373
+          "trending_up": 369
         }
       }
     },
     "30T": {
       "data_info": {
-        "total_rows": 1373,
+        "total_rows": 1374,
         "date_range": {
-          "start": "2025-05-26 01:30:00",
-          "end": "2025-06-25 01:00:00"
+          "start": "2025-05-26 03:00:00",
+          "end": "2025-06-25 03:00:00"
         },
         "total_columns": 152
       },
@@ -124,7 +124,7 @@
           "min": 98107.71,
           "max": 110662.47
         },
-        "volatility": 386.6414685644967,
+        "volatility": 386.24612901043747,
         "trend": "bearish"
       },
       "signal_summary": {
@@ -134,10 +134,10 @@
       "market_regime": {
         "current": "trending_up",
         "distribution": {
-          "ranging": 597,
-          "volatile": 309,
-          "trending_up": 245,
-          "trending_down": 222
+          "ranging": 599,
+          "volatile": 308,
+          "trending_up": 246,
+          "trending_down": 221
         }
       }
     },
@@ -145,8 +145,8 @@
       "data_info": {
         "total_rows": 688,
         "date_range": {
-          "start": "2025-05-26 01:00:00",
-          "end": "2025-06-25 01:00:00"
+          "start": "2025-05-26 03:00:00",
+          "end": "2025-06-25 03:00:00"
         },
         "total_columns": 152
       },
@@ -155,7 +155,7 @@
           "min": 98107.71,
           "max": 110662.47
         },
-        "volatility": 556.0637745362719,
+        "volatility": 555.2704130363743,
         "trend": "bearish"
       },
       "signal_summary": {
@@ -165,10 +165,10 @@
       "market_regime": {
         "current": "trending_up",
         "distribution": {
-          "ranging": 311,
+          "ranging": 312,
           "volatile": 181,
-          "trending_down": 113,
-          "trending_up": 83
+          "trending_down": 110,
+          "trending_up": 85
         }
       }
     }

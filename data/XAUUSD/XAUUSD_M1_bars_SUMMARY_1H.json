@@ -2,8 +2,8 @@
   "data_info": {
     "total_rows": 503,
     "date_range": {
-      "start": "2025-05-26 01:00:00",
-      "end": "2025-06-25 01:00:00"
+      "start": "2025-05-26 03:00:00",
+      "end": "2025-06-25 03:00:00"
     },
     "total_columns": 152
   },
@@ -12,7 +12,7 @@
       "min": 3245.47,
       "max": 3451.19
     },
-    "volatility": 10.672652946509412,
+    "volatility": 10.662746673265769,
     "trend": "bearish"
   },
   "signal_summary": {

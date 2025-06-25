@@ -1,38 +1,19 @@
-# Create corrected ngrok configuration for ngrok v3+
-import yaml
-
-# Fixed ngrok config - removing invalid bind_tls field
-corrected_config = {
-    'version': '2',
-    'authtoken': 'YOUR_NGROK_AUTH_TOKEN_HERE',
-    'tunnels': {
-        'zanalytics-api': {
-            'addr': '5010',
-            'proto': 'http',
-            'inspect': True
-        },
-        'streamlit-dashboard': {
-            'addr': '8501', 
-            'proto': 'http',
-            'inspect': True
-        },
-        'data-processor': {
-            'addr': '5011',
-            'proto': 'http', 
-            'inspect': True
-        },
-        'websocket-stream': {
-            'addr': '8765',
-            'proto': 'http',
-            'inspect': True
-        }
-    }
-}
-
-# Write corrected config
-with open('ngrok_fixed.yml', 'w') as f:
-    yaml.dump(corrected_config, f, default_flow_style=False, indent=2)
-
-print("✅ Created FIXED ngrok configuration: ngrok_fixed.yml")
-print("🔧 Removed invalid 'bind_tls' fields")
-print("✅ Compatible with ngrok v3+")
+authtoken: 2ylwNSOegedyWqRc8aGyxwQuB6l_5yHXT3zkR4KwxavcJZoCK
+tunnels:
+  data-processor:
+    addr: '5011'
+    inspect: true
+    proto: http
+  streamlit-dashboard:
+    addr: '8501'
+    inspect: true
+    proto: http
+  websocket-stream:
+    addr: '8765'
+    inspect: true
+    proto: http
+  zanalytics-api:
+    addr: '5010'
+    inspect: true
+    proto: http
+version: '2'

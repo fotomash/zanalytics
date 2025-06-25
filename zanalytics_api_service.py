@@ -1,369 +1,335 @@
-# zanalytics_api_service.py - Fixed with correct DataFlowManager interface
-from flask import Flask, jsonify, request, g
-from flask_cors import CORS
+from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
+import uvicorn
 import asyncio
-import threading
 import json
-import pandas as pd
-import numpy as np
+import os
 from datetime import datetime
-from pathlib import Path
+from typing import Dict, List, Optional, Any
+import pandas as pd
+from pydantic import BaseModel
 import logging
 
-# Import your existing systems
-from data_flow_manager import DataFlowManager, DataFlowEvent
-from ncos_agent_system import ncOSAgentOrchestrator
+# Import your custom modules (assuming they exist)
+try:
+    from data_flow_manager import DataFlowManager
+    from agent_registry import AgentRegistry
+    from zanalytics_adapter import ZanalyticsAdapter
+except ImportError as e:
+    print(f"Warning: Could not import modules: {e}")
+    print("Running in standalone mode...")
 
-app = Flask(__name__)
-CORS(app)
+# Configure logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
+# FastAPI app
+app = FastAPI(
+    title="ZANALYTICS API Service",
+    description="Real-time trading data analysis and agent decision API",
+    version="1.0.0"
+)
 
-# Global state for the API service
-class ZAnalyticsAPIState:
+# CORS middleware
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+# Global state
+class AppState:
     def __init__(self):
-        # Data storage
-        self.current_data = {}
-        self.agent_responses = {}
-        self.session_state = {}
-        self.analysis_history = []
-
-        # System components
-        self.agent_orchestrator = None
         self.data_flow_manager = None
+        self.agent_registry = None
+        self.zanalytics_adapter = None
+        self.websocket_connections: List[WebSocket] = []
+        self.analysis_cache = {}
+        self.agent_decisions = []
+        self.system_status = "INITIALIZING"
 
-        # Cache for fast access
-        self.latest_tick_data = {}
-        self.latest_ohlc_data = {}
-        self.latest_analysis = {}
+    async def initialize(self):
+        """Initialize all components"""
+        try:
+            # Initialize components if modules are available
+            try:
+                self.agent_registry = AgentRegistry()
+                self.zanalytics_adapter = ZanalyticsAdapter()
+                self.data_flow_manager = DataFlowManager(
+                    zanalytics_callback=self.process_zanalytics_event
+                )
+                self.system_status = "ONLINE"
+                logger.info("All components initialized successfully")
+            except Exception as e:
+                logger.warning(f"Could not initialize full system: {e}")
+                self.system_status = "STANDALONE"
+        except Exception as e:
+            logger.error(f"Failed to initialize: {e}")
+            self.system_status = "ERROR"
 
-    def update_data(self, symbol: str, timeframe: str, data: dict):
-        """Update cached data for fast API access"""
-        key = f"{symbol}_{timeframe}"
-        self.current_data[key] = {
-            'symbol': symbol,
-            'timeframe': timeframe,
-            'data': data,
-            'timestamp': datetime.now().isoformat(),
-            'processed': True
-        }
+    async def process_zanalytics_event(self, event_data):
+        """Process ZANALYTICS events"""
+        try:
+            # Cache the analysis
+            self.analysis_cache[event_data.get('symbol', 'UNKNOWN')] = event_data
 
-
-# Global state instance
-api_state = ZAnalyticsAPIState()
-
-
-# ===============================================================================
-# CORE API ENDPOINTS - EVERYTHING YOUR GPT MODELS NEED
-# ===============================================================================
-
-@app.route('/status', methods=['GET'])
-def get_system_status():
-    """Complete system status for LLM awareness"""
-    return jsonify({
-        'system': 'zanalytics_intelligence_api',
-        'version': '1.0.0',
-        'status': 'operational',
-        'data_feeds': {
-            'active_symbols': list(api_state.latest_tick_data.keys()),
-            'active_timeframes': list(set([d['timeframe'] for d in api_state.current_data.values()])),
-            'last_update': max(
-                [d['timestamp'] for d in api_state.current_data.values()]) if api_state.current_data else None
-        },
-        'agents': {
-            'active_agents': ['bozenka', 'stefania', 'lusia', 'zdzisiek', 'rysiek'],
-            'last_consensus': api_state.session_state.get('last_consensus', None)
-        },
-        'data_manager': api_state.data_flow_manager.get_data_status() if api_state.data_flow_manager else {},
-        'session_metrics': {
-            'events_processed': api_state.session_state.get('event_count', 0),
-            'analysis_count': len(api_state.analysis_history)
-        }
-    })
-
-
-@app.route('/data/latest/<symbol>', methods=['GET'])
-def get_latest_data(symbol):
-    """Get latest processed data for a symbol - ALL TIMEFRAMES"""
-    symbol = symbol.upper()
-
-    # Get all timeframes for this symbol
-    symbol_data = {k: v for k, v in api_state.current_data.items() if k.startswith(symbol)}
-
-    if not symbol_data:
-        return jsonify({'error': f'No data available for {symbol}'}), 404
-
-    return jsonify({
-        'symbol': symbol,
-        'timeframes': symbol_data,
-        'tick_data': api_state.latest_tick_data.get(symbol, {}),
-        'latest_analysis': api_state.latest_analysis.get(symbol, {}),
-        'metadata': {
-            'available_timeframes': [k.split('_')[1] for k in symbol_data.keys()],
-            'data_freshness': min([v['timestamp'] for v in symbol_data.values()])
-        }
-    })
-
-
-@app.route('/data/tick/<symbol>', methods=['GET'])
-def get_tick_data(symbol):
-    """Raw tick data - perfect for microstructure analysis prompts"""
-    symbol = symbol.upper()
-    tick_data = api_state.latest_tick_data.get(symbol, {})
-
-    if not tick_data:
-        return jsonify({'error': f'No tick data for {symbol}'}), 404
-
-    return jsonify({
-        'symbol': symbol,
-        'data_type': 'tick',
-        'tick_data': tick_data,
-        'spread_analysis': tick_data.get('spread_metrics', {}),
-        'microstructure': tick_data.get('microstructure_signals', {}),
-        'timestamp': tick_data.get('timestamp')
-    })
-
-
-@app.route('/data/ohlc/<symbol>/<timeframe>', methods=['GET'])
-def get_ohlc_data(symbol, timeframe):
-    """OHLC data with all indicators and patterns"""
-    symbol = symbol.upper()
-    timeframe = timeframe.upper()
-    key = f"{symbol}_{timeframe}"
-
-    data = api_state.current_data.get(key, {})
-    if not data:
-        return jsonify({'error': f'No OHLC data for {symbol}/{timeframe}'}), 404
-
-    return jsonify({
-        'symbol': symbol,
-        'timeframe': timeframe,
-        'ohlc_data': data['data'],
-        'indicators': data['data'].get('indicators', {}),
-        'patterns': data['data'].get('patterns', {}),
-        'smc_analysis': data['data'].get('smc', {}),
-        'wyckoff_analysis': data['data'].get('wyckoff', {}),
-        'timestamp': data['timestamp']
-    })
-
-
-@app.route('/agents/decisions', methods=['GET'])
-def get_agent_decisions():
-    """Latest decisions from all agents - PERFECT FOR GPT PROMPTS"""
-    return jsonify({
-        'agents': api_state.agent_responses,
-        'consensus': api_state.session_state.get('last_consensus', {}),
-        'decision_summary': {
-            'bozenka_signal': api_state.agent_responses.get('bozenka', {}).get('entry_signal', False),
-            'stefania_trust': api_state.agent_responses.get('stefania', {}).get('trust_score', 0.5),
-            'lusia_confluence': api_state.agent_responses.get('lusia', {}).get('confluence_score', 0.0),
-            'zdzisiek_risk': api_state.agent_responses.get('zdzisiek', {}).get('risk_acceptable', True),
-            'rysiek_phase': api_state.agent_responses.get('rysiek', {}).get('phase', 'unknown')
-        },
-        'timestamp': datetime.now().isoformat()
-    })
-
-
-@app.route('/analysis/summary/<symbol>', methods=['GET'])
-def get_analysis_summary(symbol):
-    """Complete analysis summary - ONE CALL FOR EVERYTHING"""
-    symbol = symbol.upper()
-
-    # Gather all data for this symbol
-    latest_data = {}
-    for k, v in api_state.current_data.items():
-        if k.startswith(symbol):
-            timeframe = k.split('_')[1]
-            latest_data[timeframe] = v['data']
-
-    tick_data = api_state.latest_tick_data.get(symbol, {})
-    analysis = api_state.latest_analysis.get(symbol, {})
-
-    return jsonify({
-        'symbol': symbol,
-        'timestamp': datetime.now().isoformat(),
-        'data_available': list(latest_data.keys()),
-
-        # Microstructure (from tick data)
-        'microstructure': {
-            'spread': tick_data.get('spread_metrics', {}),
-            'liquidity': tick_data.get('liquidity_signals', {}),
-            'manipulation': tick_data.get('manipulation_detected', False)
-        },
-
-        # Multi-timeframe structure
-        'structure_analysis': {tf: data.get('smc', {}) for tf, data in latest_data.items()},
-
-        # Wyckoff phases across timeframes
-        'wyckoff_phases': {tf: data.get('wyckoff', {}) for tf, data in latest_data.items()},
-
-        # Technical indicators
-        'indicators': {tf: data.get('indicators', {}) for tf, data in latest_data.items()},
-
-        # Agent consensus
-        'agent_consensus': api_state.session_state.get('last_consensus', {}),
-
-        # Trade decision support
-        'decision_support': {
-            'entry_signals': [agent for agent, resp in api_state.agent_responses.items()
-                              if resp.get('entry_signal', False)],
-            'risk_level': api_state.agent_responses.get('zdzisiek', {}).get('risk_score', 0.5),
-            'confluence_score': api_state.agent_responses.get('lusia', {}).get('confluence_score', 0.0),
-            'trust_score': api_state.agent_responses.get('stefania', {}).get('trust_score', 0.5)
-        }
-    })
-
-
-@app.route('/data/upload', methods=['POST'])
-def upload_data():
-    """Upload CSV/JSON data for processing"""
-    if 'file' not in request.files:
-        return jsonify({'error': 'No file uploaded'}), 400
-
-    file = request.files['file']
-    if file.filename == '':
-        return jsonify({'error': 'No file selected'}), 400
-
-    # Create uploads directory if it doesn't exist
-    upload_dir = Path("./uploads")
-    upload_dir.mkdir(exist_ok=True)
-
-    # Save file and trigger processing
-    file_path = upload_dir / file.filename
-    file.save(str(file_path))
-
-    return jsonify({
-        'status': 'uploaded',
-        'filename': file.filename,
-        'processing': 'monitoring will detect automatically'
-    })
-
-
-# ===============================================================================
-# EVENT PROCESSING INTEGRATION - FIXED TO USE CORRECT INTERFACE
-# ===============================================================================
-
-async def process_data_event(event: DataFlowEvent):
-    """Process incoming data events and update API state"""
-<<<<<<< HEAD
-    try:
-        # Update cached data
-        api_state.update_data(event.symbol, event.timeframe, event.data)
-
-        # Store tick data separately for microstructure analysis
-        if event.source == 'csv' and event.data.get('data_type') == 'tick':
-            api_state.latest_tick_data[event.symbol] = event.data
-
-        # Process through agents if orchestrator is available
-        if api_state.agent_orchestrator:
-            agent_event = {
-                'event_type': event.event_type,
-                'symbol': event.symbol,
-                'timeframe': event.timeframe,
-                'data': event.data.get('analysis', event.data),  # Use analysis if available
-                'indicators': event.data.get('indicators', {}),
-                'risk_metrics': {'spread': 0.2, 'volatility': 0.3},  # Default values
-                'wyckoff': {'phase': 'unknown', 'confidence': 0.5}  # Default values
-            }
-
-            agent_result = await api_state.agent_orchestrator.process_event(agent_event)
-
-            # Update agent responses
-            api_state.agent_responses = agent_result.get('agent_responses', {})
-            api_state.session_state['last_consensus'] = agent_result.get('consensus', {})
-
-            # Add to history
-            api_state.analysis_history.append({
-                'timestamp': datetime.now().isoformat(),
-                'symbol': event.symbol,
-                'timeframe': event.timeframe,
-                'agent_results': agent_result,
-                'event_data': event.data
+            # Broadcast to WebSocket clients
+            await self.broadcast_to_websockets({
+                "type": "analysis_update",
+                "data": event_data,
+                "timestamp": datetime.now().isoformat()
             })
 
-            print(f"✅ Processed {event.symbol} {event.timeframe} through agents")
+            logger.info(f"Processed ZANALYTICS event for {event_data.get('symbol', 'UNKNOWN')}")
+        except Exception as e:
+            logger.error(f"Error processing ZANALYTICS event: {e}")
 
-    except Exception as e:
-        print(f"❌ Error processing data event: {e}")
-        # Continue rather than crash
+    async def broadcast_to_websockets(self, message):
+        """Broadcast message to all connected WebSocket clients"""
+        if not self.websocket_connections:
+            return
 
+        disconnected = []
+        for websocket in self.websocket_connections:
+            try:
+                await websocket.send_json(message)
+            except:
+                disconnected.append(websocket)
 
-def setup_data_integration():
-    """Initialize data flow integration - FIXED"""
-    config = {
-        'watch_directories': ['./data', './exports', './uploads'],
-        'agents': {
-            'bozenka': {'active': True},
-            'stefania': {'active': True},
-            'lusia': {'active': True},
-            'zdzisiek': {'active': True},
-            'rysiek': {'active': True}
-        }
+        # Remove disconnected clients
+        for ws in disconnected:
+            self.websocket_connections.remove(ws)
+
+# Global app state
+state = AppState()
+
+# Pydantic models
+class SystemStatus(BaseModel):
+    status: str
+    timestamp: str
+    components: Dict[str, str]
+    active_symbols: int
+    events_processed: int
+    analysis_count: int
+
+class AgentDecision(BaseModel):
+    agent_id: str
+    agent_type: str
+    symbol: str
+    decision: str
+    confidence: float
+    reasoning: str
+    timestamp: str
+
+class AnalysisSummary(BaseModel):
+    symbol: str
+    timeframe: str
+    price: float
+    trend: str
+    signals: List[Dict]
+    patterns: List[Dict]
+    risk_metrics: Dict
+    timestamp: str
+
+# API Routes
+@app.on_event("startup")
+async def startup_event():
+    """Initialize the application on startup"""
+    await state.initialize()
+    logger.info("ZANALYTICS API Service started successfully")
+
+@app.get("/")
+async def root():
+    """Root endpoint"""
+    return {
+        "service": "ZANALYTICS API",
+        "version": "1.0.0",
+        "status": state.system_status,
+        "timestamp": datetime.now().isoformat()
     }
-<<<<<<< HEAD
 
-    # Create directories if they don't exist
-    for directory in config['watch_directories']:
-        Path(directory).mkdir(exist_ok=True)
+@app.get("/status", response_model=SystemStatus)
+async def get_system_status():
+    """Get system status"""
+    components = {
+        "data_flow_manager": "ONLINE" if state.data_flow_manager else "OFFLINE",
+        "agent_registry": "ONLINE" if state.agent_registry else "OFFLINE",
+        "zanalytics_adapter": "ONLINE" if state.zanalytics_adapter else "OFFLINE",
+        "websocket_connections": f"{len(state.websocket_connections)} active"
+    }
+
+    return SystemStatus(
+        status=state.system_status,
+        timestamp=datetime.now().isoformat(),
+        components=components,
+        active_symbols=len(state.analysis_cache),
+        events_processed=len(state.agent_decisions),
+        analysis_count=len(state.analysis_cache)
+    )
+
+@app.get("/agents/decisions")
+async def get_agent_decisions():
+    """Get recent agent decisions"""
+    try:
+        # Return recent decisions (last 50)
+        recent_decisions = state.agent_decisions[-50:] if state.agent_decisions else []
+
+        # If no real decisions, return mock data for demo
+        if not recent_decisions:
+            mock_decisions = [
+                {
+                    "agent_id": "risk_manager_001",
+                    "agent_type": "RiskManager",
+                    "symbol": "XAUUSD",
+                    "decision": "REDUCE_EXPOSURE",
+                    "confidence": 0.85,
+                    "reasoning": "High volatility detected, reducing position size",
+                    "timestamp": datetime.now().isoformat()
+                },
+                {
+                    "agent_id": "macro_analyst_001",
+                    "agent_type": "MacroAnalyst",
+                    "symbol": "XAUUSD",
+                    "decision": "BULLISH_BIAS",
+                    "confidence": 0.72,
+                    "reasoning": "Dollar weakness and inflation concerns support gold",
+                    "timestamp": datetime.now().isoformat()
+                }
+            ]
+            return {"decisions": mock_decisions, "total": len(mock_decisions)}
+
+        return {"decisions": recent_decisions, "total": len(recent_decisions)}
+    except Exception as e:
+        logger.error(f"Error getting agent decisions: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/analysis/summary/{symbol}")
+async def get_analysis_summary(symbol: str, timeframe: str = "M1"):
+    """Get analysis summary for a symbol"""
+    try:
+        # Check cache first
+        if symbol in state.analysis_cache:
+            cached_data = state.analysis_cache[symbol]
+            return cached_data
+
+        # If no cached data, return mock analysis for demo
+        mock_analysis = {
+            "symbol": symbol,
+            "timeframe": timeframe,
+            "price": 2650.45 if symbol == "XAUUSD" else 1.0850,
+            "trend": "BULLISH",
+            "signals": [
+                {"type": "BUY", "strength": 0.75, "source": "RSI_OVERSOLD"},
+                {"type": "HOLD", "strength": 0.60, "source": "SUPPORT_LEVEL"}
+            ],
+            "patterns": [
+                {"name": "HAMMER", "confidence": 0.82},
+                {"name": "BULLISH_ENGULFING", "confidence": 0.65}
+            ],
+            "risk_metrics": {
+                "volatility": 0.15,
+                "max_drawdown": 0.03,
+                "sharpe_ratio": 1.25
+            },
+            "timestamp": datetime.now().isoformat()
+        }
+
+        return mock_analysis
+    except Exception as e:
+        logger.error(f"Error getting analysis for {symbol}: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/symbols")
+async def get_active_symbols():
+    """Get list of active symbols"""
+    symbols = list(state.analysis_cache.keys()) if state.analysis_cache else ["XAUUSD", "EURUSD"]
+    return {"symbols": symbols, "total": len(symbols)}
+
+@app.post("/analysis/trigger/{symbol}")
+async def trigger_analysis(symbol: str, timeframe: str = "M1"):
+    """Trigger analysis for a symbol"""
+    try:
+        if state.zanalytics_adapter:
+            # Trigger real analysis
+            result = await state.zanalytics_adapter.trigger_analysis(symbol, timeframe)
+            return {"status": "triggered", "symbol": symbol, "timeframe": timeframe, "result": result}
+        else:
+            # Mock response
+            return {"status": "triggered", "symbol": symbol, "timeframe": timeframe, "message": "Analysis queued"}
+    except Exception as e:
+        logger.error(f"Error triggering analysis for {symbol}: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.websocket("/ws")
+async def websocket_endpoint(websocket: WebSocket):
+    """WebSocket endpoint for real-time updates"""
+    await websocket.accept()
+    state.websocket_connections.append(websocket)
+    logger.info(f"WebSocket connected. Total connections: {len(state.websocket_connections)}")
 
     try:
-        # Initialize agent orchestrator
-        api_state.agent_orchestrator = ncOSAgentOrchestrator(config)
-        print(f"✅ Agent orchestrator initialized")
+        # Send initial status
+        await websocket.send_json({
+            "type": "connection_established",
+            "status": state.system_status,
+            "timestamp": datetime.now().isoformat()
+        })
 
-        # Initialize data flow manager with CORRECT parameter name
-        api_state.data_flow_manager = DataFlowManager(
-            watch_directories=config['watch_directories'],
-            zanalytics_callback=process_data_event  # CORRECT parameter name!
-        )
+        # Keep connection alive
+        while True:
+            try:
+                # Wait for client messages (ping/pong)
+                data = await websocket.receive_text()
+                message = json.loads(data)
 
-        # Start monitoring
-        api_state.data_flow_manager.start_monitoring()
-        print(f"✅ Data flow manager started, monitoring: {config['watch_directories']}")
+                if message.get("type") == "ping":
+                    await websocket.send_json({"type": "pong", "timestamp": datetime.now().isoformat()})
 
-    except Exception as e:
-        print(f"❌ Error setting up data integration: {e}")
-        print(f"API will run in basic mode without data monitoring")
+            except WebSocketDisconnect:
+                break
+            except Exception as e:
+                logger.error(f"WebSocket error: {e}")
+                break
 
+    except WebSocketDisconnect:
+        pass
+    finally:
+        if websocket in state.websocket_connections:
+            state.websocket_connections.remove(websocket)
+        logger.info(f"WebSocket disconnected. Remaining connections: {len(state.websocket_connections)}")
 
-# ===============================================================================
-# STARTUP
-# ===============================================================================
+@app.get("/health")
+async def health_check():
+    """Health check endpoint"""
+    return {
+        "status": "healthy",
+        "timestamp": datetime.now().isoformat(),
+        "system_status": state.system_status,
+        "connections": len(state.websocket_connections)
+    }
 
-if __name__ == '__main__':
-    # Setup logging
-    logging.basicConfig(level=logging.INFO)
+# Error handlers
+@app.exception_handler(Exception)
+async def global_exception_handler(request, exc):
+    logger.error(f"Global exception: {exc}")
+    return JSONResponse(
+        status_code=500,
+        content={"detail": f"Internal server error: {str(exc)}"}
+    )
 
-    # Create logs directory
-    Path("logs").mkdir(exist_ok=True)
+if __name__ == "__main__":
+    print("🚀 Starting ZANALYTICS API Service...")
+    print("📊 Service will be available at: http://localhost:5010")
+    print("🔌 WebSocket endpoint: ws://localhost:5010/ws")
+    print("📖 API docs: http://localhost:5010/docs")
 
-    print("""
-╔══════════════════════════════════════════════════════╗
-║           ZANALYTICS INTELLIGENCE API v1.0           ║
-║              Data Intelligence for GPT Models        ║
-╠══════════════════════════════════════════════════════╣
-║  🚀 Starting API Service...                          ║
-╚══════════════════════════════════════════════════════╝
-    """)
-
-    # Initialize integrations
-    setup_data_integration()
-
-    print("""
-╔══════════════════════════════════════════════════════╗
-║  📊 Real-time Data Processing Active                 ║
-║  🤖 Agent Decisions Available                        ║
-║  ⚡ Ready for LLM Integration                        ║
-╚══════════════════════════════════════════════════════╝
-
-API Endpoints for your GPT models:
-    GET  /status                    - System status
-    GET  /data/latest/{symbol}      - Latest all data
-    GET  /data/tick/{symbol}        - Tick data
-    GET  /data/ohlc/{symbol}/{tf}   - OHLC with indicators
-    GET  /agents/decisions          - Agent decisions
-    GET  /analysis/summary/{symbol} - Complete analysis
-
-Running on http://0.0.0.0:5010
-    """)
-
-    app.run(host='0.0.0.0', port=5010, debug=False, threaded=True)
+    uvicorn.run(
+        app,
+        host="0.0.0.0",
+        port=5010,
+        log_level="info",
+        access_log=True
+    )

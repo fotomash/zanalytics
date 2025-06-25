@@ -9,10 +9,10 @@
   "successful_files": [],
   "failed_files": [],
   "skipped_files": [],
-  "processed_at": "2025-06-24T23:30:22.120369",
+  "processed_at": "2025-06-25T01:22:50.340536",
   "configuration": {
     "timeframes": "['1T', '5T', '15T', '30T', '1H', '4H', '1D', '1W', '1M']",
-    "output_dir": "/Users/tom/Documents/GitHub/zanalytics/data/latest",
+    "output_dir": "/Users/tom/Documents/GitHub/zanalytics/data",
     "parallel_processing": "True",
     "max_workers": "11",
     "use_tick_volume_for_volume_indicators": "True",
