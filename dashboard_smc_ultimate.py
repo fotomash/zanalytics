@@ -1,5 +1,3 @@
-# dashboard_smc_ultimate.py - Complete version with proper indentation
-
 import streamlit as st
 import pandas as pd
 import plotly.graph_objects as go
@@ -122,393 +120,192 @@ class UltimateSMCConfig:
             'wyckoff_dist': '#e17055'
         }
 
-# Ultimate Data Loader with ALL SMC features
-class UltimateSMCDataLoader:
-    def __init__(self, config: UltimateSMCConfig):
+# Data Loader
+class SMCDataLoader:
+    def __init__(self, config):
         self.config = config
         
-    def scan_complete_data(self) -> Dict:
-        """Scan for ALL SMC data including COMPREHENSIVE files"""
-        data_map = {}
+    def scan_data_directory(self):
+        """Scan data directory for comprehensive and summary files"""
+        pairs_data = {}
         
+        # Look for CSV files (comprehensive data)
+        csv_files = glob.glob(os.path.join(self.config.data_dir, "**", "*.csv"), recursive=True)
+        
+        # Look for JSON files (summary data)
+        json_files = glob.glob(os.path.join(self.config.data_dir, "**", "*.json"), recursive=True)
+        
+        # Process each pair
         for pair in self.config.pairs:
-            pair_path = os.path.join(self.config.data_dir, pair)
-            if not os.path.exists(pair_path):
-                continue
-                
-            data_map[pair] = {
-                "comprehensive_files": {},
-                "summary_files": {},
-                "analysis_report": None,
-                "available_timeframes": []
+            pairs_data[pair] = {
+                'comprehensive_files': {},
+                'summary_files': {}
             }
             
-            # Find COMPREHENSIVE CSV files (these have ALL SMC data)
+            # Find comprehensive files for each timeframe
             for tf in self.config.timeframes:
-                comp_file = os.path.join(pair_path, f"{pair}_M1_bars_COMPREHENSIVE_{tf}.csv")
-                if os.path.exists(comp_file):
-                    data_map[pair]["comprehensive_files"][tf] = comp_file
-                    data_map[pair]["available_timeframes"].append(tf)
-                    
-                # Find corresponding SUMMARY JSON
-                summary_file = os.path.join(pair_path, f"{pair}_M1_bars_SUMMARY_{tf}.json")
-                if os.path.exists(summary_file):
-                    data_map[pair]["summary_files"][tf] = summary_file
-            
-            # Find ANALYSIS REPORT
-            analysis_report = os.path.join(pair_path, f"{pair}_M1_bars_ANALYSIS_REPORT.json")
-            if os.path.exists(analysis_report):
-                data_map[pair]["analysis_report"] = analysis_report
+                # Find comprehensive files
+                comp_files = [f for f in csv_files if pair in f and (f"_{tf}" in f or f"_{tf.lower()}" in f)]
+                if comp_files:
+                    pairs_data[pair]['comprehensive_files'][tf] = comp_files[-1]  # Use the latest file
+                
+                # Find summary files
+                summary_files = [f for f in json_files if pair in f and (f"_{tf}" in f or f"_{tf.lower()}" in f)]
+                if summary_files:
+                    pairs_data[pair]['summary_files'][tf] = summary_files[-1]  # Use the latest file
         
-        return data_map
+        return pairs_data
     
-    def load_comprehensive_data(self, file_path: str, max_bars: int = None) -> pd.DataFrame:
-        """Load COMPREHENSIVE CSV with ALL SMC indicators"""
+    def load_comprehensive_data(self, file_path, max_bars=None):
+        """Load comprehensive data from CSV file"""
         try:
-            # Load CSV
+            # Try comma-separated first
             df = pd.read_csv(file_path)
             
-            # Parse timestamp
+            # If doesn't have expected columns, try tab-separated
+            if 'open' not in df.columns and 'high' not in df.columns:
+                df = pd.read_csv(file_path, sep='	')
+            
+            # Convert timestamp to datetime if it exists
             if 'timestamp' in df.columns:
                 df['timestamp'] = pd.to_datetime(df['timestamp'])
-                df = df.set_index('timestamp')
+                df.set_index('timestamp', inplace=True)
             
-            # Sort and get latest bars
-            df = df.sort_index()
-            if max_bars:
-                df = df.tail(max_bars)
+            # Limit the number of bars if specified
+            if max_bars and len(df) > max_bars:
+                df = df.iloc[-max_bars:]
             
             return df
-            
         except Exception as e:
-            st.error(f"Error loading comprehensive data: {str(e)}")
+            st.error(f"Error loading data: {str(e)}")
             return None
     
-    def load_smc_summary(self, file_path: str) -> Dict:
-        """Load SMC summary JSON with all analysis results"""
+    def load_smc_summary(self, file_path):
+        """Load SMC summary from JSON file"""
         try:
             with open(file_path, 'r') as f:
-                return json.load(f)
+                summary = json.load(f)
+            return summary
         except Exception as e:
             st.error(f"Error loading summary: {str(e)}")
             return {}
     
-    def extract_all_smc_features(self, df: pd.DataFrame, summary: Dict) -> Dict:
-        """Extract ALL SMC features from comprehensive data and summary"""
-        smc_features = {
-            "order_blocks": self._extract_order_blocks(df, summary),
-            "liquidity_zones": self._extract_liquidity_zones(df, summary),
-            "fair_value_gaps": self._extract_fvg(df, summary),
-            "supply_demand_zones": self._extract_supply_demand(df, summary),
-            "bos_choch_points": self._extract_structure_breaks(df, summary),
-            "pivot_points": self._extract_pivots(df, summary),
-            "market_structure": self._extract_market_structure(df, summary),
-            "volume_profile": self._extract_volume_profile(df, summary),
-            "harmonic_patterns": self._extract_harmonics(summary),
-            "wyckoff_analysis": self._extract_wyckoff(summary),
-            "signals": self._extract_trading_signals(df, summary)
+    def extract_all_smc_features(self, df, summary):
+        """Extract all SMC features from dataframe and summary"""
+        # Initialize features dictionary
+        features = {
+            'order_blocks': [],
+            'liquidity_zones': [],
+            'fair_value_gaps': [],
+            'supply_demand_zones': {'supply': [], 'demand': []},
+            'bos_choch_points': {'bos': [], 'choch': []},
+            'pivot_points': {'highs': [], 'lows': []},
+            'market_structure': {'trend': 'neutral', 'strength': 50},
+            'volume_profile': {'poc': None, 'vah': None, 'val': None},
+            'harmonic_patterns': [],
+            'wyckoff_analysis': {'phase': 'Unknown', 'events': [], 'accumulation_zones': [], 'distribution_zones': []},
+            'signals': []
         }
         
-        return smc_features
-    
-    def _extract_order_blocks(self, df: pd.DataFrame, summary: Dict) -> List[Dict]:
-        """Extract order blocks from data"""
-        order_blocks = []
-        
-        # From summary JSON
-        if 'smc_analysis' in summary and 'order_blocks' in summary['smc_analysis']:
-            order_blocks.extend(summary['smc_analysis']['order_blocks'])
-        
-        # From DataFrame columns if they exist
-        if 'order_block_high' in df.columns and 'order_block_low' in df.columns:
-            ob_mask = df['order_block_high'].notna() | df['order_block_low'].notna()
-            for idx in df[ob_mask].index[-10:]:  # Last 10 order blocks
-                order_blocks.append({
-                    'timestamp': idx,
-                    'high': df.loc[idx, 'order_block_high'] if pd.notna(df.loc[idx, 'order_block_high']) else df.loc[idx, 'high'],
-                    'low': df.loc[idx, 'order_block_low'] if pd.notna(df.loc[idx, 'order_block_low']) else df.loc[idx, 'low'],
-                    'type': 'bullish' if df.loc[idx, 'close'] > df.loc[idx, 'open'] else 'bearish'
-                })
-        
-        return order_blocks
-    
-    def _extract_liquidity_zones(self, df: pd.DataFrame, summary: Dict) -> List[Dict]:
-        """Extract liquidity zones"""
-        zones = []
-        
-        # From summary
-        if 'liquidity_analysis' in summary:
-            if 'zones' in summary['liquidity_analysis']:
-                zones.extend(summary['liquidity_analysis']['zones'])
-            if 'levels' in summary['liquidity_analysis']:
-                for level in summary['liquidity_analysis']['levels']:
-                    zones.append({'level': level, 'type': 'liquidity'})
-        
-        # From price action - find swing highs/lows
-        if len(df) > 20:
-            highs = df['high'].rolling(10).max()
-            lows = df['low'].rolling(10).min()
+        # Extract features from summary if available
+        if summary:
+            # Order blocks
+            if 'order_blocks' in summary:
+                features['order_blocks'] = summary['order_blocks']
             
-            # Recent swing highs as sell-side liquidity
-            recent_highs = df[df['high'] == highs]['high'].tail(5)
-            for idx, high in recent_highs.items():
-                zones.append({
-                    'timestamp': idx,
-                    'level': high,
-                    'type': 'sell_side_liquidity'
-                })
+            # Liquidity zones
+            if 'liquidity_zones' in summary:
+                features['liquidity_zones'] = summary['liquidity_zones']
             
-            # Recent swing lows as buy-side liquidity
-            recent_lows = df[df['low'] == lows]['low'].tail(5)
-            for idx, low in recent_lows.items():
-                zones.append({
-                    'timestamp': idx,
-                    'level': low,
-                    'type': 'buy_side_liquidity'
-                })
-        
-        return zones
-    
-    def _extract_fvg(self, df: pd.DataFrame, summary: Dict) -> List[Dict]:
-        """Extract Fair Value Gaps"""
-        fvgs = []
-        
-        # From summary
-        if 'microstructure_analysis' in summary and 'fair_value_gaps' in summary['microstructure_analysis']:
-            fvgs.extend(summary['microstructure_analysis']['fair_value_gaps'])
-        
-        # Calculate from price action
-        if len(df) > 3:
-            for i in range(2, len(df)):
-                # Bullish FVG: Current low > Previous high
-                if df.iloc[i]['low'] > df.iloc[i-2]['high']:
-                    fvgs.append({
-                        'timestamp': df.index[i],
-                        'high': df.iloc[i]['low'],
-                        'low': df.iloc[i-2]['high'],
-                        'type': 'bullish_fvg'
-                    })
-                
-                # Bearish FVG: Current high < Previous low
-                elif df.iloc[i]['high'] < df.iloc[i-2]['low']:
-                    fvgs.append({
-                        'timestamp': df.index[i],
-                        'high': df.iloc[i-2]['low'],
-                        'low': df.iloc[i]['high'],
-                        'type': 'bearish_fvg'
-                    })
-        
-        return fvgs[-20:]  # Last 20 FVGs
-    
-    def _extract_supply_demand(self, df: pd.DataFrame, summary: Dict) -> Dict:
-        """Extract supply and demand zones"""
-        zones = {'supply': [], 'demand': []}
-        
-        # From summary
-        if 'supply_demand_analysis' in summary:
-            if 'supply_zones' in summary['supply_demand_analysis']:
-                zones['supply'] = summary['supply_demand_analysis']['supply_zones']
-            if 'demand_zones' in summary['supply_demand_analysis']:
-                zones['demand'] = summary['supply_demand_analysis']['demand_zones']
-        
-        # From DataFrame - find strong moves
-        if 'volume' in df.columns and len(df) > 10:
-            # High volume + big red candle = Supply zone
-            vol_mean = df['volume'].mean()
-            for i in range(10, len(df)):
-                if df.iloc[i]['volume'] > vol_mean * 2:
-                    if df.iloc[i]['close'] < df.iloc[i]['open']:  # Red candle
-                        body = abs(df.iloc[i]['close'] - df.iloc[i]['open'])
-                        if body > df['close'].pct_change().std() * df.iloc[i]['close'] * 2:
-                            zones['supply'].append({
-                                'timestamp': df.index[i],
-                                'high': df.iloc[i]['high'],
-                                'low': df.iloc[i]['low'],
-                                'strength': df.iloc[i]['volume'] / vol_mean
-                            })
-                    else:  # Green candle = Demand zone
-                        body = abs(df.iloc[i]['close'] - df.iloc[i]['open'])
-                        if body > df['close'].pct_change().std() * df.iloc[i]['close'] * 2:
-                            zones['demand'].append({
-                                'timestamp': df.index[i],
-                                'high': df.iloc[i]['high'],
-                                'low': df.iloc[i]['low'],
-                                'strength': df.iloc[i]['volume'] / vol_mean
-                            })
-        
-        return zones
-    
-    def _extract_structure_breaks(self, df: pd.DataFrame, summary: Dict) -> Dict:
-        """Extract BOS and CHoCH points"""
-        structure = {'bos': [], 'choch': []}
-        
-        # From summary
-        if 'market_structure' in summary:
-            if 'break_of_structure' in summary['market_structure']:
-                structure['bos'] = summary['market_structure']['break_of_structure']
-            if 'change_of_character' in summary['market_structure']:
-                structure['choch'] = summary['market_structure']['change_of_character']
-        
-        return structure
-    
-    def _extract_pivots(self, df: pd.DataFrame, summary: Dict) -> Dict:
-        """Extract pivot points"""
-        pivots = {'highs': [], 'lows': []}
-        
-        # From DataFrame
-        if 'pivot_high' in df.columns:
-            pivot_highs = df[df['pivot_high'].notna()]
-            for idx in pivot_highs.index[-10:]:
-                pivots['highs'].append({
-                    'timestamp': idx,
-                    'price': df.loc[idx, 'pivot_high']
-                })
-        
-        if 'pivot_low' in df.columns:
-            pivot_lows = df[df['pivot_low'].notna()]
-            for idx in pivot_lows.index[-10:]:
-                pivots['lows'].append({
-                    'timestamp': idx,
-                    'price': df.loc[idx, 'pivot_low']
-                })
-        
-        return pivots
-    
-    def _extract_market_structure(self, df: pd.DataFrame, summary: Dict) -> Dict:
-        """Extract overall market structure"""
-        structure = {
-            'trend': 'neutral',
-            'strength': 0,
-            'phase': 'ranging'
-        }
-        
-        # From summary
-        if 'market_analysis' in summary:
-            structure.update(summary['market_analysis'])
-        
-        # Calculate from price
-        if len(df) > 50:
-            sma20 = df['close'].rolling(20).mean()
-            sma50 = df['close'].rolling(50).mean()
+            # Fair value gaps
+            if 'fair_value_gaps' in summary:
+                features['fair_value_gaps'] = summary['fair_value_gaps']
             
-            if df['close'].iloc[-1] > sma20.iloc[-1] > sma50.iloc[-1]:
-                structure['trend'] = 'bullish'
-                structure['strength'] = min((df['close'].iloc[-1] - sma50.iloc[-1]) / sma50.iloc[-1] * 100, 100)
-            elif df['close'].iloc[-1] < sma20.iloc[-1] < sma50.iloc[-1]:
-                structure['trend'] = 'bearish' 
-                structure['strength'] = min((sma50.iloc[-1] - df['close'].iloc[-1]) / sma50.iloc[-1] * 100, 100)
-        
-        return structure
-    
-    def _extract_volume_profile(self, df: pd.DataFrame, summary: Dict) -> Dict:
-        """Extract volume profile data"""
-        profile = {
-            'poc': None,  # Point of Control
-            'vah': None,  # Value Area High
-            'val': None,  # Value Area Low
-            'levels': []
-        }
-        
-        if 'volume_profile' in summary:
-            profile.update(summary['volume_profile'])
-        
-        # Calculate from data
-        if 'volume' in df.columns and len(df) > 20:
-            price_bins = pd.cut(df['close'], bins=20)
-            volume_profile = df.groupby(price_bins)['volume'].sum()
+            # Supply/demand zones
+            if 'supply_demand_zones' in summary:
+                # Handle both list and dictionary formats
+                if isinstance(summary['supply_demand_zones'], dict):
+                    features['supply_demand_zones'] = summary['supply_demand_zones']
+                else:
+                    # Convert list to dict format
+                    supply = [z for z in summary['supply_demand_zones'] if z.get('type') == 'supply']
+                    demand = [z for z in summary['supply_demand_zones'] if z.get('type') == 'demand']
+                    features['supply_demand_zones'] = {'supply': supply, 'demand': demand}
             
-            if len(volume_profile) > 0:
-                poc_idx = volume_profile.idxmax()
-                if poc_idx is not None:
-                    profile['poc'] = poc_idx.mid
+            # BOS/CHoCH points
+            if 'bos_choch_points' in summary:
+                features['bos_choch_points'] = summary['bos_choch_points']
+            
+            # Pivot points
+            if 'pivot_points' in summary:
+                features['pivot_points'] = summary['pivot_points']
+            
+            # Market structure
+            if 'market_structure' in summary:
+                features['market_structure'] = summary['market_structure']
+            
+            # Volume profile
+            if 'volume_profile' in summary:
+                features['volume_profile'] = summary['volume_profile']
+            
+            # Harmonic patterns
+            if 'harmonic_patterns' in summary:
+                features['harmonic_patterns'] = summary['harmonic_patterns']
+            
+            # Wyckoff analysis
+            if 'wyckoff_analysis' in summary:
+                features['wyckoff_analysis'] = summary['wyckoff_analysis']
+            
+            # Signals
+            if 'signals' in summary:
+                features['signals'] = summary['signals']
+        
+        # If no summary or missing features, try to extract from dataframe
+        if not features['market_structure']['trend'] or features['market_structure']['trend'] == 'neutral':
+            # Simple trend detection
+            if len(df) > 20:
+                sma20 = df['close'].rolling(20).mean()
+                sma50 = df['close'].rolling(50).mean()
                 
-                # Value area (70% of volume)
-                total_vol = volume_profile.sum()
-                cumsum = 0
-                va_indices = []
+                if sma20.iloc[-1] > sma50.iloc[-1]:
+                    features['market_structure']['trend'] = 'bullish'
+                    features['market_structure']['strength'] = 70
+                else:
+                    features['market_structure']['trend'] = 'bearish'
+                    features['market_structure']['strength'] = 70
+        
+        # If no volume profile, calculate simple one
+        if not features['volume_profile']['poc']:
+            if 'volume' in df.columns and len(df) > 0:
+                # Simple POC calculation
+                price_bins = pd.cut(df['close'], bins=10)
+                volume_profile = df.groupby(price_bins)['volume'].sum()
+                max_vol_bin = volume_profile.idxmax()
                 
-                sorted_profile = volume_profile.sort_values(ascending=False)
-                for idx, vol in sorted_profile.items():
-                    cumsum += vol
-                    va_indices.append(idx)
-                    if cumsum >= total_vol * 0.7:
-                        break
-                
-                if va_indices:
-                    all_mids = [idx.mid for idx in va_indices]
-                    profile['vah'] = max(all_mids)
-                    profile['val'] = min(all_mids)
+                features['volume_profile']['poc'] = max_vol_bin.mid
+                features['volume_profile']['vah'] = max_vol_bin.right
+                features['volume_profile']['val'] = max_vol_bin.left
         
-        return profile
-    
-    def _extract_harmonics(self, summary: Dict) -> List[Dict]:
-        """Extract harmonic patterns"""
-        patterns = []
-        
-        if 'harmonic_patterns' in summary:
-            patterns = summary['harmonic_patterns']
-        
-        return patterns
-    
-    def _extract_wyckoff(self, summary: Dict) -> Dict:
-        """Extract Wyckoff analysis"""
-        wyckoff = {
-            'phase': 'Unknown',
-            'events': [],
-            'accumulation_zones': [],
-            'distribution_zones': []
-        }
-        
-        if 'wyckoff_analysis' in summary:
-            wyckoff.update(summary['wyckoff_analysis'])
-        
-        return wyckoff
-    
-    def _extract_trading_signals(self, df: pd.DataFrame, summary: Dict) -> List[Dict]:
-        """Extract trading signals"""
-        signals = []
-        
-        if 'signals' in summary:
-            signals = summary['signals']
-        
-        # Generate signals from indicators if available
-        if 'signal' in df.columns:
-            signal_df = df[df['signal'] != 0].tail(10)
-            for idx in signal_df.index:
-                signals.append({
-                    'timestamp': idx,
-                    'type': 'buy' if signal_df.loc[idx, 'signal'] > 0 else 'sell',
-                    'price': signal_df.loc[idx, 'close'],
-                    'strength': abs(signal_df.loc[idx, 'signal'])
-                })
-        
-        return signals
+        return features
 
-# Ultimate Chart Generator with ALL SMC features  
-class UltimateSMCChartGenerator:
-    def __init__(self, config: UltimateSMCConfig):
-        self.colors = config.colors
+# Chart Generator
+class SMCChartGenerator:
+    def __init__(self, config):
+        self.config = config
     
-    def create_ultimate_smc_chart(self, df: pd.DataFrame, smc_features: Dict, pair: str, timeframe: str) -> go.Figure:
-        """Create the ULTIMATE SMC chart with ALL features"""
-        
-        # Create figure with subplots
+    def create_ultimate_smc_chart(self, df, features, pair, timeframe_name):
+        """Create ultimate SMC chart with all features"""
+        # Create figure with secondary y-axis
         fig = make_subplots(
-            rows=5, cols=1,
-            row_heights=[0.5, 0.15, 0.1, 0.1, 0.15],
-            subplot_titles=[
-                f"{pair} {timeframe} - Ultimate SMC Analysis",
-                "Volume & Order Flow",
-                "Market Structure",
-                "RSI & Momentum", 
-                "Signal Strength"
-            ],
-            vertical_spacing=0.02,
-            shared_xaxes=True
+            rows=2, 
+            cols=1, 
+            shared_xaxes=True,
+            vertical_spacing=0.05,
+            row_heights=[0.8, 0.2],
+            subplot_titles=(f"{pair} - {timeframe_name} - SMC Analysis", "Volume")
         )
         
-        # 1. Main Price Chart with ALL SMC overlays
-        # Candlesticks
+        # Add candlestick chart
         fig.add_trace(
             go.Candlestick(
                 x=df.index,
@@ -516,121 +313,261 @@ class UltimateSMCChartGenerator:
                 high=df['high'],
                 low=df['low'],
                 close=df['close'],
-                name="Price",
-                increasing_line_color=self.colors['bullish'],
-                decreasing_line_color=self.colors['bearish']
+                name="Price"
             ),
             row=1, col=1
         )
         
-        # Add ALL SMC features
-        self._add_all_order_blocks(fig, df, smc_features['order_blocks'])
-        self._add_all_liquidity_zones(fig, smc_features['liquidity_zones'])
-        self._add_all_supply_demand_zones(fig, smc_features['supply_demand_zones'])
-        self._add_all_fair_value_gaps(fig, smc_features['fair_value_gaps'])
-        self._add_structure_breaks(fig, smc_features['bos_choch_points'])
-        self._add_pivot_points(fig, smc_features['pivot_points'])
-        self._add_volume_profile_levels(fig, smc_features['volume_profile'])
-        self._add_harmonic_patterns(fig, smc_features['harmonic_patterns'])
-        self._add_wyckoff_zones(fig, smc_features['wyckoff_analysis'])
-        self._add_trading_signals(fig, smc_features['signals'])
-        
-        # Add technical indicators if available
-        if 'ema_9' in df.columns:
-            fig.add_trace(
-                go.Scatter(x=df.index, y=df['ema_9'], name="EMA 9", 
-                          line=dict(color='orange', width=1)),
-                row=1, col=1
-            )
-        
-        if 'ema_21' in df.columns:
-            fig.add_trace(
-                go.Scatter(x=df.index, y=df['ema_21'], name="EMA 21",
-                          line=dict(color='blue', width=1)),
-                row=1, col=1
-            )
-        
-        if 'bb_upper' in df.columns and 'bb_lower' in df.columns:
-            fig.add_trace(
-                go.Scatter(x=df.index, y=df['bb_upper'], name="BB Upper",
-                          line=dict(color='gray', width=1, dash='dash')),
-                row=1, col=1
-            )
-            fig.add_trace(
-                go.Scatter(x=df.index, y=df['bb_lower'], name="BB Lower",
-                          line=dict(color='gray', width=1, dash='dash')),
-                row=1, col=1
-            )
-        
-        # 2. Volume with delta
+        # Add volume
         if 'volume' in df.columns:
-            colors = [self.colors['bullish'] if df['close'].iloc[i] > df['open'].iloc[i] 
-                     else self.colors['bearish'] for i in range(len(df))]
+            colors = [self.config.colors['bullish'] if row['close'] >= row['open'] else self.config.colors['bearish'] 
+                     for _, row in df.iterrows()]
             
             fig.add_trace(
-                go.Bar(x=df.index, y=df['volume'], name="Volume",
-                       marker_color=colors, opacity=0.7),
+                go.Bar(
+                    x=df.index,
+                    y=df['volume'],
+                    marker_color=colors,
+                    name="Volume"
+                ),
                 row=2, col=1
             )
+        
+        # Add order blocks
+        for ob in features['order_blocks']:
+            color = self.config.colors['bullish_ob'] if ob.get('type') == 'bullish' else self.config.colors['bearish_ob']
             
-            # Add volume moving average
-            if len(df) > 20:
-                vol_ma = df['volume'].rolling(20).mean()
-                fig.add_trace(
-                    go.Scatter(x=df.index, y=vol_ma, name="Vol MA(20)",
-                              line=dict(color='yellow', width=2)),
-                    row=2, col=1
+            fig.add_shape(
+                type="rect",
+                x0=ob.get('start_time', df.index[0]),
+                x1=ob.get('end_time', df.index[-1]),
+                y0=ob.get('low', 0),
+                y1=ob.get('high', 0),
+                fillcolor=color,
+                opacity=0.7,
+                line=dict(width=0),
+                row=1, col=1
+            )
+            
+            # Add annotation
+            fig.add_annotation(
+                x=ob.get('end_time', df.index[-1]),
+                y=ob.get('high', 0),
+                text=f"OB {ob.get('type', '')}",
+                showarrow=True,
+                arrowhead=2,
+                row=1, col=1
+            )
+        
+        # Add liquidity zones
+        for lz in features['liquidity_zones']:
+            fig.add_shape(
+                type="line",
+                x0=df.index[0],
+                x1=df.index[-1],
+                y0=lz.get('level', 0),
+                y1=lz.get('level', 0),
+                line=dict(
+                    color=self.config.colors['liquidity'],
+                    width=2,
+                    dash="dash"
+                ),
+                row=1, col=1
+            )
+            
+            # Add annotation
+            fig.add_annotation(
+                x=df.index[-1],
+                y=lz.get('level', 0),
+                text=f"LIQ {lz.get('type', '')}",
+                showarrow=True,
+                arrowhead=2,
+                row=1, col=1
+            )
+        
+        # Add fair value gaps
+        for fvg in features['fair_value_gaps']:
+            color = self.config.colors['fvg_bull'] if fvg.get('type') == 'bullish' else self.config.colors['fvg_bear']
+            
+            fig.add_shape(
+                type="rect",
+                x0=fvg.get('start_time', df.index[0]),
+                x1=fvg.get('end_time', df.index[-1]),
+                y0=fvg.get('low', 0),
+                y1=fvg.get('high', 0),
+                fillcolor=color,
+                opacity=0.5,
+                line=dict(width=0),
+                row=1, col=1
+            )
+        
+        # Add supply/demand zones
+        for supply in features['supply_demand_zones'].get('supply', []):
+            fig.add_shape(
+                type="rect",
+                x0=supply.get('start_time', df.index[0]),
+                x1=supply.get('end_time', df.index[-1]),
+                y0=supply.get('low', 0),
+                y1=supply.get('high', 0),
+                fillcolor=self.config.colors['supply'],
+                opacity=0.7,
+                line=dict(width=0),
+                row=1, col=1
+            )
+        
+        for demand in features['supply_demand_zones'].get('demand', []):
+            fig.add_shape(
+                type="rect",
+                x0=demand.get('start_time', df.index[0]),
+                x1=demand.get('end_time', df.index[-1]),
+                y0=demand.get('low', 0),
+                y1=demand.get('high', 0),
+                fillcolor=self.config.colors['demand'],
+                opacity=0.7,
+                line=dict(width=0),
+                row=1, col=1
+            )
+        
+        # Add BOS/CHoCH points
+        for bos in features['bos_choch_points'].get('bos', []):
+            fig.add_trace(
+                go.Scatter(
+                    x=[bos.get('time', df.index[0])],
+                    y=[bos.get('price', 0)],
+                    mode='markers',
+                    marker=dict(
+                        symbol='triangle-up' if bos.get('direction') == 'up' else 'triangle-down',
+                        size=12,
+                        color='green' if bos.get('direction') == 'up' else 'red',
+                        line=dict(width=2, color='white')
+                    ),
+                    name=f"BOS {bos.get('direction', '')}"
+                ),
+                row=1, col=1
+            )
+        
+        for choch in features['bos_choch_points'].get('choch', []):
+            fig.add_trace(
+                go.Scatter(
+                    x=[choch.get('time', df.index[0])],
+                    y=[choch.get('price', 0)],
+                    mode='markers',
+                    marker=dict(
+                        symbol='star',
+                        size=12,
+                        color='purple',
+                        line=dict(width=2, color='white')
+                    ),
+                    name=f"CHoCH {choch.get('direction', '')}"
+                ),
+                row=1, col=1
+            )
+        
+        # Add volume profile
+        if features['volume_profile']['poc']:
+            # POC line
+            fig.add_shape(
+                type="line",
+                x0=df.index[0],
+                x1=df.index[-1],
+                y0=features['volume_profile']['poc'],
+                y1=features['volume_profile']['poc'],
+                line=dict(
+                    color=self.config.colors['poc'],
+                    width=2
+                ),
+                row=1, col=1
+            )
+            
+            # Value area
+            if features['volume_profile']['vah'] and features['volume_profile']['val']:
+                fig.add_shape(
+                    type="rect",
+                    x0=df.index[0],
+                    x1=df.index[-1],
+                    y0=features['volume_profile']['val'],
+                    y1=features['volume_profile']['vah'],
+                    fillcolor=self.config.colors['value_area'],
+                    opacity=0.3,
+                    line=dict(width=0),
+                    row=1, col=1
                 )
         
-        # 3. Market Structure Indicator
-        if 'atr' in df.columns:
-            fig.add_trace(
-                go.Scatter(x=df.index, y=df['atr'], name="ATR",
-                          line=dict(color='purple', width=2)),
-                row=3, col=1
+        # Add harmonic patterns
+        for pattern in features['harmonic_patterns']:
+            # Connect pattern points
+            points_x = [pattern.get(f'point{i}_time', df.index[0]) for i in range(1, 5) if f'point{i}_time' in pattern]
+            points_y = [pattern.get(f'point{i}_price', 0) for i in range(1, 5) if f'point{i}_price' in pattern]
+            
+            if len(points_x) >= 3 and len(points_y) >= 3:
+                fig.add_trace(
+                    go.Scatter(
+                        x=points_x,
+                        y=points_y,
+                        mode='lines+markers',
+                        line=dict(color=self.config.colors['harmonic'], width=2),
+                        marker=dict(size=8),
+                        name=f"Harmonic: {pattern.get('pattern_type', 'Unknown')}"
+                    ),
+                    row=1, col=1
+                )
+        
+        # Add Wyckoff phases
+        for acc_zone in features['wyckoff_analysis'].get('accumulation_zones', []):
+            fig.add_shape(
+                type="rect",
+                x0=acc_zone.get('start_time', df.index[0]),
+                x1=acc_zone.get('end_time', df.index[-1]),
+                y0=acc_zone.get('low', 0),
+                y1=acc_zone.get('high', 0),
+                fillcolor=self.config.colors['wyckoff_acc'],
+                opacity=0.3,
+                line=dict(width=0),
+                row=1, col=1
             )
         
-        # 4. RSI
-        if 'rsi' in df.columns:
-            fig.add_trace(
-                go.Scatter(x=df.index, y=df['rsi'], name="RSI",
-                          line=dict(color='green', width=2)),
-                row=4, col=1
+        for dist_zone in features['wyckoff_analysis'].get('distribution_zones', []):
+            fig.add_shape(
+                type="rect",
+                x0=dist_zone.get('start_time', df.index[0]),
+                x1=dist_zone.get('end_time', df.index[-1]),
+                y0=dist_zone.get('low', 0),
+                y1=dist_zone.get('high', 0),
+                fillcolor=self.config.colors['wyckoff_dist'],
+                opacity=0.3,
+                line=dict(width=0),
+                row=1, col=1
             )
-            
-            # RSI levels
-            fig.add_hline(y=70, line_dash="dash", line_color="red", 
-                         row=4, col=1, annotation_text="OB")
-            fig.add_hline(y=30, line_dash="dash", line_color="green",
-                         row=4, col=1, annotation_text="OS")
-            fig.add_hline(y=50, line_dash="dot", line_color="gray", row=4, col=1)
         
-        # 5. Signal Strength
-        if smc_features['signals']:
-            signal_times = [s['timestamp'] for s in smc_features['signals']]
-            signal_strengths = [s.get('strength', 1) for s in smc_features['signals']]
-            signal_types = [s['type'] for s in smc_features['signals']]
-            
-            colors = [self.colors['bullish'] if t == 'buy' else self.colors['bearish'] 
-                     for t in signal_types]
+        # Add signals
+        for signal in features['signals']:
+            marker_color = 'green' if signal.get('type') == 'buy' else 'red'
+            marker_symbol = 'triangle-up' if signal.get('type') == 'buy' else 'triangle-down'
             
             fig.add_trace(
-                go.Bar(x=signal_times, y=signal_strengths, name="Signals",
-                       marker_color=colors),
-                row=5, col=1
+                go.Scatter(
+                    x=[signal.get('timestamp', df.index[0])],
+                    y=[signal.get('price', 0)],
+                    mode='markers',
+                    marker=dict(
+                        symbol=marker_symbol,
+                        size=12,
+                        color=marker_color,
+                        line=dict(width=2, color='white')
+                    ),
+                    name=f"Signal: {signal.get('type', '').upper()}"
+                ),
+                row=1, col=1
             )
         
         # Update layout
         fig.update_layout(
-            title=dict(
-                text=f"{pair} {timeframe} - ncOS Ultimate SMC Analysis",
-                font=dict(size=24, color='white')
-            ),
-            height=1200,
-            showlegend=True,
-            template="plotly_dark",
-            hovermode='x unified',
+            title=f"{pair} - {timeframe_name} - Ultimate SMC Analysis",
+            xaxis_title="Time",
+            yaxis_title="Price",
             xaxis_rangeslider_visible=False,
+            template="plotly_dark",
+            height=800,
             legend=dict(
                 orientation="h",
                 yanchor="bottom",
@@ -640,440 +577,90 @@ class UltimateSMCChartGenerator:
             )
         )
         
-        # Update axes
+        # Update y-axis
         fig.update_yaxes(title_text="Price", row=1, col=1)
         fig.update_yaxes(title_text="Volume", row=2, col=1)
-        fig.update_yaxes(title_text="ATR", row=3, col=1)
-        fig.update_yaxes(title_text="RSI", range=[0, 100], row=4, col=1)
-        fig.update_yaxes(title_text="Signal", row=5, col=1)
-        fig.update_xaxes(title_text="Time", row=5, col=1)
         
         return fig
-    
-    def _add_all_order_blocks(self, fig, df, order_blocks):
-        """Add ALL order blocks with proper visualization"""
-        for ob in order_blocks[-20:]:  # Last 20 OBs
-            if 'timestamp' in ob:
-                # Find the zone
-                try:
-                    idx_pos = df.index.get_loc(ob['timestamp'])
-                    start_idx = max(0, idx_pos - 5)
-                    end_idx = min(len(df) - 1, idx_pos + 20)
-                    
-                    color = self.colors['bullish_ob'] if ob.get('type') == 'bullish' else self.colors['bearish_ob']
-                    
-                    fig.add_shape(
-                        type="rect",
-                        x0=df.index[start_idx],
-                        x1=df.index[end_idx],
-                        y0=ob.get('low', df.iloc[idx_pos]['low']),
-                        y1=ob.get('high', df.iloc[idx_pos]['high']),
-                        fillcolor=color,
-                        line=dict(color=color.replace('0.3', '1'), width=2),
-                        row=1, col=1
-                    )
-                    
-                    # Add label
-                    fig.add_annotation(
-                        x=ob['timestamp'],
-                        y=ob.get('high', df.iloc[idx_pos]['high']),
-                        text=f"OB-{ob.get('type', 'N/A').upper()}",
-                        showarrow=True,
-                        arrowhead=2,
-                        arrowcolor=color.replace('0.3', '1'),
-                        row=1, col=1
-                    )
-                except:
-                    pass
-    
-    def _add_all_liquidity_zones(self, fig, zones):
-        """Add ALL liquidity zones"""
-        for zone in zones[-15:]:  # Last 15 zones
-            if 'level' in zone:
-                zone_type = zone.get('type', 'liquidity')
-                color = self.colors['liquidity']
-                
-                if 'sell_side' in zone_type:
-                    color = self.colors['bearish']
-                    annotation = "SSL"
-                elif 'buy_side' in zone_type:
-                    color = self.colors['bullish']
-                    annotation = "BSL"
-                else:
-                    annotation = "LIQ"
-                
-                fig.add_hline(
-                    y=zone['level'],
-                    line_dash="dot",
-                    line_color=color,
-                    annotation_text=annotation,
-                    annotation_position="right",
-                    row=1, col=1
-                )
-    
-    def _add_all_supply_demand_zones(self, fig, zones):
-        """Add ALL supply and demand zones"""
-        # Supply zones
-        for zone in zones.get('supply', [])[-10:]:
-            if 'timestamp' in zone:
-                try:
-                    fig.add_shape(
-                        type="rect",
-                        x0=zone['timestamp'],
-                        x1=zone['timestamp'] + pd.Timedelta(hours=1),
-                        y0=zone.get('low', 0),
-                        y1=zone.get('high', 0),
-                        fillcolor=self.colors['supply'],
-                        line=dict(color='red', width=1, dash='dash'),
-                        row=1, col=1
-                    )
-                except:
-                    pass
-        
-        # Demand zones
-        for zone in zones.get('demand', [])[-10:]:
-            if 'timestamp' in zone:
-                try:
-                    fig.add_shape(
-                        type="rect",
-                        x0=zone['timestamp'],
-                        x1=zone['timestamp'] + pd.Timedelta(hours=1),
-                        y0=zone.get('low', 0),
-                        y1=zone.get('high', 0),
-                        fillcolor=self.colors['demand'],
-                        line=dict(color='green', width=1, dash='dash'),
-                        row=1, col=1
-                    )
-                except:
-                    pass
-    
-    def _add_all_fair_value_gaps(self, fig, fvgs):
-        """Add ALL Fair Value Gaps"""
-        for fvg in fvgs:
-            if 'timestamp' in fvg:
-                color = self.colors['fvg_bull'] if 'bullish' in fvg.get('type', '') else self.colors['fvg_bear']
-                
-                try:
-                    fig.add_shape(
-                        type="rect",
-                        x0=fvg['timestamp'],
-                        x1=fvg['timestamp'] + pd.Timedelta(minutes=30),
-                        y0=fvg.get('low', 0),
-                        y1=fvg.get('high', 0),
-                        fillcolor=color,
-                        line=dict(color=color.replace('0.2', '1'), width=1),
-                        row=1, col=1
-                    )
-                    
-                    # Add FVG label
-                    fig.add_annotation(
-                        x=fvg['timestamp'],
-                        y=(fvg.get('high', 0) + fvg.get('low', 0)) / 2,
-                        text="FVG",
-                        font=dict(size=8, color='white'),
-                        bgcolor=color.replace('0.2', '0.8'),
-                        row=1, col=1
-                    )
-                except:
-                    pass
-    
-    def _add_structure_breaks(self, fig, structure):
-        """Add BOS and CHoCH points"""
-        # BOS
-        for bos in structure.get('bos', [])[-10:]:
-            if 'timestamp' in bos:
-                fig.add_annotation(
-                    x=bos['timestamp'],
-                    y=bos.get('price', 0),
-                    text="BOS",
-                    showarrow=True,
-                    arrowhead=4,
-                    arrowcolor='yellow',
-                    bgcolor='yellow',
-                    font=dict(color='black', size=10),
-                    row=1, col=1
-                )
-        
-        # CHoCH
-        for choch in structure.get('choch', [])[-10:]:
-            if 'timestamp' in choch:
-                fig.add_annotation(
-                    x=choch['timestamp'],
-                    y=choch.get('price', 0),
-                    text="CHoCH",
-                    showarrow=True,
-                    arrowhead=3,
-                    arrowcolor='orange',
-                    bgcolor='orange',
-                    font=dict(color='black', size=10),
-                    row=1, col=1
-                )
-    
-    def _add_pivot_points(self, fig, pivots):
-        """Add pivot highs and lows"""
-        # Pivot highs
-        for ph in pivots.get('highs', []):
-            if 'timestamp' in ph:
-                fig.add_annotation(
-                    x=ph['timestamp'],
-                    y=ph['price'],
-                    text="PH",
-                    showarrow=False,
-                    font=dict(size=8, color='red'),
-                    row=1, col=1
-                )
-        
-        # Pivot lows
-        for pl in pivots.get('lows', []):
-            if 'timestamp' in pl:
-                fig.add_annotation(
-                    x=pl['timestamp'],
-                    y=pl['price'],
-                    text="PL",
-                    showarrow=False,
-                    font=dict(size=8, color='green'),
-                    row=1, col=1
-                )
-    
-    def _add_volume_profile_levels(self, fig, profile):
-        """Add volume profile levels (POC, VAH, VAL)"""
-        if profile['poc']:
-            fig.add_hline(
-                y=profile['poc'],
-                line_dash="solid",
-                line_color=self.colors['poc'],
-                line_width=3,
-                annotation_text="POC",
-                annotation_position="right",
-                row=1, col=1
-            )
-        
-        if profile['vah'] and profile['val']:
-            # Value area rectangle
-            fig.add_hrect(
-                y0=profile['val'],
-                y1=profile['vah'],
-                fillcolor=self.colors['value_area'],
-                line_width=0,
-                row=1, col=1
-            )
-            
-            # VAH line
-            fig.add_hline(
-                y=profile['vah'],
-                line_dash="dash",
-                line_color=self.colors['poc'],
-                annotation_text="VAH",
-                annotation_position="right",
-                row=1, col=1
-            )
-            
-            # VAL line
-            fig.add_hline(
-                y=profile['val'],
-                line_dash="dash",
-                line_color=self.colors['poc'],
-                annotation_text="VAL",
-                annotation_position="right",
-                row=1, col=1
-            )
-    
-    def _add_harmonic_patterns(self, fig, patterns):
-        """Add harmonic patterns"""
-        for pattern in patterns[-5:]:  # Last 5 patterns
-            if 'points' in pattern:
-                # Draw pattern lines
-                points = pattern['points']
-                if len(points) >= 4:
-                    # XABCD pattern
-                    x_vals = [p.get('timestamp') for p in points if 'timestamp' in p]
-                    y_vals = [p.get('price', 0) for p in points]
-                    
-                    if x_vals:
-                        fig.add_trace(
-                            go.Scatter(
-                                x=x_vals,
-                                y=y_vals,
-                                mode='lines+markers',
-                                line=dict(color=self.colors['harmonic'], width=2, dash='dash'),
-                                marker=dict(size=8, color=self.colors['harmonic']),
-                                name=f"Harmonic-{pattern.get('type', 'Pattern')}",
-                                showlegend=False
-                            ),
-                            row=1, col=1
-                        )
-                        
-                        # Add pattern label
-                        if x_vals and y_vals:
-                            fig.add_annotation(
-                                x=x_vals[-1],
-                                y=y_vals[-1],
-                                text=pattern.get('type', 'Harmonic'),
-                                bgcolor=self.colors['harmonic'],
-                                font=dict(color='white', size=10),
-                                row=1, col=1
-                            )
-    
-    def _add_wyckoff_zones(self, fig, wyckoff):
-        """Add Wyckoff accumulation/distribution zones"""
-        # Current phase background
-        if wyckoff['phase'] != 'Unknown':
-            phase_color = self.colors['wyckoff_acc'] if 'accumulation' in wyckoff['phase'].lower() else self.colors['wyckoff_dist']
-            
-            # Add phase annotation
-            fig.add_annotation(
-                xref="paper",
-                yref="paper",
-                x=0.02,
-                y=0.98,
-                text=f"Wyckoff: {wyckoff['phase']}",
-                showarrow=False,
-                bgcolor=phase_color,
-                font=dict(color='white', size=12),
-                row=1, col=1
-            )
-        
-        # Accumulation zones
-        for zone in wyckoff.get('accumulation_zones', [])[-5:]:
-            if 'start' in zone and 'end' in zone:
-                try:
-                    fig.add_vrect(
-                        x0=zone['start'],
-                        x1=zone['end'],
-                        fillcolor=self.colors['wyckoff_acc'],
-                        opacity=0.2,
-                        annotation_text="Accumulation",
-                        annotation_position="top left",
-                        row=1, col=1
-                    )
-                except:
-                    pass
-        
-        # Distribution zones
-        for zone in wyckoff.get('distribution_zones', [])[-5:]:
-            if 'start' in zone and 'end' in zone:
-                try:
-                    fig.add_vrect(
-                        x0=zone['start'],
-                        x1=zone['end'],
-                        fillcolor=self.colors['wyckoff_dist'],
-                        opacity=0.2,
-                        annotation_text="Distribution",
-                        annotation_position="top left",
-                        row=1, col=1
-                    )
-                except:
-                    pass
-    
-    def _add_trading_signals(self, fig, signals):
-        """Add trading signals with arrows"""
-        for signal in signals[-20:]:  # Last 20 signals
-            if 'timestamp' in signal and 'price' in signal:
-                arrow_color = self.colors['bullish'] if signal['type'] == 'buy' else self.colors['bearish']
-                arrow_symbol = 5 if signal['type'] == 'buy' else 6  # Up or down arrow
-                y_shift = -50 if signal['type'] == 'buy' else 50
-                
-                fig.add_annotation(
-                    x=signal['timestamp'],
-                    y=signal['price'],
-                    text=signal['type'].upper(),
-                    showarrow=True,
-                    arrowhead=arrow_symbol,
-                    arrowsize=2,
-                    arrowwidth=2,
-                    arrowcolor=arrow_color,
-                    ax=0,
-                    ay=y_shift,
-                    bgcolor=arrow_color,
-                    font=dict(color='white', size=10),
-                    row=1, col=1
-                )
 
-# Main Ultimate Dashboard
 def main():
+    # Initialize config
+    config = UltimateSMCConfig()
+    
+    # Initialize data loader and chart generator
+    loader = SMCDataLoader(config)
+    chart_gen = SMCChartGenerator(config)
+    
     # Header
     st.markdown("""
     <div class="main-header">
-        <h1>🎯 ncOS Ultimate SMC Intelligence Dashboard</h1>
-        <p>Complete Smart Money Concepts Analysis with ALL Features</p>
-        <p><em>Processing COMPREHENSIVE data with full SMC suite</em></p>
+        <h1>🎯 ncOS Ultimate SMC Intelligence</h1>
+        <p>Advanced Smart Money Concepts Analysis & Visualization</p>
     </div>
     """, unsafe_allow_html=True)
     
-    # Initialize
-    config = UltimateSMCConfig()
-    loader = UltimateSMCDataLoader(config)
-    chart_gen = UltimateSMCChartGenerator(config)
-    
-    # Scan data
-    data_map = loader.scan_complete_data()
-    
-    if not data_map:
-        st.error("❌ No data found in ./data directory")
-        return
+    # Scan data directory
+    pairs_data = loader.scan_data_directory()
     
     # Sidebar
-    st.sidebar.title("🎛️ Ultimate SMC Controls")
-    
-    # Data status
-    st.sidebar.markdown("### 📊 Data Status")
-    for pair, info in data_map.items():
-        if info['available_timeframes']:
-            st.sidebar.markdown(f"""
-            <span class="data-status">✅ {pair}: {len(info['available_timeframes'])} TFs</span>
-            """, unsafe_allow_html=True)
+    st.sidebar.title("🔧 Configuration")
     
     # Pair selection
-    st.sidebar.markdown("### 💱 Currency Pair")
-    available_pairs = [p for p, info in data_map.items() if info['available_timeframes']]
+    available_pairs = [pair for pair in pairs_data.keys() if any(pairs_data[pair]['comprehensive_files'].values())]
     
     if not available_pairs:
-        st.error("❌ No pairs with COMPREHENSIVE data found")
+        st.error("❌ No data files found. Please check your data directory.")
         return
     
-    selected_pair = st.sidebar.selectbox(
-        "Select Pair:",
-        options=available_pairs,
-        key="ultimate_pair"
-    )
+    selected_pair = st.sidebar.selectbox("Select Pair", available_pairs)
     
     # Timeframe selection
-    pair_info = data_map[selected_pair]
-    st.sidebar.markdown("### ⏰ Timeframe")
+    available_tfs = [tf for tf, file in pairs_data[selected_pair]['comprehensive_files'].items() if file]
     
-    selected_tf = st.sidebar.selectbox(
-        "Select Timeframe:",
-        options=pair_info['available_timeframes'],
-        format_func=lambda x: config.timeframe_map.get(x, x),
-        key="ultimate_tf"
-    )
+    if not available_tfs:
+        st.error(f"❌ No data files found for {selected_pair}. Please check your data directory.")
+        return
     
-    # Bar limit
-    max_bars = st.sidebar.number_input(
-        "📊 Max Bars (Latest First)",
-        min_value=100,
-        max_value=5000,
-        value=config.max_bars,
-        step=100,
-        key="ultimate_bars"
-    )
+    selected_tf = st.sidebar.selectbox("Select Timeframe", available_tfs)
+    
+    # Max bars
+    max_bars = st.sidebar.slider("Max Bars to Display", 100, 5000, config.max_bars)
     
     # Feature toggles
-    with st.sidebar.expander("🎯 SMC Features", expanded=True):
+    st.sidebar.markdown("### 🎚️ Feature Toggles")
+    
+    col1, col2 = st.sidebar.columns(2)
+    
+    with col1:
         show_order_blocks = st.checkbox("Order Blocks", value=True)
         show_liquidity = st.checkbox("Liquidity Zones", value=True)
-        show_supply_demand = st.checkbox("Supply/Demand Zones", value=True)
+        show_supply_demand = st.checkbox("Supply/Demand", value=True)
         show_fvg = st.checkbox("Fair Value Gaps", value=True)
-        show_structure = st.checkbox("BOS/CHoCH", value=True)
+        show_structure = st.checkbox("Market Structure", value=True)
+    
+    with col2:
         show_pivots = st.checkbox("Pivot Points", value=True)
         show_volume_profile = st.checkbox("Volume Profile", value=True)
         show_harmonics = st.checkbox("Harmonic Patterns", value=True)
         show_wyckoff = st.checkbox("Wyckoff Analysis", value=True)
         show_signals = st.checkbox("Trading Signals", value=True)
     
-    # Load and process data
+    # Data status
+    st.sidebar.markdown("### 📊 Data Status")
+    
+    pair_info = pairs_data[selected_pair]
+    
+    # Show data status
+    st.sidebar.markdown(f"""
+    <div>
+        <span class="data-status">📈 Comprehensive: {len(pair_info['comprehensive_files'])} files</span>
+        <span class="data-status">📋 Summary: {len(pair_info['summary_files'])} files</span>
+    </div>
+    """, unsafe_allow_html=True)
+    
+    # Main content
     if selected_pair and selected_tf:
-# Load COMPREHENSIVE data
+        # Load COMPREHENSIVE data
         comp_file = pair_info['comprehensive_files'].get(selected_tf)
         summary_file = pair_info['summary_files'].get(selected_tf)
         
