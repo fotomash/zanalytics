@@ -88,6 +88,14 @@ except ImportError:
     def tag_smc_zones(df, **kwargs): df[['bos', 'choch', 'fvg_zone']] = 'N/A (SMC Engine Missing)'; return df # Dummy
     SMC_ENGINE_LOADED = False
 
+try:
+    from zanflow_enrichment_engine_v3 import apply_zanflow_enrichment
+    ZANFLOW_ENGINE_LOADED = True
+except ImportError:
+    print("[WARN][MarkerEnrichment] zanflow_enrichment_engine_v3.py not found or failed to import 'apply_zanflow_enrichment'.")
+    def apply_zanflow_enrichment(df, **kwargs): return df  # Dummy passthrough
+    ZANFLOW_ENGINE_LOADED = False
+
 
 # --- Main Enrichment Function ---
 
@@ -147,6 +155,8 @@ def add_all_indicators(df: pd.DataFrame, timeframe: str, config: Optional[Dict] 
             df_enriched = tag_wyckoff_phases(df_enriched, timeframe=timeframe, config=config.get('wyckoff_config'))
         if MENTFX_ENGINE_LOADED:
             df_enriched = tag_mentfx_ici(df_enriched, timeframe=timeframe, config=config.get('mentfx_config'))
+        if ZANFLOW_ENGINE_LOADED:
+            df_enriched = apply_zanflow_enrichment(df_enriched, tf=timeframe, config=config.get('zanflow_config'))
 
         print(f"[INFO][MarkerEnrichment] Successfully completed enrichment for timeframe: {timeframe}.")
 
