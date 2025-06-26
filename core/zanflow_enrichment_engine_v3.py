@@ -5,8 +5,12 @@
 # Description:
 #   Placeholder ZanFlow enrichment engine adding simple signal columns.
 
+import logging
 import pandas as pd
 from typing import Dict, Optional
+
+
+logger = logging.getLogger(__name__)
 
 
 def apply_zanflow_enrichment(df: pd.DataFrame, tf: str = "1min", config: Optional[Dict] = None) -> pd.DataFrame:
@@ -37,7 +41,7 @@ def apply_zanflow_enrichment(df: pd.DataFrame, tf: str = "1min", config: Optiona
 
 
 if __name__ == "__main__":
-    print("--- Testing ZanFlow Enrichment Engine v3 ---")
+    logger.info("--- Testing ZanFlow Enrichment Engine v3 ---")
     sample = {
         "Open": [1, 2, 3],
         "High": [2, 3, 4],
@@ -47,4 +51,4 @@ if __name__ == "__main__":
     }
     df_sample = pd.DataFrame(sample)
     enriched = apply_zanflow_enrichment(df_sample)
-    print(enriched)
+    logger.info("%s", enriched)
