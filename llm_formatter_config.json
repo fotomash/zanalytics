@@ -1,0 +1,71 @@
+{
+    "output_dir": "./llm_outputs",
+    "default_format": "json",
+    "include_metadata": true,
+    "compression": {
+        "enabled": true,
+        "level": "balanced",
+        "preserve_key_insights": true,
+        "max_patterns": 5,
+        "max_signals": 10,
+        "max_indicators_per_category": 3
+    },
+    "enrichment": {
+        "add_explanations": true,
+        "add_context": true,
+        "add_definitions": true,
+        "add_examples": false,
+        "explain_technical_terms": true,
+        "provide_interpretations": true
+    },
+    "structuring": {
+        "hierarchical": true,
+        "max_depth": 4,
+        "group_by_theme": true,
+        "prioritize_by_confidence": true,
+        "include_timestamps": true
+    },
+    "prompt_engineering": {
+        "include_system_prompt": true,
+        "include_examples": true,
+        "optimize_for_model": "gpt-4",
+        "max_tokens_guidance": {
+            "brief": 500,
+            "standard": 1500,
+            "comprehensive": 3000
+        },
+        "response_style": {
+            "use_markdown": true,
+            "use_bullet_points": true,
+            "use_tables": false,
+            "use_emojis": true
+        }
+    },
+    "output_formats": {
+        "json": {
+            "pretty_print": true,
+            "include_schema": false,
+            "flatten_nested": false
+        },
+        "markdown": {
+            "include_toc": false,
+            "use_collapsible_sections": false,
+            "highlight_important": true
+        },
+        "xml": {
+            "include_dtd": false,
+            "use_attributes": true
+        }
+    },
+    "filtering": {
+        "min_confidence_threshold": 0.5,
+        "exclude_expired_signals": true,
+        "exclude_conflicting_signals": false,
+        "max_age_hours": 24
+    },
+    "caching": {
+        "enabled": true,
+        "ttl_minutes": 60,
+        "max_cache_size_mb": 100
+    }
+}

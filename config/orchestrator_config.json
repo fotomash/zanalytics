@@ -1,0 +1,17 @@
+{
+  "update_interval": 300,
+  "max_workers": 4,
+  "symbols": [
+    "BTC/USD",
+    "ETH/USD"
+  ],
+  "timeframes": [
+    "1h",
+    "4h",
+    "1d"
+  ],
+  "data_source": "yahoo",
+  "enable_backtesting": true,
+  "enable_live_monitoring": true,
+  "enable_llm_analysis": true
+}

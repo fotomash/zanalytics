@@ -1,0 +1,32 @@
+{
+    "data_dir": "./data",
+    "output_dir": "./output",
+    "enriched_dir": "./enriched",
+    "symbols": ["BTC/USDT", "ETH/USDT", "XRP/USDT", "SOL/USDT"],
+    "timeframes": ["1m", "5m", "15m", "1h", "4h", "1d"],
+    "exchange": "binance",
+    "api_key": "YOUR_API_KEY",
+    "api_secret": "YOUR_API_SECRET",
+    "indicators": {
+        "sma": [20, 50, 200],
+        "ema": [9, 21, 55],
+        "rsi": 14,
+        "macd": [12, 26, 9],
+        "bollinger": [20, 2],
+        "volume_profile": true,
+        "market_profile": true
+    },
+    "database": {
+        "type": "postgresql",
+        "host": "localhost",
+        "port": 5432,
+        "name": "zanalytics",
+        "user": "trader",
+        "password": "password"
+    },
+    "redis": {
+        "host": "localhost",
+        "port": 6379,
+        "db": 0
+    }
+}

@@ -1,0 +1,19 @@
+{
+  "timestamp": "2025-06-25T21:16:40.049327",
+  "symbols": [
+    "BTC/USD",
+    "ETH/USD"
+  ],
+  "symbol_analysis": {
+    "BTC/USD": {
+      "symbol": "BTC/USD",
+      "timestamp": "2025-06-25T21:16:40.049330",
+      "status": "completed"
+    },
+    "ETH/USD": {
+      "symbol": "ETH/USD",
+      "timestamp": "2025-06-25T21:16:40.049332",
+      "status": "completed"
+    }
+  }
+}

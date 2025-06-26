@@ -1,0 +1,101 @@
+# ZAnalytics Orchestrator Configuration
+
+# Components to initialize
+components:
+  - data_pipeline
+  - microstructure_analyzer
+  - signal_generator
+  - risk_monitor
+  - backtester
+  - llm_framework
+  - market_monitor
+  - advanced_analytics
+  - dashboard
+
+# Workflow definitions
+workflows:
+  # Real-time market analysis
+  market_analysis:
+    schedule: realtime  # every minute
+    tasks:
+      - fetch_market_data
+      - analyze_microstructure
+      - generate_signals
+      - assess_risk
+      - update_dashboard
+    error_handling: continue  # continue, stop, retry
+
+  # Hourly comprehensive analysis
+  comprehensive_analysis:
+    schedule: hourly
+    tasks:
+      - fetch_market_data
+      - analyze_microstructure
+      - detect_patterns
+      - generate_signals
+      - assess_risk
+      - generate_llm_insights
+      - send_alerts
+
+  # Daily reporting
+  daily_report:
+    schedule: daily
+    tasks:
+      - aggregate_daily_data
+      - performance_analysis
+      - risk_assessment
+      - generate_report
+      - export_results
+
+  # Weekly optimization
+  strategy_optimization:
+    schedule: weekly
+    tasks:
+      - collect_historical_data
+      - run_backtests
+      - optimize_parameters
+      - validate_results
+      - update_strategy_config
+
+# Task configurations
+tasks:
+  fetch_market_data:
+    timeout: 60
+    retry_count: 3
+    priority: 10
+
+  analyze_microstructure:
+    timeout: 120
+    retry_count: 2
+    priority: 8
+
+  generate_signals:
+    timeout: 60
+    retry_count: 2
+    priority: 9
+
+  assess_risk:
+    timeout: 90
+    retry_count: 2
+    priority: 10
+
+# System settings
+system:
+  data_retention_hours: 168  # 7 days
+  max_concurrent_tasks: 10
+  log_level: INFO
+
+# Alert settings
+alerts:
+  channels:
+    - console
+    - file
+    - webhook
+  min_priority: 2
+
+# Performance settings
+performance:
+  enable_caching: true
+  cache_ttl_minutes: 60
+  enable_parallel_processing: true
+  max_workers: 8
