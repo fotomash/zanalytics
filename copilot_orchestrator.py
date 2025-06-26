@@ -91,6 +91,8 @@ except ImportError: log_info("WARN: core/confluence_engine.py not found.", "WARN
 # --- NEW: Import Liquidity Sweep Detector ---
 try: from core.liquidity_sweep_detector import tag_liquidity_sweeps
 except ImportError: log_info("WARN: core/liquidity_sweep_detector.py not found.", "WARN"); tag_liquidity_sweeps = None
+try: from core.zanflow_enrichment_engine_v3 import apply_zanflow_enrichment
+except ImportError: log_info("WARN: core/zanflow_enrichment_engine_v3.py not found.", "WARN"); apply_zanflow_enrichment = None
 
 
 # --- Chart Generation Function (ENHANCED to include Wyckoff & Sweeps) ---
@@ -388,6 +390,8 @@ def handle_price_check(pair: str, timestamp_str: str, tf: str = 'm15', strategy_
                 if tag_mentfx_ici: df_temp = tag_mentfx_ici(df_temp, tf=tf_str_for_tagging)
                 # Apply Accumulation/Distribution Tags
                 if tag_accumulation: df_temp = tag_accumulation(df_temp)
+                # Apply ZanFlow Enrichment
+                if apply_zanflow_enrichment: df_temp = apply_zanflow_enrichment(df_temp, tf=tf_str_for_tagging)
                 # Wyckoff tagging is now done separately below
             except Exception as enrich_err: log_info(f"Error during enrichment for TF {tf_key}: {enrich_err}", "ERROR"); traceback.print_exc()
             enriched_tf_data[tf_key] = df_temp
