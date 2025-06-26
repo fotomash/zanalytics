@@ -6,3 +6,4 @@ analysis_output/
 journal/
 logs/
 data/
+cron.log
