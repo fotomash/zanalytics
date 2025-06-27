@@ -885,9 +885,13 @@ class UltimateZANFLOWDashboard:
                 smc_bias = metrics.get('smc_bias', 'N/A')
 
                 st.markdown(f"""
-                **{pair}**: Manipulation {manipulation_score:.1f}% | SMC Bias: {smc_bias} | 
+                **{pair}**: Manipulation {manipulation_score:.1f}% | SMC Bias: {smc_bias} |
                 Stop Hunts: {metrics.get('stop_hunts', 0)} | Liquidity Sweeps: {metrics.get('liquidity_sweeps', 0)}
                 """)
+
+    def display_home_page(self, *args, **kwargs):
+        """Wrapper for backward compatibility"""
+        return self.display_market_overview(*args, **kwargs)
 
     # Include other essential methods
     def create_microstructure_analysis(self, df):

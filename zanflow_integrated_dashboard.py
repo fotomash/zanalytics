@@ -232,6 +232,10 @@ class UltimateZANFLOWDashboard:
         # Correlation matrix
         st.markdown("### 🔗 Correlation Analysis")
         self.create_correlation_matrix()
+
+    def display_home_page(self, *args, **kwargs):
+        """Wrapper for backward compatibility"""
+        return self.display_market_overview(*args, **kwargs)
     
     def create_market_heatmap(self):
         """Create market performance heatmap"""
