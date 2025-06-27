@@ -111,7 +111,7 @@ source zanalytics_env/bin/activate  # On Windows: zanalytics_env\Scripts\activat
 pip install -r requirements.txt
 
 # Additional dependencies for specific components
-pip install backtrader vectorbt streamlit plotly
+pip install backtrader vectorbt streamlit plotly loguru
 ```
 
 ### Directory Structure
