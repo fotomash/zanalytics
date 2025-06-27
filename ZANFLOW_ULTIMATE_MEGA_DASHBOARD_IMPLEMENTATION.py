@@ -339,6 +339,10 @@ class ZANFLOWUltimateMegaDashboard:
         st.markdown("## 🌍 Market Overview & Analysis Summary")
         st.info("Market overview will be displayed here")
 
+    def display_home_page(self, *args, **kwargs):
+        """Wrapper for backward compatibility"""
+        return self.display_market_overview(*args, **kwargs)
+
     def display_economic_data(self):
         """Display economic data and macro sentiment"""
         # Implementation will be added later

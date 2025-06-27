@@ -55,6 +55,10 @@ class UltimateZANFLOWDashboard:
         st.markdown("### 📈 Market Overview")
         st.write(f"Displaying base analysis for **{st.session_state['selected_pair']}**.")
 
+    def display_home_page(self, *args, **kwargs):
+        """Wrapper for backward compatibility"""
+        return self.display_market_overview(*args, **kwargs)
+
     def display_ultimate_analysis(self):
         """Placeholder for the ultimate analysis display."""
         st.markdown("---")

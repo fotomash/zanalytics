@@ -599,10 +599,14 @@ class UltimateTradingDashboard:
         with col1:
             self.create_top_movers(market_data)
         with col2:
-            self.create_correlation_matrix(market_data)
+        self.create_correlation_matrix(market_data)
 
         # Market sentiment analysis
         self.create_market_sentiment(market_data)
+
+    def display_home_page(self, *args, **kwargs):
+        """Wrapper for backward compatibility"""
+        return self.display_market_overview(*args, **kwargs)
 
     def create_market_metrics(self, market_data):
         """Create market overview metrics"""
