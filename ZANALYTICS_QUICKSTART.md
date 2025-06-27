@@ -15,6 +15,7 @@ pip install pandas numpy ta scipy scikit-learn loguru
 pip install backtrader vectorbt
 pip install streamlit plotly
 pip install aiohttp beautifulsoup4
+pip install loguru
 ```
 
 ## 2. Basic Setup (2 minutes)
