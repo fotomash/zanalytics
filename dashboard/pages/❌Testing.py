@@ -27,8 +27,12 @@ except ImportError:
 warnings.filterwarnings('ignore')
 
 class ZANFLOWUltimateMegaDashboard:
-    def __init__(self, data_directory="."):
+    def __init__(self, data_directory=None):
         """Initialize the MEGA dashboard with all features"""
+        # Use path from .streamlit/secrets.toml if provided (key: data_directory)
+        # Resolve data directory: prefer Streamlit secrets, then argument, finally default "."
+        if data_directory is None:
+            data_directory = st.secrets.get("data_directory", ".")
         self.data_dir = Path(data_directory)
         
         # Data storage
@@ -58,7 +62,7 @@ class ZANFLOWUltimateMegaDashboard:
         }
 
     def scan_available_symbols(self):
-        """Robust symbol scanner that works with all file naming conventions"""
+        """Robust symbol scanner that works with all file naming conventions, including subdirectories like ./data/{symbol}/*"""
         if not self.data_dir.exists():
             return False
 
@@ -68,84 +72,48 @@ class ZANFLOWUltimateMegaDashboard:
         self.bar_data = {}
         self.microstructure_data = {}
 
-        # Find all processed CSV files
-        csv_files = list(self.data_dir.glob("*_processed.csv"))
-        
-        if not csv_files:
-            return False
+        # Iterate over all subdirectories in data_dir, treat each as a symbol
+        found_any = False
+        for symbol_folder in self.data_dir.iterdir():
+            if symbol_folder.is_dir():
+                symbol = symbol_folder.name
+                self.symbols_data[symbol] = {}
+                self.tick_data[symbol] = {}
+                self.bar_data[symbol] = {}
+                csv_files = list(symbol_folder.glob("*_processed.csv"))
+                for file_path in csv_files:
+                    try:
+                        filename = file_path.name
+                        # Determine timeframe
+                        if 'tick_tick' in filename:
+                            timeframe = 'tick'
+                        elif '1min' in filename:
+                            timeframe = '1min'
+                        elif '5min' in filename:
+                            timeframe = '5min'
+                        elif '15min' in filename:
+                            timeframe = '15min'
+                        elif '30min' in filename:
+                            timeframe = '30min'
+                        elif '1H' in filename:
+                            timeframe = '1H'
+                        elif '4H' in filename:
+                            timeframe = '4H'
+                        elif '1D' in filename:
+                            timeframe = '1D'
+                        else:
+                            parts = filename.split('_')
+                            timeframe = parts[-2] if len(parts) > 2 else 'unknown'
 
-        # Process each file
-        for file_path in csv_files:
-            try:
-                filename = file_path.name
-                
-                # Extract symbol (usually the first part before underscore)
-                if 'XAUUSD' in filename:
-                    symbol = 'XAUUSD'
-                else:
-                    symbol = filename.split('_')[0]
-                
-                # Initialize symbol data structures if needed
-                if symbol not in self.symbols_data:
-                    self.symbols_data[symbol] = {}
-                if symbol not in self.tick_data:
-                    self.tick_data[symbol] = {}
-                if symbol not in self.bar_data:
-                    self.bar_data[symbol] = {}
-                
-                # Determine if it's tick or bar data and extract timeframe
-                if 'TICK' in filename:
-                    # Tick data
-                    if 'tick_tick' in filename:
-                        timeframe = 'tick'
-                    elif '1min' in filename:
-                        timeframe = '1min'
-                    elif '5min' in filename:
-                        timeframe = '5min'
-                    elif '15min' in filename:
-                        timeframe = '15min'
-                    elif '30min' in filename:
-                        timeframe = '30min'
-                    else:
-                        # Default to the part after the last underscore before _processed
-                        parts = filename.split('_')
-                        timeframe = parts[-2] if len(parts) > 2 else 'unknown'
-                    
-                    self.tick_data[symbol][timeframe] = file_path
-                    self.symbols_data[symbol][timeframe] = file_path
-                    
-                elif 'bars' in filename or 'M1' in filename:
-                    # Bar data
-                    if '1min' in filename:
-                        timeframe = '1min'
-                    elif '5min' in filename:
-                        timeframe = '5min'
-                    elif '15min' in filename:
-                        timeframe = '15min'
-                    elif '30min' in filename:
-                        timeframe = '30min'
-                    elif '1H' in filename:
-                        timeframe = '1H'
-                    elif '4H' in filename:
-                        timeframe = '4H'
-                    elif '1D' in filename:
-                        timeframe = '1D'
-                    else:
-                        # Extract from filename
-                        parts = filename.split('_')
-                        timeframe = parts[-2] if len(parts) > 2 else 'unknown'
-                    
-                    self.bar_data[symbol][timeframe] = file_path
-                    self.symbols_data[symbol][timeframe] = file_path
-                else:
-                    # Generic case - just use the last part before _processed
-                    parts = filename.split('_')
-                    timeframe = parts[-2] if len(parts) > 2 else 'unknown'
-                    self.symbols_data[symbol][timeframe] = file_path
-            
-            except Exception as e:
-                # Skip files that don't match expected patterns
-                continue
+                        if 'TICK' in filename:
+                            self.tick_data[symbol][timeframe] = file_path
+                        elif 'bars' in filename or 'M1' in filename:
+                            self.bar_data[symbol][timeframe] = file_path
+
+                        self.symbols_data[symbol][timeframe] = file_path
+                        found_any = True
+                    except Exception:
+                        continue
 
         # Load TXT reports
         self.load_txt_reports()
@@ -157,11 +125,11 @@ class ZANFLOWUltimateMegaDashboard:
         self.available_symbols = list(self.symbols_data.keys())
         self.available_timeframes = {s: list(t.keys()) for s, t in self.symbols_data.items()}
         
-        return len(self.available_symbols) > 0
+        return found_any and len(self.available_symbols) > 0
 
     def load_txt_reports(self):
-        """Load all TXT analysis reports"""
-        txt_files = list(self.data_dir.glob("*.txt"))
+        """Load all TXT analysis reports from subdirectories (./data/{symbol}/*.txt)"""
+        txt_files = list(self.data_dir.glob("*/*.txt"))
         
         for txt_file in txt_files:
             try:
@@ -190,9 +158,9 @@ class ZANFLOWUltimateMegaDashboard:
                 continue
 
     def load_microstructure_data(self):
-        """Load microstructure analysis data"""
+        """Load microstructure analysis data from subdirectories (./data/{symbol}/*Microstructure*.json)"""
         # Look for JSON files with microstructure data
-        json_files = list(self.data_dir.glob("*Microstructure*.json"))
+        json_files = list(self.data_dir.glob("*/*Microstructure*.json"))
         
         for json_file in json_files:
             try:
@@ -1182,37 +1150,37 @@ class ZANFLOWUltimateMegaDashboard:
         if is_tick_data:
             # Tick data analysis
             col1, col2, col3 = st.columns(3)
-            
+
             with col1:
                 spread = df['ask'] - df['bid']
                 st.metric("Average Spread", f"{spread.mean():.5f}")
                 st.metric("Spread Volatility", f"{spread.std():.5f}")
-            
+
             with col2:
                 if 'mid_price' in df.columns:
                     price_changes = df['mid_price'].diff().dropna()
                 else:
                     price_changes = ((df['ask'] + df['bid']) / 2).diff().dropna()
-                
+
                 st.metric("Tick Volatility", f"{price_changes.std():.6f}")
                 st.metric("Max Tick Move", f"{abs(price_changes).max():.6f}")
-            
+
             with col3:
                 # Manipulation detection
                 manipulation_cols = ['spoofing_detected', 'layering_detected', 'momentum_ignition']
                 manipulation_count = sum(df[col].sum() for col in manipulation_cols if col in df.columns)
-                
+
                 st.metric("Manipulation Events", f"{int(manipulation_count)}")
-                
+
                 if 'order_flow_imbalance' in df.columns:
                     avg_imbalance = df['order_flow_imbalance'].mean()
                     st.metric("Order Flow Imbalance", f"{avg_imbalance:.4f}")
-            
+
             # Spread analysis chart
             st.subheader("Spread Analysis")
-            
+
             fig = go.Figure()
-            
+
             fig.add_trace(go.Scatter(
                 x=df.index,
                 y=spread,
@@ -1220,7 +1188,7 @@ class ZANFLOWUltimateMegaDashboard:
                 name='Spread',
                 line=dict(color='purple', width=2)
             ))
-            
+
             fig.update_layout(
                 title="Bid-Ask Spread Over Time",
                 xaxis_title="Time",
@@ -1228,12 +1196,12 @@ class ZANFLOWUltimateMegaDashboard:
                 template=st.session_state.get('chart_theme', 'plotly_dark'),
                 height=300
             )
-            
+
             st.plotly_chart(fig, use_container_width=True)
-            
+
             # Price change distribution
             st.subheader("Tick-to-Tick Price Change Distribution")
-            
+
             fig = px.histogram(
                 price_changes,
                 nbins=50,
@@ -1241,38 +1209,38 @@ class ZANFLOWUltimateMegaDashboard:
                 labels={'value': 'Price Change', 'count': 'Frequency'},
                 template=st.session_state.get('chart_theme', 'plotly_dark')
             )
-            
+
             fig.update_layout(height=300)
             st.plotly_chart(fig, use_container_width=True)
-            
+
             # Manipulation timeline if available
             manipulation_cols = ['spoofing_detected', 'layering_detected', 'momentum_ignition']
             if any(col in df.columns for col in manipulation_cols):
                 st.subheader("Market Manipulation Timeline")
-                
+
                 manipulation_data = pd.DataFrame(index=df.index)
-                
+
                 for col in manipulation_cols:
                     if col in df.columns:
                         manipulation_data[col] = df[col]
-                
+
                 if not manipulation_data.empty:
                     fig = go.Figure()
-                    
+
                     colors = {'spoofing_detected': 'red', 'layering_detected': 'orange', 'momentum_ignition': 'purple'}
-                    
+
                     for col in manipulation_data.columns:
                         events = df[df[col] == True].index
-                        
+
                         if len(events) > 0:
                             fig.add_trace(go.Scatter(
                                 x=events,
-                                y=[colors.get(col, 'blue')] * len(events),
+                                y=[col.replace('_', ' ').title()] * len(events),
                                 mode='markers',
                                 name=col.replace('_', ' ').title(),
                                 marker=dict(symbol='square', size=10, color=colors.get(col, 'blue'))
                             ))
-                    
+
                     fig.update_layout(
                         title="Market Manipulation Events Timeline",
                         xaxis_title="Time",
@@ -1281,7 +1249,7 @@ class ZANFLOWUltimateMegaDashboard:
                         height=250,
                         showlegend=True
                     )
-                    
+
                     st.plotly_chart(fig, use_container_width=True)
         else:
             # Bar data microstructure analysis

@@ -32,15 +32,36 @@ st.markdown("""
         margin-bottom: 2rem;
         box-shadow: 0 10px 40px rgba(0,0,0,0.2);
     }
-    .smc-metric {
-        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-        padding: 1.5rem;
-        border-radius: 15px;
-        color: white;
-        text-align: center;
-        margin: 0.5rem 0;
-        box-shadow: 0 5px 20px rgba(0,0,0,0.2);
-    }
+.smc-metric {
+    background: #222e3a;
+    color: #e7eaf0;
+    padding: 0.45rem 0.7rem;
+    border-radius: 6px;
+    border: 1px solid #263246;
+    box-shadow: 0 1px 3px rgba(20,30,40,0.09);
+    text-align: center;
+    min-width: 90px;
+    max-width: 120px;
+    font-size: 0.93rem;
+    margin: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+}
+.smc-metric h2 {
+    font-size: 1rem;
+    font-weight: 600;
+    margin: 0.18rem 0 0.07rem 0;
+}
+.smc-metric h3 {
+    font-size: 0.92rem;
+    font-weight: 500;
+    margin-bottom: 0.04rem;
+}
+.smc-metric p {
+    font-size: 0.81rem;
+    margin: 0.08rem 0;
+}
     .order-block-card {
         background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%);
         padding: 1rem;
@@ -591,13 +612,7 @@ def main():
     loader = SMCDataLoader(config)
     chart_gen = SMCChartGenerator(config)
     
-    # Header
-    st.markdown("""
-    <div class="main-header">
-        <h1>🎯 ncOS Ultimate SMC Intelligence</h1>
-        <p>Advanced Smart Money Concepts Analysis & Visualization</p>
-    </div>
-    """, unsafe_allow_html=True)
+    # (Header removed as per instructions)
     
     # Scan data directory
     pairs_data = loader.scan_data_directory()
@@ -684,71 +699,31 @@ def main():
             # Extract ALL SMC features
             smc_features = loader.extract_all_smc_features(df, summary)
         
-        # Display metrics
-        col1, col2, col3, col4, col5 = st.columns(5)
-        
-        with col1:
-            current_price = df['close'].iloc[-1]
-            prev_close = df['close'].iloc[-2] if len(df) > 1 else current_price
-            change = current_price - prev_close
-            change_pct = (change / prev_close * 100) if prev_close != 0 else 0
-            
-            st.markdown(f"""
-            <div class="smc-metric">
-                <h3>💰 Price</h3>
-                <h2>{current_price:.5f}</h2>
-                <p>{change:+.5f} ({change_pct:+.2f}%)</p>
-            </div>
-            """, unsafe_allow_html=True)
-        
-        with col2:
-            market_structure = smc_features['market_structure']
-            trend_color = "#00ff88" if market_structure['trend'] == 'bullish' else "#ff4757"
-            
-            st.markdown(f"""
-            <div class="smc-metric">
-                <h3>📈 Trend</h3>
-                <h2 style="color: {trend_color}">{market_structure['trend'].upper()}</h2>
-                <p>Strength: {market_structure.get('strength', 0):.1f}%</p>
-            </div>
-            """, unsafe_allow_html=True)
-        
-        with col3:
-            order_blocks_count = len(smc_features['order_blocks'])
-            liquidity_count = len(smc_features['liquidity_zones'])
-            
-            st.markdown(f"""
-            <div class="smc-metric">
-                <h3>🎯 SMC Levels</h3>
-                <h2>{order_blocks_count + liquidity_count}</h2>
-                <p>OB: {order_blocks_count} | LIQ: {liquidity_count}</p>
-            </div>
-            """, unsafe_allow_html=True)
-        
-        with col4:
-            wyckoff_phase = smc_features['wyckoff_analysis']['phase']
-            phase_color = "#00cec9" if 'accumulation' in wyckoff_phase.lower() else "#e17055"
-            
-            st.markdown(f"""
-            <div class="smc-metric">
-                <h3>📊 Wyckoff</h3>
-                <h2 style="color: {phase_color}; font-size: 1.2rem">{wyckoff_phase}</h2>
-                <p>Events: {len(smc_features['wyckoff_analysis'].get('events', []))}</p>
-            </div>
-            """, unsafe_allow_html=True)
-        
-        with col5:
-            signals_count = len(smc_features['signals'])
-            buy_signals = sum(1 for s in smc_features['signals'] if s.get('type') == 'buy')
-            sell_signals = signals_count - buy_signals
-            
-            st.markdown(f"""
-            <div class="smc-metric">
-                <h3>🚀 Signals</h3>
-                <h2>{signals_count}</h2>
-                <p>Buy: {buy_signals} | Sell: {sell_signals}</p>
-            </div>
-            """, unsafe_allow_html=True)
+        # Display metrics as a compact Streamlit table
+        current_price = df['close'].iloc[-1]
+        prev_close = df['close'].iloc[-2] if len(df) > 1 else current_price
+        change = current_price - prev_close
+        change_pct = (change / prev_close * 100) if prev_close != 0 else 0
+        market_structure = smc_features['market_structure']
+        order_blocks_count = len(smc_features['order_blocks'])
+        liquidity_count = len(smc_features['liquidity_zones'])
+        wyckoff_phase = smc_features['wyckoff_analysis']['phase']
+        signals_count = len(smc_features['signals'])
+        buy_signals = sum(1 for s in smc_features['signals'] if s.get('type') == 'buy')
+        sell_signals = signals_count - buy_signals
+        metric_table = {
+            "Metric": ["Price", "Change", "Trend", "SMC Levels", "Wyckoff Phase", "Signals"],
+            "Value": [
+                f"{current_price:.5f}",
+                f"{change:+.5f} ({change_pct:+.2f}%)",
+                f"{market_structure['trend'].capitalize()}",
+                f"OB: {order_blocks_count}, LIQ: {liquidity_count}",
+                wyckoff_phase,
+                f"Buy: {buy_signals}, Sell: {sell_signals}"
+            ]
+        }
+        st.markdown("### 🔹 Market Snapshot")
+        st.table(pd.DataFrame(metric_table))
         
         # Key insights
         st.markdown("### 🔍 Key SMC Insights")
@@ -781,16 +756,20 @@ def main():
                 </div>
                 """, unsafe_allow_html=True)
         
-        with col3:
-            if smc_features['volume_profile']['poc']:
-                st.markdown(f"""
-                <div class="wyckoff-phase">
-                    <h4>🎯 Volume Profile</h4>
-                    <p>POC: {smc_features['volume_profile']['poc']:.5f}</p>
-                    <p>VAH: {smc_features['volume_profile'].get('vah', 0):.5f}</p>
-                    <p>VAL: {smc_features['volume_profile'].get('val', 0):.5f}</p>
-                </div>
-                """, unsafe_allow_html=True)
+        vp = smc_features['volume_profile']
+        if vp['poc']:
+            volume_table = {
+                "Metric": ["POC", "VAH", "VAL"],
+                "Value": [
+                    f"{vp['poc']:.5f}",
+                    f"{vp.get('vah', 0):.5f}",
+                    f"{vp.get('val', 0):.5f}"
+                ]
+            }
+            st.markdown("### 🎯 Volume Profile", unsafe_allow_html=True)
+            col1_, col2_, col3_ = st.columns([1, 2, 1])
+            with col2_:
+                st.table(pd.DataFrame(volume_table))
         
         # Latest signal alert
         if smc_features['signals']:
