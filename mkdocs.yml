@@ -6,6 +6,7 @@ nav:
   - Startup Blueprint: startup_blueprint.md
   - Architecture: architecture.md
   - Agents: agents.md
+  - Custom GPT: custom-gpt.md
   - Workflows & Flows: flows.md
   - Schemas: schemas.md
   - System Prompt & Routing: system.md
