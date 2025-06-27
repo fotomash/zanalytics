@@ -11,8 +11,35 @@ from datetime import datetime, timedelta
 import warnings
 import time
 import glob
+from typing import Optional
 
 warnings.filterwarnings('ignore')
+
+# Mapping of possible SMC column variants to unified keys
+SMC_VARIANT_MAP = {
+    'fvg_bullish': ['SMC_fvg_bullish', 'bullish_fvg', 'fvg_up'],
+    'fvg_bearish': ['SMC_fvg_bearish', 'bearish_fvg', 'fvg_down'],
+    'ob_bullish': ['SMC_bullish_ob', 'bullish_order_block', 'bullish_ob', 'ob_up'],
+    'ob_bearish': ['SMC_bearish_ob', 'bearish_order_block', 'bearish_ob', 'ob_down'],
+    'structure_break': ['structure_break', 'SMC_structure_break', 'bos']
+}
+
+
+def find_column(df: pd.DataFrame, variants: list) -> Optional[str]:
+    """Return the first matching column from variants if present."""
+    for col in variants:
+        if col in df.columns:
+            return col
+    return None
+
+
+def count_events(df: pd.DataFrame, col: str) -> int:
+    """Count truthy values in a column, handling boolean and numeric types."""
+    if col not in df.columns:
+        return 0
+    if df[col].dtype == bool:
+        return int(df[col].sum())
+    return int((df[col] != 0).sum())
 
 # Custom CSS for enhanced styling
 st.markdown("""
@@ -377,8 +404,9 @@ class UltimateTradingDashboard:
     def add_smc_overlays(self, fig, df):
         """Add Smart Money Concepts overlays"""
         # Fair Value Gaps
-        if 'SMC_fvg_bullish' in df.columns:
-            fvg_bullish = df[df['SMC_fvg_bullish'] == True]
+        b_fvg_col = find_column(df, SMC_VARIANT_MAP['fvg_bullish'])
+        if b_fvg_col:
+            fvg_bullish = df[df[b_fvg_col] == True]
             if not fvg_bullish.empty:
                 fig.add_trace(go.Scatter(
                     x=fvg_bullish.index, y=fvg_bullish['low'],
@@ -387,8 +415,9 @@ class UltimateTradingDashboard:
                     showlegend=True
                 ))
 
-        if 'SMC_fvg_bearish' in df.columns:
-            fvg_bearish = df[df['SMC_fvg_bearish'] == True]
+        s_fvg_col = find_column(df, SMC_VARIANT_MAP['fvg_bearish'])
+        if s_fvg_col:
+            fvg_bearish = df[df[s_fvg_col] == True]
             if not fvg_bearish.empty:
                 fig.add_trace(go.Scatter(
                     x=fvg_bearish.index, y=fvg_bearish['high'],
@@ -398,8 +427,9 @@ class UltimateTradingDashboard:
                 ))
 
         # Order Blocks
-        if 'SMC_bullish_ob' in df.columns:
-            ob_bullish = df[df['SMC_bullish_ob'] == True]
+        ob_bull_col = find_column(df, SMC_VARIANT_MAP['ob_bullish'])
+        if ob_bull_col:
+            ob_bullish = df[df[ob_bull_col] == True]
             if not ob_bullish.empty:
                 fig.add_trace(go.Scatter(
                     x=ob_bullish.index, y=ob_bullish['low'],
@@ -408,8 +438,9 @@ class UltimateTradingDashboard:
                     showlegend=True
                 ))
 
-        if 'SMC_bearish_ob' in df.columns:
-            ob_bearish = df[df['SMC_bearish_ob'] == True]
+        ob_bear_col = find_column(df, SMC_VARIANT_MAP['ob_bearish'])
+        if ob_bear_col:
+            ob_bearish = df[df[ob_bear_col] == True]
             if not ob_bearish.empty:
                 fig.add_trace(go.Scatter(
                     x=ob_bearish.index, y=ob_bearish['high'],
@@ -455,10 +486,15 @@ class UltimateTradingDashboard:
             latest = df.iloc[-1]
 
             # SMC signals
-            bullish_fvg = latest.get('SMC_fvg_bullish', False)
-            bearish_fvg = latest.get('SMC_fvg_bearish', False)
-            bullish_ob = latest.get('SMC_bullish_ob', False)
-            bearish_ob = latest.get('SMC_bearish_ob', False)
+            b_fvg_col = find_column(df, SMC_VARIANT_MAP['fvg_bullish'])
+            s_fvg_col = find_column(df, SMC_VARIANT_MAP['fvg_bearish'])
+            ob_bull_col = find_column(df, SMC_VARIANT_MAP['ob_bullish'])
+            ob_bear_col = find_column(df, SMC_VARIANT_MAP['ob_bearish'])
+
+            bullish_fvg = latest.get(b_fvg_col, False) if b_fvg_col else False
+            bearish_fvg = latest.get(s_fvg_col, False) if s_fvg_col else False
+            bullish_ob = latest.get(ob_bull_col, False) if ob_bull_col else False
+            bearish_ob = latest.get(ob_bear_col, False) if ob_bear_col else False
 
             # Wyckoff signals
             wyckoff_acc = latest.get('wyckoff_accumulation', False)
@@ -522,13 +558,17 @@ class UltimateTradingDashboard:
         col1, col2, col3, col4, col5 = st.columns(5)
 
         with col1:
-            bullish_fvgs = df['SMC_fvg_bullish'].sum() if 'SMC_fvg_bullish' in df.columns else 0
-            bearish_fvgs = df['SMC_fvg_bearish'].sum() if 'SMC_fvg_bearish' in df.columns else 0
+            b_col = find_column(df, SMC_VARIANT_MAP['fvg_bullish'])
+            s_col = find_column(df, SMC_VARIANT_MAP['fvg_bearish'])
+            bullish_fvgs = count_events(df, b_col) if b_col else 0
+            bearish_fvgs = count_events(df, s_col) if s_col else 0
             st.markdown(f'<div class="smc-signal"><strong>Fair Value Gaps</strong><br>🟢 {bullish_fvgs} | 🔴 {bearish_fvgs}</div>', unsafe_allow_html=True)
 
         with col2:
-            bullish_obs = df['SMC_bullish_ob'].sum() if 'SMC_bullish_ob' in df.columns else 0
-            bearish_obs = df['SMC_bearish_ob'].sum() if 'SMC_bearish_ob' in df.columns else 0
+            ob_bull_col = find_column(df, SMC_VARIANT_MAP['ob_bullish'])
+            ob_bear_col = find_column(df, SMC_VARIANT_MAP['ob_bearish'])
+            bullish_obs = count_events(df, ob_bull_col) if ob_bull_col else 0
+            bearish_obs = count_events(df, ob_bear_col) if ob_bear_col else 0
             st.markdown(f'<div class="smc-signal"><strong>Order Blocks</strong><br>🟢 {bullish_obs} | 🔴 {bearish_obs}</div>', unsafe_allow_html=True)
 
         with col3:
@@ -536,8 +576,10 @@ class UltimateTradingDashboard:
             st.markdown(f'<div class="smc-signal"><strong>Liquidity Grabs</strong><br>⚡ {liquidity_grabs}</div>', unsafe_allow_html=True)
 
         with col4:
-            bos_bullish = df['SMC_bos_bullish'].sum() if 'SMC_bos_bullish' in df.columns else 0
-            bos_bearish = df['SMC_bos_bearish'].sum() if 'SMC_bos_bearish' in df.columns else 0
+            bos_bull_col = find_column(df, SMC_VARIANT_MAP.get('bos_bullish', ['SMC_bos_bullish']))
+            bos_bear_col = find_column(df, SMC_VARIANT_MAP.get('bos_bearish', ['SMC_bos_bearish']))
+            bos_bullish = count_events(df, bos_bull_col) if bos_bull_col else 0
+            bos_bearish = count_events(df, bos_bear_col) if bos_bear_col else 0
             st.markdown(f'<div class="smc-signal"><strong>Break of Structure</strong><br>🟢 {bos_bullish} | 🔴 {bos_bearish}</div>', unsafe_allow_html=True)
 
         with col5:
@@ -1051,10 +1093,15 @@ class UltimateTradingDashboard:
                     volume = latest.get('volume', np.nan)
 
                     # SMC signals
-                    bullish_fvg = latest.get('SMC_fvg_bullish', False)
-                    bearish_fvg = latest.get('SMC_fvg_bearish', False)
-                    bullish_ob = latest.get('SMC_bullish_ob', False)
-                    bearish_ob = latest.get('SMC_bearish_ob', False)
+                    b_fvg_col = find_column(df, SMC_VARIANT_MAP['fvg_bullish'])
+                    s_fvg_col = find_column(df, SMC_VARIANT_MAP['fvg_bearish'])
+                    ob_bull_col = find_column(df, SMC_VARIANT_MAP['ob_bullish'])
+                    ob_bear_col = find_column(df, SMC_VARIANT_MAP['ob_bearish'])
+
+                    bullish_fvg = latest.get(b_fvg_col, False) if b_fvg_col else False
+                    bearish_fvg = latest.get(s_fvg_col, False) if s_fvg_col else False
+                    bullish_ob = latest.get(ob_bull_col, False) if ob_bull_col else False
+                    bearish_ob = latest.get(ob_bear_col, False) if ob_bear_col else False
 
                     # Wyckoff signals
                     wyckoff_acc = latest.get('wyckoff_accumulation', False)
