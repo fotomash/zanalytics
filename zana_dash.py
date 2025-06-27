@@ -620,18 +620,18 @@ class UltimateZANFLOWDashboard:
                     top_gainers = movers_df.nlargest(5, 'Performance')
                     for _, row in top_gainers.iterrows():
                         rsi_value = f"RSI: {row['RSI']:.1f}" if not np.isnan(row['RSI']) else ""
-                    st.markdown(f"""
-                    **{row['Pair']} ({row['Timeframe']})**: {row['Performance']:+.2f}% {rsi_value}
-                    """)
-                
+                        st.markdown(f"""
+                        **{row['Pair']} ({row['Timeframe']})**: {row['Performance']:+.2f}% {rsi_value}
+                        """)
+
                 with col2:
                     st.markdown("#### 📉 Top Losers")
                     top_losers = movers_df.nsmallest(5, 'Performance')
                     for _, row in top_losers.iterrows():
                         rsi_value = f"RSI: {row['RSI']:.1f}" if not np.isnan(row['RSI']) else ""
-                    st.markdown(f"""
-                    **{row['Pair']} ({row['Timeframe']})**: {row['Performance']:+.2f}% {rsi_value}
-                    """)
+                        st.markdown(f"""
+                        **{row['Pair']} ({row['Timeframe']})**: {row['Performance']:+.2f}% {rsi_value}
+                        """)
         
         except Exception as e:
             st.error(f"Error analyzing top movers: {str(e)}")
@@ -763,18 +763,18 @@ class UltimateZANFLOWDashboard:
                     top_gainers = movers_df.nlargest(5, 'Performance')
                     for _, row in top_gainers.iterrows():
                         rsi_value = f"RSI: {row['RSI']:.1f}" if not np.isnan(row['RSI']) else ""
-                    st.markdown(f"""
-                    **{row['Pair']} ({row['Timeframe']})**: {row['Performance']:+.2f}% | {rsi_value}
-                    """)
-                
+                        st.markdown(f"""
+                        **{row['Pair']} ({row['Timeframe']})**: {row['Performance']:+.2f}% | {rsi_value}
+                        """)
+
                 with col2:
                     st.markdown("#### 📉 Top Losers")
                     top_losers = movers_df.nsmallest(5, 'Performance')
                     for _, row in top_losers.iterrows():
                         rsi_value = f"RSI: {row['RSI']:.1f}" if not np.isnan(row['RSI']) else ""
-                    st.markdown(f"""
-                    **{row['Pair']} ({row['Timeframe']})**: {row['Performance']:+.2f}% | {rsi_value}
-                    """)
+                        st.markdown(f"""
+                        **{row['Pair']} ({row['Timeframe']})**: {row['Performance']:+.2f}% | {rsi_value}
+                        """)
         
         except Exception as e:
             st.error(f"Error analyzing top movers: {str(e)}")
