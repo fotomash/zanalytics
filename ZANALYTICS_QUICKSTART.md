@@ -11,7 +11,7 @@ python -m venv venv
 source venv/bin/activate  # Windows: venv\Scripts\activate
 
 # Install dependencies
-pip install pandas numpy ta scipy scikit-learn
+pip install pandas numpy ta scipy scikit-learn loguru
 pip install backtrader vectorbt
 pip install streamlit plotly
 pip install aiohttp beautifulsoup4

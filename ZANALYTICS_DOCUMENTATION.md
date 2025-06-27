@@ -108,10 +108,10 @@ source zanalytics_env/bin/activate  # On Windows: zanalytics_env\Scripts\activat
 ### Install Dependencies
 ```bash
 # Core dependencies
-pip install -r requirements.txt
+pip install -r requirements.txt  # now includes loguru
 
 # Additional dependencies for specific components
-pip install backtrader vectorbt streamlit plotly
+pip install backtrader vectorbt streamlit plotly loguru
 ```
 
 ### Directory Structure
@@ -318,7 +318,7 @@ processor.config["max_data_points"] = 5000
 1. **Import Errors**
    ```bash
    # Ensure all dependencies are installed
-   pip install -r requirements.txt
+   pip install -r requirements.txt  # includes loguru
    ```
 
 2. **API Rate Limits**
