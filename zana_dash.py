@@ -17,6 +17,7 @@ import re
 from scipy import stats
 import importlib
 import openpyxl  # required for Excel file support
+# Suppress Streamlit warnings
 warnings.filterwarnings('ignore')
 
 # Mapping of possible SMC column variants to unified keys
@@ -25,7 +26,7 @@ SMC_VARIANT_MAP = {
     'fvg_bearish': ['SMC_fvg_bearish', 'bearish_fvg', 'fvg_down'],
     'ob_bullish': ['SMC_bullish_ob', 'bullish_order_block', 'bullish_ob', 'ob_up'],
     'ob_bearish': ['SMC_bearish_ob', 'bearish_order_block', 'bearish_ob', 'ob_down'],
-    'structure_break': ['structure_break', 'SMC_structure_break', 'bos']
+    'structure_break': ['structure_break', 'SMC_structure_break', 'bos'],
 }
 
 
@@ -44,7 +45,10 @@ def count_events(df: pd.DataFrame, col: str) -> int:
     if df[col].dtype == bool:
         return int(df[col].sum())
     return int((df[col] != 0).sum())
+<<<<<<< HEAD
 
+=======
+>>>>>>> e7e452c08669c3b63431b7e831232928fc3dd682
 # --- SMC, Wyckoff, Microstructure advanced detectors ---
 try:
     from phase_detector_wyckoff_v1 import detect_phases
@@ -1120,6 +1124,7 @@ class UltimateZANFLOWDashboard:
                         showlegend=True
                     ), row=row, col=1)
 
+
     def add_wyckoff_overlays(self, fig, df, row=1):
         """Add Wyckoff analysis overlays"""
         wyckoff_features = getattr(analyzer_defaults, "WYCKOFF_FEATURES", {}) if analyzer_defaults else {}
@@ -1496,7 +1501,7 @@ class UltimateZANFLOWDashboard:
             sb_col = find_column(df, SMC_VARIANT_MAP['structure_break'])
             if sb_col:
                 smc_events.append(f"Structure Breaks: {count_events(df, sb_col)}")
-        st.info(" | ".join(smc_events) if smc_events else "No SMC events detected in this dataset.")
+
 
     def display_wyckoff_analysis(self):
         st.markdown("## 🏛️ Wyckoff Analysis")
