@@ -1,10 +1,11 @@
-# Create the ultimate comprehensive dashboard without loading messages
-ultimate_dashboard = '''#!/usr/bin/env python3
+#!/usr/bin/env python3
 """
 ZANFLOW v12 Ultimate Trading Dashboard
 Comprehensive microstructure, SMC, Wyckoff, and top-down analysis
 Reads processed data from convert_final_enhanced_smc_ULTIMATE.py
 """
+
+# Create the ultimate comprehensive dashboard without loading messages
 
 import streamlit as st
 import pandas as pd
@@ -1290,25 +1291,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-'''
-
-# Write the ultimate dashboard file
-with open('zanflow_ultimate_dashboard.py', 'w', encoding='utf-8') as f:
-    f.write(ultimate_dashboard)
-
-print("✅ Created ultimate dashboard: zanflow_ultimate_dashboard.py")
-print("\n🚀 Features:")
-print("- No loading messages (silent data loading)")
-print("- Comprehensive microstructure analysis")
-print("- Full SMC analysis with FVGs, Order Blocks, Structure Breaks")
-print("- Complete Wyckoff analysis with phases and volume")
-print("- Pattern recognition with candlestick patterns")
-print("- Advanced volume analysis and volume profile")
-print("- Risk analysis with drawdowns and VaR")
-print("- Statistical analysis and ML features")
-print("- Signal analysis with composite signals")
-print("- Top-down market analysis")
-print("- Market heatmap and correlation matrix")
-print("- Responsive design with custom styling")
-print("\n📊 To run:")
-print("streamlit run zanflow_ultimate_dashboard.py")
