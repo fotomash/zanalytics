@@ -39,9 +39,20 @@ class UltimateZANFLOWDashboard:
         pair_dirs = [d for d in self.data_dir.iterdir() if d.is_dir()]
 
         for pair_dir in pair_dirs:
-            pair_name = pair_dir.name
+            pair_name = re.split(r'[_\-]', pair_dir.name)[0].upper()
             self.pairs_data[pair_name] = {}
             self.analysis_reports[pair_name] = {}
+
+            # Load SMC CSVs (e.g., *_XAUUSD_M1_bars_1D_csv_processed*.csv)
+            smc_csv_files = list(pair_dir.glob(f"*_{pair_name}_M1_bars_1D_csv_processed*.csv"))
+            self.smc_analysis[pair_name] = {}
+            for smc_csv in smc_csv_files:
+                try:
+                    df = pd.read_csv(smc_csv, index_col=0, parse_dates=True)
+                    # Store under descriptive key or use filename if needed
+                    self.smc_analysis[pair_name]["M1_SMC_1D"] = df
+                except Exception:
+                    continue
 
             # Load CSV files for each timeframe
             csv_files = list(pair_dir.glob("*_COMPREHENSIVE_*.csv"))

@@ -2,7 +2,7 @@ cd /Users/tom/Documents/_trade/_exports/_tick
 # Activate venv directly via python binary
 /Users/tom/venvs/ncos_env/bin/python \
   /Users/tom/Documents/_trade/_exports/_tick/convert_final_enhanced_smc_ULTIMATE.py \
-  --output /Users/tom/Documents/GitHub/zanalytics/data
+  --output /Users/tom/Documents/GitHub/zanalytics/data --bar-limit 300 --no-tick
   
 /Users/tom/venvs/ncos_env/bin/python \
   /Users/tom/Documents/_trade/_exports/_tick/ncOS_ultimate_microstructure_analyzer.py \
@@ -11,5 +11,5 @@ cd /Users/tom/Documents/_trade/_exports/_tick
 
 /Users/tom/venvs/ncos_env/bin/python \
   /Users/tom/Documents/_trade/_exports/_tick/zanflow_microstructure_analyzer.py --folder /Users/tom/Documents/_trade/_exports/_tick/ \
-  --limit 250 --json \
+  --limit 150 --json \
   --output /Users/tom/Documents/GitHub/zanalytics/data --no-dashboard
