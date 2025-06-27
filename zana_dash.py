@@ -17,16 +17,16 @@ import re
 from scipy import stats
 import importlib
 import openpyxl  # required for Excel file support
+# Suppress Streamlit warnings
 warnings.filterwarnings('ignore')
 
-<<<<<<< Updated upstream
 # Mapping of possible SMC column variants to unified keys
 SMC_VARIANT_MAP = {
     'fvg_bullish': ['SMC_fvg_bullish', 'bullish_fvg', 'fvg_up'],
     'fvg_bearish': ['SMC_fvg_bearish', 'bearish_fvg', 'fvg_down'],
     'ob_bullish': ['SMC_bullish_ob', 'bullish_order_block', 'bullish_ob', 'ob_up'],
     'ob_bearish': ['SMC_bearish_ob', 'bearish_order_block', 'bearish_ob', 'ob_down'],
-    'structure_break': ['structure_break', 'SMC_structure_break', 'bos']
+    'structure_break': ['structure_break', 'SMC_structure_break', 'bos'],
 }
 
 
@@ -45,7 +45,6 @@ def count_events(df: pd.DataFrame, col: str) -> int:
     if df[col].dtype == bool:
         return int(df[col].sum())
     return int((df[col] != 0).sum())
-=======
 # --- SMC, Wyckoff, Microstructure advanced detectors ---
 try:
     from phase_detector_wyckoff_v1 import detect_phases
@@ -99,7 +98,6 @@ def enrich_dataframe(df):
         except Exception as e:
             print(fn.__name__, "error:", e)
     return df
->>>>>>> Stashed changes
 
 # Import analyzer defaults for config-driven overlays
 try:
@@ -1122,6 +1120,29 @@ class UltimateZANFLOWDashboard:
                         showlegend=True
                     ), row=row, col=1)
 
+            # Detect any additional SMC_ prefixed boolean columns
+            for col in df.columns:
+                if col.startswith('SMC_') and col not in ['SMC_range_high', 'SMC_range_low', 'SMC_range_mid']:
+                    if df[col].dtype == bool:
+                        vals = df[df[col] == True]
+                        if not vals.empty and len(vals) < 1000:
+                            if 'liquidity' in col:
+                                marker = dict(symbol='diamond', color='cyan', size=10)
+                            elif 'premium' in col:
+                                marker = dict(symbol='star', color='gold', size=10)
+                            elif 'discount' in col:
+                                marker = dict(symbol='star', color='silver', size=10)
+                            else:
+                                marker = dict(symbol='circle', color='white', size=8)
+
+                            y_col = 'low' if 'bullish' in col else 'high' if 'bearish' in col else 'close'
+                            fig.add_trace(go.Scatter(
+                                x=vals.index, y=vals[y_col],
+                                mode='markers', name=col.replace('SMC_', '').replace('_', ' ').title(),
+                                marker=marker,
+                                showlegend=True
+                            ), row=row, col=1)
+
     def add_wyckoff_overlays(self, fig, df, row=1):
         """Add Wyckoff analysis overlays"""
         wyckoff_features = getattr(analyzer_defaults, "WYCKOFF_FEATURES", {}) if analyzer_defaults else {}
@@ -1498,6 +1519,14 @@ class UltimateZANFLOWDashboard:
             sb_col = find_column(df, SMC_VARIANT_MAP['structure_break'])
             if sb_col:
                 smc_events.append(f"Structure Breaks: {count_events(df, sb_col)}")
+
+            for col in df.columns:
+                if col.startswith('SMC_') and col not in ['SMC_range_high', 'SMC_range_low', 'SMC_range_mid']:
+                    if df[col].dtype == bool:
+                        count = df[col].sum()
+                        if count > 0:
+                            label = col.replace('SMC_', '').replace('_', ' ').title()
+                            smc_events.append(f"{label}: {int(count)}")
         st.info(" | ".join(smc_events) if smc_events else "No SMC events detected in this dataset.")
 
     def display_wyckoff_analysis(self):
