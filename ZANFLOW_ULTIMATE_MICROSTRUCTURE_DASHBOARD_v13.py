@@ -387,6 +387,10 @@ class UltimateMicrostructureZANFLOW:
             else:
                 st.metric("🛡️ Manipulation", "N/A")
 
+    def display_home_page(self, *args, **kwargs):
+        """Wrapper for backward compatibility"""
+        return self.display_market_overview(*args, **kwargs)
+
     def display_microstructure_dashboard(self, symbol):
         """Display comprehensive microstructure analysis dashboard"""
         st.markdown("## 🔍 Advanced Microstructure Analysis")
