@@ -9,7 +9,7 @@ The CLI Simulator provides a local, interactive entry point to your Copilot Fram
 - **Python** 3.9+
 - Project dependencies installed:  
   ```bash
-  pip install -r requirements.txt
+  pip install -r requirements.txt  # includes loguru
   ```
 - A valid **API key** (or JWT) set via environment variable or flag.
 
@@ -30,7 +30,7 @@ The CLI Simulator provides a local, interactive entry point to your Copilot Fram
    ```
 3. **Install** dependencies:  
    ```bash
-   pip install -r requirements.txt
+   pip install -r requirements.txt  # installs dependencies like `loguru`
    ```
 
 ---

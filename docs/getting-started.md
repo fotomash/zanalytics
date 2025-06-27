@@ -19,7 +19,7 @@ cd your-project
 # If using Poetry:
 poetry install
 # Or with pip:
-pip install -r requirements.txt
+pip install -r requirements.txt  # installs core packages including `loguru`
 
 # Copy example environment variables
 cp .env.example .env

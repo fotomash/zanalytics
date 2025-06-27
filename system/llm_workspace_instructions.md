@@ -63,7 +63,7 @@ All runtime settings, endpoints, and feature flags must be resolved via environm
 
 2. In your Python environment, install dependencies:
    ```bash
-   pip install fastapi pydantic uvicorn pyyaml
+   pip install fastapi pydantic uvicorn pyyaml loguru
    ```
 
 ## 2. Bootstrap the FastAPI Orchestrator
