@@ -19,33 +19,6 @@ import importlib
 import openpyxl  # required for Excel file support
 warnings.filterwarnings('ignore')
 
-<<<<<<< Updated upstream
-# Mapping of possible SMC column variants to unified keys
-SMC_VARIANT_MAP = {
-    'fvg_bullish': ['SMC_fvg_bullish', 'bullish_fvg', 'fvg_up'],
-    'fvg_bearish': ['SMC_fvg_bearish', 'bearish_fvg', 'fvg_down'],
-    'ob_bullish': ['SMC_bullish_ob', 'bullish_order_block', 'bullish_ob', 'ob_up'],
-    'ob_bearish': ['SMC_bearish_ob', 'bearish_order_block', 'bearish_ob', 'ob_down'],
-    'structure_break': ['structure_break', 'SMC_structure_break', 'bos']
-}
-
-
-def find_column(df: pd.DataFrame, variants: list) -> Optional[str]:
-    """Return the first matching column from variants if present."""
-    for col in variants:
-        if col in df.columns:
-            return col
-    return None
-
-
-def count_events(df: pd.DataFrame, col: str) -> int:
-    """Count truthy values in a column, handling boolean and numeric types."""
-    if col not in df.columns:
-        return 0
-    if df[col].dtype == bool:
-        return int(df[col].sum())
-    return int((df[col] != 0).sum())
-=======
 # --- SMC, Wyckoff, Microstructure advanced detectors ---
 try:
     from phase_detector_wyckoff_v1 import detect_phases
@@ -99,7 +72,6 @@ def enrich_dataframe(df):
         except Exception as e:
             print(fn.__name__, "error:", e)
     return df
->>>>>>> Stashed changes
 
 # Import analyzer defaults for config-driven overlays
 try:
@@ -1067,9 +1039,9 @@ class UltimateZANFLOWDashboard:
                         ), row=row, col=1)
         else:
             # Fallback to old logic if config missing
-            b_fvg_col = find_column(df, SMC_VARIANT_MAP['fvg_bullish'])
-            if b_fvg_col:
-                fvg_bullish = df[df[b_fvg_col] == True]
+            # Fair Value Gaps
+            if 'bullish_fvg' in df.columns:
+                fvg_bullish = df[df['bullish_fvg'] == True]
                 if not fvg_bullish.empty:
                     fig.add_trace(go.Scatter(
                         x=fvg_bullish.index, y=fvg_bullish['low'],
@@ -1077,10 +1049,8 @@ class UltimateZANFLOWDashboard:
                         marker=dict(symbol='triangle-up', color='lime', size=12),
                         showlegend=True
                     ), row=row, col=1)
-
-            s_fvg_col = find_column(df, SMC_VARIANT_MAP['fvg_bearish'])
-            if s_fvg_col:
-                fvg_bearish = df[df[s_fvg_col] == True]
+            if 'bearish_fvg' in df.columns:
+                fvg_bearish = df[df['bearish_fvg'] == True]
                 if not fvg_bearish.empty:
                     fig.add_trace(go.Scatter(
                         x=fvg_bearish.index, y=fvg_bearish['high'],
@@ -1088,10 +1058,9 @@ class UltimateZANFLOWDashboard:
                         marker=dict(symbol='triangle-down', color='red', size=12),
                         showlegend=True
                     ), row=row, col=1)
-
-            ob_bull_col = find_column(df, SMC_VARIANT_MAP['ob_bullish'])
-            if ob_bull_col:
-                ob_bullish = df[df[ob_bull_col] == True]
+            # Order Blocks
+            if 'bullish_order_block' in df.columns:
+                ob_bullish = df[df['bullish_order_block'] == True]
                 if not ob_bullish.empty:
                     fig.add_trace(go.Scatter(
                         x=ob_bullish.index, y=ob_bullish['low'],
@@ -1099,10 +1068,8 @@ class UltimateZANFLOWDashboard:
                         marker=dict(symbol='square', color='lightgreen', size=10),
                         showlegend=True
                     ), row=row, col=1)
-
-            ob_bear_col = find_column(df, SMC_VARIANT_MAP['ob_bearish'])
-            if ob_bear_col:
-                ob_bearish = df[df[ob_bear_col] == True]
+            if 'bearish_order_block' in df.columns:
+                ob_bearish = df[df['bearish_order_block'] == True]
                 if not ob_bearish.empty:
                     fig.add_trace(go.Scatter(
                         x=ob_bearish.index, y=ob_bearish['high'],
@@ -1110,10 +1077,9 @@ class UltimateZANFLOWDashboard:
                         marker=dict(symbol='square', color='lightcoral', size=10),
                         showlegend=True
                     ), row=row, col=1)
-
-            sb_col = find_column(df, SMC_VARIANT_MAP['structure_break'])
-            if sb_col:
-                structure_breaks = df[df[sb_col] == True]
+            # Structure breaks
+            if 'structure_break' in df.columns:
+                structure_breaks = df[df['structure_break'] == True]
                 if not structure_breaks.empty:
                     fig.add_trace(go.Scatter(
                         x=structure_breaks.index, y=structure_breaks['close'],
@@ -1478,26 +1444,17 @@ class UltimateZANFLOWDashboard:
                         value = df[col].sum()
                     smc_events.append(f"{label}: {value}")
         else:
-            # Fallback to old logic with variant detection
-            b_fvg_col = find_column(df, SMC_VARIANT_MAP['fvg_bullish'])
-            if b_fvg_col:
-                smc_events.append(f"Bullish FVGs: {count_events(df, b_fvg_col)}")
-
-            s_fvg_col = find_column(df, SMC_VARIANT_MAP['fvg_bearish'])
-            if s_fvg_col:
-                smc_events.append(f"Bearish FVGs: {count_events(df, s_fvg_col)}")
-
-            ob_bull_col = find_column(df, SMC_VARIANT_MAP['ob_bullish'])
-            if ob_bull_col:
-                smc_events.append(f"Bullish OBs: {count_events(df, ob_bull_col)}")
-
-            ob_bear_col = find_column(df, SMC_VARIANT_MAP['ob_bearish'])
-            if ob_bear_col:
-                smc_events.append(f"Bearish OBs: {count_events(df, ob_bear_col)}")
-
-            sb_col = find_column(df, SMC_VARIANT_MAP['structure_break'])
-            if sb_col:
-                smc_events.append(f"Structure Breaks: {count_events(df, sb_col)}")
+            # Fallback to old logic
+            if 'bullish_fvg' in df.columns:
+                smc_events.append(f"Bullish FVGs: {df['bullish_fvg'].sum()}")
+            if 'bearish_fvg' in df.columns:
+                smc_events.append(f"Bearish FVGs: {df['bearish_fvg'].sum()}")
+            if 'bullish_order_block' in df.columns:
+                smc_events.append(f"Bullish OBs: {df['bullish_order_block'].sum()}")
+            if 'bearish_order_block' in df.columns:
+                smc_events.append(f"Bearish OBs: {df['bearish_order_block'].sum()}")
+            if 'structure_break' in df.columns:
+                smc_events.append(f"Structure Breaks: {df['structure_break'].sum()}")
         st.info(" | ".join(smc_events) if smc_events else "No SMC events detected in this dataset.")
 
     def display_wyckoff_analysis(self):

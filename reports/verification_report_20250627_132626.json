@@ -1,0 +1,77 @@
+{
+  "timestamp": "20250627_132626",
+  "base_path": ".",
+  "results": {
+    "directory_structure": {
+      "data": {
+        "exists": true,
+        "required": true,
+        "path": "data"
+      },
+      "data/tick": {
+        "exists": false,
+        "required": true,
+        "path": "data/tick"
+      },
+      "data/bar": {
+        "exists": false,
+        "required": true,
+        "path": "data/bar"
+      },
+      "logs": {
+        "exists": true,
+        "required": false,
+        "path": "logs"
+      },
+      "reports": {
+        "exists": false,
+        "required": false,
+        "path": "reports"
+      },
+      "config": {
+        "exists": true,
+        "required": false,
+        "path": "config"
+      }
+    },
+    "data_files": {},
+    "indicators": {
+      "moving_averages": {
+        "status": "success",
+        "sma_last": 95.58168710481473,
+        "ema_last": 95.4340788324775
+      }
+    },
+    "smc_analysis": {
+      "order_blocks": {
+        "status": "success",
+        "test_passed": true
+      },
+      "fvg": {
+        "status": "success",
+        "test_passed": true
+      }
+    },
+    "wyckoff_analysis": {
+      "phase_detection": {
+        "status": "success",
+        "test_passed": true
+      },
+      "volume_analysis": {
+        "status": "success",
+        "test_passed": true
+      }
+    },
+    "errors": [
+      "Required directory missing: data/tick",
+      "Required directory missing: data/bar"
+    ],
+    "warnings": []
+  },
+  "summary": {
+    "total_errors": 2,
+    "total_warnings": 0,
+    "directories_checked": 6,
+    "data_files_checked": 0
+  }
+}
