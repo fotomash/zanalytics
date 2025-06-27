@@ -19,7 +19,6 @@ import importlib
 import openpyxl  # required for Excel file support
 warnings.filterwarnings('ignore')
 
-<<<<<<< Updated upstream
 # Mapping of possible SMC column variants to unified keys
 SMC_VARIANT_MAP = {
     'fvg_bullish': ['SMC_fvg_bullish', 'bullish_fvg', 'fvg_up'],
@@ -45,7 +44,7 @@ def count_events(df: pd.DataFrame, col: str) -> int:
     if df[col].dtype == bool:
         return int(df[col].sum())
     return int((df[col] != 0).sum())
-=======
+
 # --- SMC, Wyckoff, Microstructure advanced detectors ---
 try:
     from phase_detector_wyckoff_v1 import detect_phases
@@ -99,7 +98,6 @@ def enrich_dataframe(df):
         except Exception as e:
             print(fn.__name__, "error:", e)
     return df
->>>>>>> Stashed changes
 
 # Import analyzer defaults for config-driven overlays
 try:
@@ -1526,6 +1524,14 @@ class UltimateZANFLOWDashboard:
         df_display = df.tail(lookback).copy()
         st.markdown(f"### {pair} {timeframe} - Wyckoff Phase Analysis")
         self.create_wyckoff_dashboard(df_display, pair, timeframe)
+        # Wyckoff phase counts and recent table
+        if 'wyckoff_phase' in df_display.columns:
+            phase_counts = df_display['wyckoff_phase'].value_counts().sort_index()
+            st.markdown("### Wyckoff Phase Counts")
+            st.bar_chart(phase_counts)
+
+            st.markdown("### Recent Wyckoff Phases")
+            st.dataframe(df_display[['wyckoff_phase']].tail(20), use_container_width=True)
 
     def create_wyckoff_dashboard(self, df, pair, timeframe):
         fig = go.Figure()
@@ -1578,6 +1584,16 @@ class UltimateZANFLOWDashboard:
         df = self.tick_data[pair]
         st.markdown(f"### {pair} - Tick Data Microstructure")
         st.write(df.tail(100))
+        # Plot bid/ask over time
+        fig = make_subplots(rows=1, cols=1)
+        fig.add_trace(go.Scatter(x=df.index, y=df['bid'], mode='lines', name='Bid'), row=1, col=1)
+        fig.add_trace(go.Scatter(x=df.index, y=df['ask'], mode='lines', name='Ask'), row=1, col=1)
+        fig.update_layout(
+            title=f"{pair} Tick Microstructure (Bid/Ask)",
+            template=st.session_state.get('chart_theme', 'plotly_dark'),
+            height=400
+        )
+        st.plotly_chart(fig, use_container_width=True)
         # --- Manipulation Detection Display ---
         manipulation_cols = [col for col in df.columns if "manipulation" in col.lower()]
         if manipulation_cols:
