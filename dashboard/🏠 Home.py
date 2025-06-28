@@ -11,7 +11,7 @@ import plotly.graph_objects as go
 import plotly.express as px
 import os
 import glob
-from pathlib import Path
+from pathlib import Path 
 from datetime import datetime
 import warnings
 import re
@@ -116,28 +116,35 @@ class ZanalyticsDashboard:
         self.display_home_page(data_sources)
 
     def display_home_page(self, data_sources):
-        st.markdown("## 🚀 Zanalytics Dashboard&nbsp;&nbsp;<sub><sup>(v1.4)</sup></sub>")
-        st.caption("A concise, trader‑oriented command center")
+        st.markdown(
+            """
+            <h2 style='text-align:center; margin-bottom:0.2rem'>
+                🚀 Zanalytics Dashboard  <small style='font-size:65%'>(v1.4)</small>
+            </h2>
+            <p style='text-align:center; font-size:0.9rem; margin-top:0'>
+                A concise, trader‑oriented command center
+            </p>
+            """,
+            unsafe_allow_html=True,
+        )
 
-        col1, col2 = st.columns([0.4, 0.6])
+        st.markdown(
+            """
+            <div style='text-align:center; font-size:1.06rem; margin-bottom:1.2rem; margin-top:0.7rem; color:#e7eaf0;'>
+            <b>Core Tools</b><br>
+            • Market Overview – cross‑asset direction &amp; risk<br>
+            • Pair Insights – multi‑TF technical stacks<br>
+            • Wyckoff / SMC – phase &amp; smart‑money levels<br>
+            • Microstructure – tick &amp; volume analytics
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
 
-        with col1:
-            st.markdown("### Ultimate Trading Dashboard")
-            st.info(
-                "**Core Tools**  \n"
-                "• **Market Overview** – cross‑asset direction & risk  \n"
-                "• **Pair Insights** – multi‑TF technical stacks  \n"
-                "• **Wyckoff / SMC** – phase & smart‑money levels  \n"
-                "• **Microstructure** – tick & volume analytics",
-                icon="📊"
-            )
-            st.markdown("---")
-            self.display_available_data(data_sources)
+        self.create_dxy_chart()
+        st.markdown("<hr style='margin-top:1.5rem'>", unsafe_allow_html=True)
 
-        with col2:
-            self.create_dxy_chart()
-
-        yields = self.get_10y_yields()
+        latest_yields, previous_yields = self.get_10y_yields()
         st.markdown("""
 <style>
 .yields-table {
@@ -159,32 +166,43 @@ class ZanalyticsDashboard:
 </style>
 """, unsafe_allow_html=True)
 
-        st.markdown("#### 🌍 10‑Year Government Bond Yields")
-        for country, val in yields.items():
-            st.metric(country, f"{val}%" if val != 'N/A' else val)
+        st.markdown("<h5 style='text-align:center;'>🌍 10‑Year Government Bond Yields</h5>", unsafe_allow_html=True)
+        cols = st.columns(len(latest_yields))
+        for i, (country, val) in enumerate(latest_yields.items()):
+            prev_val = previous_yields.get(country)
+            delta = None
+            if prev_val is not None and val != "N/A":
+                delta = round(val - prev_val, 3)
+            cols[i].metric(country, f"{val}%" if val != 'N/A' else val, delta)
 
+        # ─── Available datasets (bottom, plain) ────────────────────────────────
+        st.markdown("---")
+        self.display_available_data(data_sources)
 
     def get_10y_yields(self):
-        """Fetches the latest available 10Y government bond yields from FRED."""
+        """Fetches the latest and previous available 10Y government bond yields from FRED."""
         tickers = {
             "US": "DGS10",
             "Germany": "IRLTLT01DEM156N",
             "Japan": "IRLTLT01JPM156N",
             "UK": "IRLTLT01GBM156N",
         }
-        latest_yields = {}
+        latest_yields, previous_yields = {}, {}
         for country, code in tickers.items():
             try:
-                series = self.fred.get_series(code)
-                latest = series.dropna().iloc[-1]
-                latest_yields[country] = round(float(latest), 3)
-            except Exception as e:
+                series = self.fred.get_series(code).dropna()
+                latest = float(series.iloc[-1])
+                prev = float(series.iloc[-2]) if len(series) > 1 else None
+                latest_yields[country] = round(latest, 3)
+                previous_yields[country] = round(prev, 3) if prev else None
+            except Exception:
                 latest_yields[country] = "N/A"
-        return latest_yields
+                previous_yields[country] = None
+        return latest_yields, previous_yields
 
     def display_available_data(self, data_sources):
         """Lists the pairs and timeframes found in the data directory."""
-        st.markdown("#### Available Datasets")
+        st.markdown("##### Available Datasets")
         if not data_sources:
             st.warning("No data found in the configured directory.")
             return
@@ -194,7 +212,7 @@ class ZanalyticsDashboard:
                 # Sort timeframes logically
                 tf_list = ", ".join(
                     sorted(tfs.keys(), key=lambda t: (self.timeframes.index(t) if t in self.timeframes else 99, t)))
-                st.markdown(f"**{pair}**: {tf_list}")
+                st.markdown(f"{pair}: {tf_list}")
 
     def create_dxy_chart(self):
         st.markdown("#### 💵 U.S. Dollar Index (DXY) - Weekly")
