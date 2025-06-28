@@ -1,0 +1,26 @@
+profile_name: ispts_demo
+description: Minimal ISPTS agent profile
+version: "12.0"
+execution_sequence:
+  - wyckoff_phase
+  - smc_structure
+  - inducement_engine
+  - micro_gating
+code_map:
+  wyckoff_phase: core.phase_detector_wyckoff_v1.detect_wyckoff_multi_tf
+  smc_structure: market_structure_analyzer_smc.analyze_market_structure
+  inducement_engine: liquidity_detector.detect_swing_highs_lows
+  micro_gating: core.tick_processor.ticks_to_bars
+meta_agent:
+  agent_id: ZF12_DEMO
+context_analyzer: {}
+liquidity_engine:
+  sweep_lookback_bars: 25
+structure_validator:
+  swing_engine_config:
+    swing_n: 2
+risk_manager: {}
+journaling: {}
+data_enricher:
+  tick_context_settings:
+    enable_tick_merge: true
