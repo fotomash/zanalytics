@@ -128,6 +128,10 @@ python -m core.icc_orchestrator --symbol OANDA:EUR_USD --json
 
 The command prints a JSON summary describing each stage.
 
+## ISPTS Pipeline Example
+
+`core/ispts_pipeline.py` implements a minimal, deterministic flow fusing Wyckoff phase logic, SMC structure analysis, inducement sweep detection and microstructure gating. Load the profile in `profiles/ispts_template.yaml` and pass your data frames to `ISPTSPipeline` to reproduce the standard pipeline.
+
 ## Local Quick Start
 
 Run the local engine without external API keys:
