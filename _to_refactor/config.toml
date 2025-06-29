@@ -1,0 +1,33 @@
+# Unified Market Microstructure Analyzer Configuration
+
+# Input/Output paths
+tick_data_paths = ["XAUUSD_TICK.csv"]
+bar_data_paths = ["XAUUSD_M1_bars.csv"]
+output_dir = "./output"
+
+# Processing parameters
+symbols = ["XAUUSD"]
+max_rows = 10000  # Optional: limit rows for testing
+remove_duplicates = true
+
+# Analysis features
+enable_smc = true
+enable_wyckoff = true
+enable_inducement = true
+enable_order_flow = true
+enable_ml_features = true
+
+# Technical indicators
+ema_periods = [9, 21, 50, 200]
+atr_period = 14
+rsi_period = 14
+
+# Market structure parameters
+structure_lookback = 50
+swing_threshold = 0.0001
+volume_profile_bins = 50
+
+# Advanced analysis parameters
+smc_lookback = 50
+wyckoff_window = 100
+ml_feature_window = 20

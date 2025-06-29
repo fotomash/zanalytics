@@ -1,4 +1,0 @@
-entry_logic:
-  trigger: tick_signal
-  target_block: context_analyzer
-  confidence_adjustment: dynamic
