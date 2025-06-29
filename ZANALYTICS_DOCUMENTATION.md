@@ -92,6 +92,7 @@ Interactive Streamlit dashboard for visualization.
 - Signal visualization
 - Performance metrics
 - Risk analytics
+- Orchestrator results written to `dashboard/latest_update.json`
 
 ## Installation
 
