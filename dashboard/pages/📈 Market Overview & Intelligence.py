@@ -29,9 +29,9 @@ class MarketOverviewDashboard:
     Encapsulates all functionality for the Market Overview Dashboard.
     """
 
-    def __init__(self, data_directory="./data"):
-        """Initialize the dashboard."""
-        self.data_dir = Path(data_directory)
+    def __init__(self, data_directory=None):
+        import streamlit as st
+        self.data_dir = Path(data_directory or st.secrets.get("JSONdir", "./data"))
         # --- Configuration ---
         self.supported_pairs = ["XAUUSD", "BTCUSD", "EURUSD", "GBPUSD", "USDJPY", "ETHUSD", "USDCAD", "AUDUSD",
                                 "NZDUSD"]
@@ -48,32 +48,186 @@ class MarketOverviewDashboard:
         if 'chart_theme' not in st.session_state:
             st.session_state.chart_theme = 'plotly_dark'
 
-    def run(self):
-        """Main execution function to run the dashboard."""
-        st.set_page_config(
-            page_title="Market Overview",
-            page_icon="📈",
-            layout="wide",
-            initial_sidebar_state="expanded"
+    def display_institutional_analysis(self):
+        st.markdown("## 🏛️ Institutional Grade Analysis")
+
+        json_files = list(self.data_dir.rglob("*.json"))
+        available_assets = sorted(set(Path(f).stem.split("_")[0] for f in json_files))
+        if not available_assets:
+            st.info("No institutional JSON files found.")
+            return
+
+        selected_asset = st.selectbox("Select Asset", available_assets)
+        selected_sections = st.multiselect(
+            "Select Sections to Display",
+            ["Market Overview", "Smart Money Concepts", "Wyckoff Analysis", "Advanced Stats", "Risk Analysis",
+             "Price Chart & Heatmap"],
+            default=["Market Overview", "Smart Money Concepts", "Price Chart & Heatmap"]
         )
-        st.markdown("""
-        <style>
-            .stMetric {
-                border-radius: 10px;
-                padding: 15px;
-                background-color: #2a2a39;
-            }
-            /* Hide the Streamlit main menu and footer */
-            #MainMenu {visibility: hidden;}
-            footer {visibility: hidden;}
-        </style>
-        """, unsafe_allow_html=True)
 
-        with st.spinner("🛰️ Scanning all data sources..."):
-            data_sources = self.scan_all_data_sources()
+        matching_file = next((f for f in json_files if selected_asset in f.name), None)
+        if not matching_file:
+            st.warning("No matching JSON data found for the selected asset.")
+            return
 
-        self.create_sidebar(data_sources)
-        self.display_market_overview(data_sources)
+        with open(matching_file, "r") as f:
+            data = json.load(f)
+
+        key = next(iter(data))
+        meta = data[key]
+        stats = meta.get("basic_stats", {})
+        indicators = meta.get("indicators", {})
+        smc = meta.get("smc_analysis", {})
+
+        price = stats.get("last_price")
+        pct = stats.get("price_change_pct")
+        vol = stats.get("volatility")
+        high = stats.get("high_price")
+        low = stats.get("low_price")
+        rsi = indicators.get("RSI_14", "N/A")
+        atr = indicators.get("ATR_14", "N/A")
+        trend = "🔴 BEAR" if isinstance(pct, (int, float)) and pct < 0 else "🟢 BULL"
+
+        st.markdown(f"""
+        ### 🚀 {selected_asset} Institutional Snapshot  
+        **Current Price:** ${price:,.2f} if price is not None else "N/A"
+        **Change %:** {pct:+.2f}%  
+        **24h High / Low:** ${high:,.2f} / ${low:,.2f}  
+        **Volatility:** {vol:.2%}  
+        **ATR(14):** {atr}  
+        **RSI(14):** {rsi}  
+        **Trend:** {trend}
+        """)
+
+        if "Smart Money Concepts" in selected_sections:
+            st.markdown("### 🧠 Smart Money Concepts")
+            st.markdown(f"""
+            - **Bias:** {smc.get("bias", "N/A")}
+            - **Breaks of Structure:** {smc.get("structure_breaks", 0)}
+            - **Order Blocks:** 🟢{smc.get('bullish_ob', 0)} | 🔴{smc.get('bearish_ob', 0)}
+            - **Fair Value Gaps:** 🟢{smc.get('bullish_fvg', 0)} | 🔴{smc.get('bearish_fvg', 0)}
+            """)
+
+        if "Wyckoff Analysis" in selected_sections:
+            st.markdown("### 📈 Wyckoff Analysis")
+            st.markdown(f"**Market Phase:** {smc.get('phase', 'Not Detected')}")
+            events = smc.get("events", [])
+            if events:
+                for ev in events[-5:]:
+                    st.markdown(f"- {ev.get('timestamp', '')}: {ev.get('event', '')} at {ev.get('price', '')}")
+
+        if "Advanced Stats" in selected_sections:
+            st.markdown("### 🔬 Advanced Statistical Summary")
+            st.markdown(f"""
+            - Skewness: {stats.get('skewness', 'N/A')}  
+            - Kurtosis: {stats.get('kurtosis', 'N/A')}  
+            - Price-Volume Corr: {stats.get('pv_correlation', 'N/A')}  
+            - Volume Ratio: {stats.get('volume_ratio', 'N/A')}  
+            """)
+
+        if "Risk Analysis" in selected_sections:
+            st.markdown("### ⚠️ Risk Metrics")
+            st.markdown(f"""
+            - Annualized Volatility: {stats.get('annualized_volatility', 'N/A')}  
+            - Max Drawdown: {stats.get('max_drawdown', 'N/A')}  
+            - VaR (95%): {stats.get('var_95', 'N/A')}  
+            """)
+
+        if "Price Chart & Heatmap" in selected_sections:
+            st.markdown("### 📊 Price Chart & Heatmap")
+            st.info("Heatmap visualization placeholder (to be implemented)")
+    def run(self):
+            selected_mode = st.sidebar.radio("Select Analysis Mode", ["Institutional Grade Analysis", "Market Overview"])
+            if selected_mode == "Institutional Grade Analysis":
+                self.display_institutional_analysis()
+            elif selected_mode == "Market Overview":
+
+                json_files = list(self.data_dir.glob("*/*.json"))
+                available_assets = sorted(set(Path(f).stem.split("_")[0] for f in json_files))
+            available_assets = sorted(set(Path(f).stem.split("_")[0] for f in json_files))
+            if not available_assets:
+                st.info("No institutional JSON files found.")
+                return
+
+            selected_asset = st.selectbox("Select Asset", available_assets)
+            selected_sections = st.multiselect(
+                "Select Sections to Display",
+                ["Market Overview", "Smart Money Concepts", "Wyckoff Analysis", "Advanced Stats", "Risk Analysis",
+                 "Price Chart & Heatmap"],
+                default=["Market Overview", "Smart Money Concepts", "Price Chart & Heatmap"]
+            )
+
+            matching_file = next((f for f in json_files if selected_asset in f.name), None)
+            if not matching_file:
+                st.warning("No matching JSON data found for the selected asset.")
+                return
+
+            with open(matching_file, "r") as f:
+                data = json.load(f)
+
+            key = next(iter(data))
+            meta = data[key]
+            stats = meta.get("basic_stats", {})
+            indicators = meta.get("indicators", {})
+            smc = meta.get("smc_analysis", {})
+
+            price = stats.get("last_price")
+            pct = stats.get("price_change_pct")
+            vol = stats.get("volatility")
+            high = stats.get("high_price")
+            low = stats.get("low_price")
+            rsi = indicators.get("RSI_14", "N/A")
+            atr = indicators.get("ATR_14", "N/A")
+            trend = "🔴 BEAR" if pct < 0 else "🟢 BULL"
+
+            st.markdown(f"""
+            ### 🚀 {selected_asset} Institutional Snapshot
+            **Current Price:** ${price:,.2f}  
+            **Change %:** {pct:+.2f}%  
+            **24h High / Low:** ${high:,.2f} / ${low:,.2f}  
+            **Volatility:** {vol:.2%}  
+            **ATR(14):** {atr}  
+            **RSI(14):** {rsi}  
+            **Trend:** {trend}
+            """)
+
+            if "Smart Money Concepts" in selected_sections:
+                st.markdown("### 🧠 Smart Money Concepts")
+                st.markdown(f"""
+                - **Bias:** {smc.get("bias", "N/A")}
+                - **Breaks of Structure:** {smc.get("structure_breaks", 0)}
+                - **Order Blocks:** 🟢{smc.get('bullish_ob', 0)} | 🔴{smc.get('bearish_ob', 0)}
+                - **Fair Value Gaps:** 🟢{smc.get('bullish_fvg', 0)} | 🔴{smc.get('bearish_fvg', 0)}
+                """)
+
+            if "Wyckoff Analysis" in selected_sections:
+                st.markdown("### 📈 Wyckoff Analysis")
+                st.markdown(f"**Market Phase:** {smc.get('phase', 'Not Detected')}")
+                events = smc.get("events", [])
+                if events:
+                    for ev in events[-5:]:
+                        st.markdown(f"- {ev.get('timestamp', '')}: {ev.get('event', '')} at {ev.get('price', '')}")
+
+            if "Advanced Stats" in selected_sections:
+                st.markdown("### 🔬 Advanced Statistical Summary")
+                st.markdown(f"""
+                - Skewness: {stats.get('skewness', 'N/A')}  
+                - Kurtosis: {stats.get('kurtosis', 'N/A')}  
+                - Price-Volume Corr: {stats.get('pv_correlation', 'N/A')}  
+                - Volume Ratio: {stats.get('volume_ratio', 'N/A')}  
+                """)
+
+            if "Risk Analysis" in selected_sections:
+                st.markdown("### ⚠️ Risk Metrics")
+                st.markdown(f"""
+                - Annualized Volatility: {stats.get('annualized_volatility', 'N/A')}  
+                - Max Drawdown: {stats.get('max_drawdown', 'N/A')}  
+                - VaR (95%): {stats.get('var_95', 'N/A')}  
+                """)
+
+            if "Price Chart & Heatmap" in selected_sections:
+                st.markdown("### 📊 Price Chart & Heatmap")
+                st.info("Heatmap visualization placeholder (to be implemented)")
 
     def create_sidebar(self, data_sources):
         """Create a simple sidebar for data source summary."""
