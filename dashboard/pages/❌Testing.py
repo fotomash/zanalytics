@@ -1858,3 +1858,23 @@ def main():
 
 if __name__ == "__main__":
     main()
+def get_image_as_base64(filename: str) -> str | None:
+    """
+    Load an image from the directory defined in .streamlit/secrets.toml
+    (key: processed_data_directory) and return it as a base-64 string.
+    """
+    import base64
+    from pathlib import Path
+
+    base_dir = Path(st.secrets.get("processed_data_directory", "."))
+    img_path = base_dir / filename
+
+    try:
+        with img_path.open("rb") as img_fh:
+            return base64.b64encode(img_fh.read()).decode()
+    except FileNotFoundError:
+        st.warning(
+            f"Background image not found at “{img_path}”. "
+            "Edit processed_data_directory in .streamlit/secrets.toml."
+        )
+        return None

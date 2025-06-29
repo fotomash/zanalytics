@@ -21,6 +21,7 @@ import yfinance as yf
 from fredapi import Fred
 
 # Suppress warnings for a cleaner output
+# Suppress warnings for a cleaner output
 warnings.filterwarnings('ignore')
 
 
@@ -111,41 +112,151 @@ class ZanalyticsDashboard:
 
         with st.spinner("🛰️ Scanning all data sources..."):
             data_sources = self.scan_all_data_sources()
-        st.success(f"📂  Loaded **{len(data_sources)}** asset folders • **{sum(len(v) for v in data_sources.values())}** timeframe files detected")
-
+        # Moved st.success to display_home_page
         self.display_home_page(data_sources)
 
     def display_home_page(self, data_sources):
+        # --- Quant-Desk Welcome Block (Updated Design) ---
         st.markdown(
             """
-            <h2 style='text-align:center; margin-bottom:0.2rem'>
-                🚀 Zanalytics Dashboard  <small style='font-size:65%'>(v1.4)</small>
-            </h2>
-            <p style='text-align:center; font-size:0.9rem; margin-top:0'>
-                A concise, trader‑oriented command center
-            </p>
-            """,
-            unsafe_allow_html=True,
-        )
-
-        st.markdown(
-            """
-            <div style='text-align:center; font-size:1.06rem; margin-bottom:1.2rem; margin-top:0.7rem; color:#e7eaf0;'>
-            <b>Core Tools</b><br>
-            • Market Overview – cross‑asset direction &amp; risk<br>
-            • Pair Insights – multi‑TF technical stacks<br>
-            • Wyckoff / SMC – phase &amp; smart‑money levels<br>
-            • Microstructure – tick &amp; volume analytics
+            <div style='
+                margin: 0 auto 1.1rem auto;
+                max-width: 900px;
+                text-align: center;
+                padding: 0.2em 0 0.1em 0;
+            '>
+                <span style='
+                    font-size: 1.65rem;
+                    font-weight: 700;
+                    color: #4ff4de;
+                    letter-spacing: -0.02em;
+                    display: block;
+                    margin-bottom: 0.15em;
+                '>
+                    Zanalytics Quant Market Desk
+                </span>
+                <span style='
+                    font-size: 1.09rem;
+                    color: #b2d9e8;
+                    font-weight: 600;
+                    display: block;
+                    margin-bottom: 0.2em;
+                '>
+                    AI-Powered Global Market Intelligence
+                </span>
+                <span style='
+                    font-size: 1.01rem;
+                    color: #90b5b5;
+                    display: block;
+                    margin-bottom: 0.25em;
+                '>
+                    Microstructure • Liquidity Flows • Macro Trends
+                </span>
+                <span style='
+                    font-size: 0.97rem;
+                    color: #bfc8da;
+                    line-height: 1.42;
+                    display: block;
+                '>
+                    Built for active risk, scenario analysis & edge discovery.
+                </span>
             </div>
             """,
+            unsafe_allow_html=True
+        )
+
+        # --- Microstructure 3D Surface Demo (BTCUSD only) ---
+        import plotly.graph_objects as go
+
+        btc_ticks_path = Path(st.secrets["raw_data_directory"]) / "BTCUSD_ticks.csv"
+        if btc_ticks_path.exists():
+            try:
+                df_ticks = pd.read_csv(btc_ticks_path, delimiter="\t", nrows=1000, encoding_errors='ignore')
+                if 'timestamp' in df_ticks.columns:
+                    df_ticks['timestamp'] = pd.to_datetime(df_ticks['timestamp'], errors='coerce')
+                if 'bid' in df_ticks.columns and 'ask' in df_ticks.columns:
+                    df_ticks['price_mid'] = (df_ticks['bid'] + df_ticks['ask']) / 2
+                else:
+                    df_ticks['price_mid'] = df_ticks['last'] if 'last' in df_ticks.columns else df_ticks.iloc[:, 1]
+                df_ticks['inferred_volume'] = df_ticks['tickvol'] if 'tickvol' in df_ticks.columns else 1
+
+                # Bin timestamps and price for 3D surface
+                time_bins = pd.cut(df_ticks.index, bins=50, labels=False)
+                price_bins = pd.cut(df_ticks['price_mid'], bins=50, labels=False)
+                surface_data = pd.pivot_table(
+                    df_ticks, values='inferred_volume',
+                    index=price_bins, columns=time_bins,
+                    aggfunc='sum', fill_value=0
+                )
+
+                if not surface_data.empty:
+                    fig = go.Figure(
+                        data=[go.Surface(
+                            z=surface_data.values,
+                            colorscale='Viridis',
+                            name='Volume Surface'
+                        )]
+                    )
+                    fig.update_layout(
+                        title="BTCUSD Microstructure 3D Volume Map (Recent Tick Data)",
+                        autosize=True,
+                        height=400,
+                        margin=dict(l=40, r=40, t=60, b=40),
+                        template=st.session_state.get('chart_theme', 'plotly_dark'),
+                        scene=dict(
+                            xaxis_title="Time Bin",
+                            yaxis_title="Price Bin",
+                            zaxis_title="Inferred Volume"
+                        )
+                    )
+                    # Only show the Plotly chart title for the BTCUSD 3D chart (remove st.markdown title)
+                    st.plotly_chart(fig, use_container_width=True)
+                else:
+                    st.info("Not enough tick data for 3D surface.")
+            except Exception as e:
+                st.warning(f"Error loading or plotting BTC tick file: {e}")
+        else:
+            st.info("BTCUSD tick data not found for 3D surface demo.")
+
+        self.create_dxy_chart()
+        st.markdown(
+            "<div style='text-align:center; font-size:0.97rem; color:#bbb; margin-bottom:1.2rem;'>"
+            "Bar chart above: U.S. Dollar Index (DXY) OHLC – weekly bars, auto-updated."
+            "</div>",
             unsafe_allow_html=True,
         )
 
-        self.create_dxy_chart()
+        # --- DXY 3D Surface Chart ---
+        dxy_data = self.economic_manager.get_dxy_data()
+        if dxy_data is not None and not dxy_data.empty:
+            time_bins = np.arange(len(dxy_data))
+            z_vals = np.abs(dxy_data['Close'].diff().fillna(0).values)
+            fig3d = go.Figure(data=[go.Scatter3d(
+                x=time_bins,
+                y=dxy_data['Close'],
+                z=z_vals,
+                mode='lines+markers',
+                marker=dict(size=4, color=z_vals, colorscale='Viridis', opacity=0.8),
+                line=dict(color='royalblue', width=2)
+            )])
+            fig3d.update_layout(
+                title="DXY - 3D Price and Volatility Chart",
+                scene=dict(
+                    xaxis_title="Time",
+                    yaxis_title="DXY Price",
+                    zaxis_title="|Price Δ|"
+                ),
+                margin=dict(l=20, r=20, t=40, b=20),
+                template=st.session_state.get('chart_theme', 'plotly_dark'),
+                height=440,
+            )
+            # Only show the Plotly chart title for the DXY 3D chart (remove st.markdown title)
+            st.plotly_chart(fig3d, use_container_width=True)
+
         st.markdown("<hr style='margin-top:1.5rem'>", unsafe_allow_html=True)
 
         latest_yields, previous_yields = self.get_10y_yields()
-        st.markdown("""
+        st.markdown("""xx
 <style>
 .yields-table {
     background: #1a222d;
@@ -175,9 +286,57 @@ class ZanalyticsDashboard:
                 delta = round(val - prev_val, 3)
             cols[i].metric(country, f"{val}%" if val != 'N/A' else val, delta)
 
-        # ─── Available datasets (bottom, plain) ────────────────────────────────
+        # Move the "About Zanalytics Trading Frameworks" expander here, after yields table, before datasets and footer
+        with st.expander("ℹ️ About Zanalytics Trading Frameworks"):
+            st.markdown("""
+            **Wyckoff Methodology:**  
+            - Analyzes price and volume to identify the four classic market phases: Accumulation, Markup, Distribution, and Markdown.
+            - Tracks composite operator (CO) behavior, supply/demand dynamics, and timing of breakouts using patterns like springs and upthrusts.
+
+            **Smart Money Concepts (SMC):**  
+            - Focuses on institutional order flow, mapping liquidity pools, inducements, and engineered stop hunts.
+            - Highlights “order blocks” where banks and funds accumulate/distribute positions.
+
+            **Microstructure & Volume Analytics:**  
+            - Provides tick-level delta, spread, and footprint charts.
+            - Reveals hidden buying/selling pressure and identifies value areas and volume imbalances.
+
+            This dashboard is designed for professionals who demand a statistical, repeatable approach to discretionary or systematic trading.
+            """)
+
+        # Insert Zanalytics expander (details) immediately after About Zanalytics Trading Frameworks
+        with st.expander("ℹ️ What is Zanalytics? (Click to expand details)"):
+            st.markdown("""
+            <div style='font-size:1.02rem; color:#e7eaf0;'>
+            <b>Institutional-Grade Analytics for Traders & Portfolio Managers</b>
+            <br><br>
+            This dashboard integrates advanced trading frameworks including
+            <b>Wyckoff Methodology</b>, <b>Smart Money Concepts (SMC)</b>, and <b>volume microstructure analysis</b>.
+            <br><br>
+            Developed for serious traders, it enables deep market phase identification, liquidity zone mapping, and order flow insights,
+            supporting decision-making at both tactical and strategic levels.
+            <br><br>
+            <b>Core Features:</b><br>
+            • <b>Wyckoff Analysis:</b> Detect accumulation, distribution, springs, upthrusts, and phase transitions.<br>
+            • <b>Smart Money Concepts:</b> Map institutional liquidity pools, order blocks, inducements, and market structure shifts.<br>
+            • <b>Microstructure Tools:</b> Tick-level volume, delta, spread, and execution flow visualization.<br>
+            • <b>Technical Confluence:</b> Multi-timeframe screening and cross-asset overlays.
+            </div>
+            """, unsafe_allow_html=True)
+
+        # Horizontal rule before available datasets
         st.markdown("---")
+        # ─── Available datasets (bottom, plain) ────────────────────────────────
         self.display_available_data(data_sources)
+
+        st.markdown(
+            "<div style='text-align:center; color:#8899a6; font-size:0.97rem; margin-top:2.5rem;'>"
+            "© 2025 Zanalytics. Powered by institutional-grade market microstructure analytics.<br>"
+            "<span style='font-size:0.92rem;'>Data and visualizations for professional and educational use only.</span>"
+            "</div>",
+            unsafe_allow_html=True,
+        )
+        st.success(f"📂  Loaded **{len(data_sources)}** asset folders • **{sum(len(v) for v in data_sources.values())}** timeframe files detected")
 
     def get_10y_yields(self):
         """Fetches the latest and previous available 10Y government bond yields from FRED."""

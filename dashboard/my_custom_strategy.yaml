@@ -1,0 +1,34 @@
+#  my_custom_strategy.yaml
+name: custom_liquidity_strategy
+version: 1.0.0
+
+stages:
+  - context
+  - catalyst
+  - confirmation
+  - entry
+  - risk
+  - confluence
+
+module_mapping:
+  context:
+    module: wyckoff_analyzer
+    parameters:
+      phase_lookback: 100
+      
+  catalyst:
+    module: smc_analyzer
+    parameters:
+      min_wick_ratio: 2.0  # Stricter wick requirement
+      min_volume_spike: 2.0
+      
+  confirmation:
+    module: microstructure_analyzer
+    parameters:
+      delta_period: 14
+      imbalance_threshold: 3.0  # Higher imbalance requirement
+
+risk_parameters:
+  risk_per_trade_pct: 0.5  # Conservative risk
+  min_risk_reward: 3.0     # Higher RR requirement
+  take_profit_ratios: [3.0, 5.0, 8.0]

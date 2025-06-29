@@ -1,0 +1,10 @@
+json_dashboard_config:
+  name: comprehensive_json_visualizer
+  data_pattern: "./data/{symbol}/{symbol}_comprehensive.json"
+  vector_ops: ["json_to_embeddings", "metric_extraction", "pattern_visualization"]
+  session_scope: single
+  modules:
+    - json_loader
+    - data_processor
+    - microstructure_visualizer
+    - smc_wyckoff_renderer
