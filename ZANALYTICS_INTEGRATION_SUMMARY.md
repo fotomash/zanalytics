@@ -51,7 +51,7 @@ formatted = llm_formatter.format(llm_context)
 - `zanalytics_signal_generator.py` - Depends on analysis format
 - `zanalytics_llm_formatter.py` - Formats any data structure
 - `zanalytics_backtester.py` - Tests strategies with historical data
-- `zanalytics_dashboard.py` - Visualizes all components
+- `dashboard/app.py` - Visualizes all components
 
 ## Configuration Files
 
