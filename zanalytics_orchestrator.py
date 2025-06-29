@@ -23,6 +23,7 @@ import os
 from concurrent.futures import ThreadPoolExecutor, ProcessPoolExecutor
 import schedule
 import time
+from dashboard.updater import DashboardUpdater
 
 # Configure logging
 logging.basicConfig(
@@ -411,7 +412,8 @@ class ZAnalyticsOrchestrator:
                 'backtester',
                 'llm_framework',
                 'market_monitor',
-                'advanced_analytics'
+                'advanced_analytics',
+                'dashboard'
             ],
             'workflows': {
                 'market_analysis': {
@@ -421,7 +423,8 @@ class ZAnalyticsOrchestrator:
                         'analyze_microstructure',
                         'generate_signals',
                         'assess_risk',
-                        'generate_llm_insights'
+                        'generate_llm_insights',
+                        'update_dashboard'
                     ]
                 },
                 'daily_report': {
@@ -473,7 +476,10 @@ class ZAnalyticsOrchestrator:
                 return {'status': 'success', 'component': self.name}
 
         for component_name in self.config['components']:
-            component = MockComponent(component_name)
+            if component_name == 'dashboard':
+                component = DashboardUpdater()
+            else:
+                component = MockComponent(component_name)
             self.registry.register(component_name, component)
             self.components[component_name] = component
 
@@ -507,7 +513,8 @@ class ZAnalyticsOrchestrator:
             'generate_llm_insights': 'llm_framework',
             'aggregate_daily_data': 'data_pipeline',
             'performance_analysis': 'advanced_analytics',
-            'generate_report': 'llm_framework'
+            'generate_report': 'llm_framework',
+            'update_dashboard': 'dashboard'
         }
         return task_module_map.get(task_name, 'data_pipeline')
 
