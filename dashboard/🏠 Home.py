@@ -171,7 +171,8 @@ class ZanalyticsDashboard:
         btc_ticks_path = Path(st.secrets["raw_data_directory"]) / "BTCUSD_ticks.csv"
         if btc_ticks_path.exists():
             try:
-                df_ticks = pd.read_csv(btc_ticks_path, delimiter="\t", nrows=1000, encoding_errors='ignore')
+                # Ingest standard comma‑separated CSV (no custom delimiter)
+                df_ticks = pd.read_csv(btc_ticks_path, nrows=1000, encoding_errors='ignore')
                 if 'timestamp' in df_ticks.columns:
                     df_ticks['timestamp'] = pd.to_datetime(df_ticks['timestamp'], errors='coerce')
                 if 'bid' in df_ticks.columns and 'ask' in df_ticks.columns:

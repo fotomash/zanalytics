@@ -25,6 +25,7 @@ class QuantumMicrostructureAnalyzer:
             'iceberg_events': [],
             'spoofing_events': [],
             'manipulation_score': 0,
+            'manipulation_score': 0,
             'market_regime': 'normal',
             'toxic_flow_periods': [],
             'hidden_liquidity_map': {}
@@ -309,6 +310,32 @@ class QuantumMicrostructureAnalyzer:
         asset = selected_file.split('_')[0] if '_' in selected_file else 'Unknown'
         st.caption(f"Asset: {asset} | File: {selected_file} | Regime: {self.session_state['market_regime'].upper()}")
 
+        # ——— Research Commentary ———
+        with st.expander("📚 Research Commentary (methodology & caveats)", expanded=False):
+            st.markdown(
+                """
+**MetaTrader data caveat:**  
+We analyse `<TICKVOL>` and `<SPREAD>` from MetaTrader exports. These lack true Level II order-book depth, so Quote-Stuffing and Spoofing signals are **heuristic** rather than definitive.
+
+**ZANFLOW microstructure heuristics**
+
+| Signal | What we look for in tick data | Heuristic trigger |
+| --- | --- | --- |
+| **Quote Stuffing Density** | Extreme burst of tick updates with <1 bp price change | `updates / sec` > threshold **and** `avg_price_movement` below threshold |
+| **Spoofing Patterns** | Spread spikes that reverse within ≤ 250 ms plus no follow-through in price | `spread_spike` > 3×MA **then** quick reversion |
+| **Regime Transitions** | VPIN > 0.7 ⇒ *manipulated* • VPIN 0.5-0.7 ⇒ *stressed* • else *normal* | VPIN 100-tick rolling |
+
+**Further reading**
+
+* [Early Market Signals and Confirmations](sandbox:/mnt/data/Early Market Signals and Confirmations.md)  
+* [Market Trading Techniques and Anomalies](sandbox:/mnt/data/Market Trading Techniques and Anomalies.md)  
+* [Trap Reversal Tick-Validated JSON](sandbox:/mnt/data/SMC_EngineeredLiquidity_TrapReversal_TickValidated_v12.json)  
+* [Tick Data Analysis Notes](sandbox:/mnt/data/tick_data_analisys.json)
+
+These documents expand on engineered-liquidity traps, Wyckoff sweeps, and the VPIN-driven regime model used here.
+"""
+            )
+
         # Key Metrics Row
         col1, col2, col3, col4, col5, col6 = st.columns(6)
         col1.metric("Iceberg Orders", len(self.session_state['iceberg_events']))
@@ -326,6 +353,10 @@ class QuantumMicrostructureAnalyzer:
             fig1.update_layout(title="Price & Inferred Volume", xaxis_title="Time", yaxis_title="Price / Volume", showlegend=True)
             st.plotly_chart(fig1, use_container_width=True)
             st.caption("Price vs Inferred Volume: Shows the evolution of market price alongside estimated trading volume. The line represents price, and the bars represent inferred volume at each tick.")
+            # Dynamic commentary
+            price_change = df['price_mid'].iloc[-1] - df['price_mid'].iloc[0]
+            total_vol = df['inferred_volume'].sum()
+            st.markdown(f"**Quick take:** Price moved {price_change:+.4f} points over the displayed period with an estimated {total_vol:,.0f} units traded.")
         except Exception:
             pass
 
@@ -345,6 +376,9 @@ class QuantumMicrostructureAnalyzer:
             fig2.update_layout(title="Spread Dynamics & Anomalies", xaxis_title="Time", yaxis_title="Spread", showlegend=True)
             st.plotly_chart(fig2, use_container_width=True)
             st.caption("Spread Dynamics & Anomalies: Visualizes spread changes over time and highlights detected spoofing events with red X markers.")
+            # Dynamic commentary
+            avg_spread = df['spread'].mean()
+            st.markdown(f"**Spread check:** Average spread {avg_spread:.4f} • Spoofing spikes detected: {len(self.session_state['spoofing_events'])}.")
         except Exception:
             pass
 
@@ -362,6 +396,9 @@ class QuantumMicrostructureAnalyzer:
             fig3.update_layout(title="Tick Rate Heatmap", xaxis_title="Time", yaxis_title="Tick Rate")
             st.plotly_chart(fig3, use_container_width=True)
             st.caption("Tick Rate Heatmap: Displays the density of tick updates over time and tick rate. Brighter areas indicate higher density of updates.")
+            # Dynamic commentary
+            peak_tick_rate = df['tick_rate'].max()
+            st.markdown(f"**Note:** Peak tick rate hit {peak_tick_rate:.1f} updates / sec in this window.")
         except Exception:
             pass
 
@@ -373,6 +410,9 @@ class QuantumMicrostructureAnalyzer:
             fig4.update_layout(title="VPIN (Toxicity)", xaxis_title="Time", yaxis_title="VPIN", showlegend=True)
             st.plotly_chart(fig4, use_container_width=True)
             st.caption("VPIN (Toxicity): Quantifies order flow toxicity and potential for informed trading. High VPIN values (above 0.5) may indicate toxic, informed, or predatory trading.")
+            # Dynamic commentary
+            toxic_pct = (df['vpin'] > 0.5).mean() * 100
+            st.markdown(f"**Flow toxicity:** {toxic_pct:.1f}% of ticks flagged as high‑risk (VPIN > 0.5).")
         except Exception:
             pass
 
@@ -397,6 +437,8 @@ class QuantumMicrostructureAnalyzer:
                 fig5.update_layout(title="Manipulation Timeline", xaxis_title="Time", yaxis_title="Confidence", showlegend=True)
                 st.plotly_chart(fig5, use_container_width=True)
                 st.caption("Manipulation Timeline: Plots the timing and confidence of detected spoofing and iceberg events. Each marker represents a detected event, with its confidence score.")
+                # Dynamic commentary
+                st.markdown(f"**Summary:** {len(self.session_state['spoofing_events'])} spoofing and {len(self.session_state['iceberg_events'])} iceberg events recorded in view.")
         except Exception:
             pass
 
@@ -423,6 +465,9 @@ class QuantumMicrostructureAnalyzer:
                 fig6.update_layout(title="Iceberg Detection Map", xaxis_title="Time", yaxis_title="Price Level", showlegend=False)
                 st.plotly_chart(fig6, use_container_width=True)
                 st.caption("Iceberg Detection Map: Shows locations and confidence of detected iceberg orders. Marker size is proportional to estimated order size; color indicates detection confidence.")
+                # Dynamic commentary
+                total_iceberg_vol = iceberg_df['estimated_total_size'].sum()
+                st.markdown(f"**Aggregate:** Total inferred iceberg volume ≈ {total_iceberg_vol:,.0f} units.")
         except Exception:
             pass
 
@@ -443,6 +488,9 @@ class QuantumMicrostructureAnalyzer:
                 fig7.update_layout(title="Order Flow Imbalance", xaxis_title="Time", yaxis_title="Imbalance", showlegend=True)
                 st.plotly_chart(fig7, use_container_width=True)
                 st.caption("Order Flow Imbalance: Indicates the net pressure from bids vs. asks over time. Positive values suggest buying pressure; negative values indicate selling pressure.")
+                # Dynamic commentary
+                peak_imb = df['order_flow_imbalance'].abs().max()
+                st.markdown(f"**Highlight:** Max absolute imbalance reached {peak_imb:.2f}.")
         except Exception:
             pass
 
@@ -471,6 +519,8 @@ class QuantumMicrostructureAnalyzer:
                 ))
                 st.plotly_chart(fig8, use_container_width=True)
                 st.caption("Microstructure 3D Surface: 3D visualization of volume distribution across price and time. Peaks indicate where large volumes concentrate in the price-time grid.")
+                # Dynamic commentary
+                st.markdown("**Interpretation:** Volume peaks mark hotspots where large orders clustered at specific price‑time zones.")
         except Exception:
             pass
 
@@ -491,21 +541,101 @@ class QuantumMicrostructureAnalyzer:
                 fig9.update_layout(title="Hidden Liquidity Zones", xaxis_title="Inferred Volume", yaxis_title="Price Level", showlegend=False)
                 st.plotly_chart(fig9, use_container_width=True)
                 st.caption("Hidden Liquidity Zones: Highlights price levels with concentrated inferred volume. Bars show the top 10 price levels where large hidden orders may reside.")
+                # Dynamic commentary
+                top_level = support_levels.index[0]
+                top_vol = support_levels.iloc[0]
+                st.markdown(f"**Takeaway:** Level {top_level:.2f} holds the densest hidden liquidity (~{top_vol:,.0f} units).")
         except Exception:
             pass
 
         # 10. Quote Stuffing Density
-        # No dedicated chart implemented; show explanation only.
-        st.markdown("#### Quote Stuffing Density")
-        st.caption("Quote Stuffing Density: If implemented, this chart would display periods of excessive quote updates with minimal price movement, signaling potential quote stuffing manipulation.")
+        try:
+            st.markdown("#### Quote Stuffing Density")
+            if self.session_state.get('quote_stuffing_events'):
+                qs_df = pd.DataFrame(self.session_state['quote_stuffing_events'])
+                qs_df['duration_s'] = (qs_df['end_time'] - qs_df['start_time']).dt.total_seconds()
+                fig_qs = go.Figure()
+                fig_qs.add_trace(go.Bar(
+                    x=qs_df['start_time'],
+                    y=qs_df['updates_per_second'],
+                    name='Updates / s',
+                    marker=dict(color='#e377c2')
+                ))
+                fig_qs.update_layout(title="Quote Stuffing Density",
+                                     xaxis_title="Time",
+                                     yaxis_title="Updates per Second")
+                st.plotly_chart(fig_qs, use_container_width=True)
+                st.caption("Quote Stuffing Density: Bars represent detected stuffing periods; height indicates quote‑update rate during each burst.")
+                # Dynamic commentary
+                max_rate = qs_df['updates_per_second'].max()
+                st.markdown(f"**Observation:** Highest burst reached {max_rate:.1f} quotes / sec across {len(qs_df)} stuffing episodes.")
+            else:
+                st.info("No quote stuffing episodes detected.")
+        except Exception:
+            pass
 
         # 11. Spoofing Patterns
-        st.markdown("#### Spoofing Patterns")
-        st.caption("Spoofing Patterns: If implemented, this chart would visualize the density or frequency of spoofing patterns detected in the data.")
+        try:
+            st.markdown("#### Spoofing Patterns")
+            if self.session_state['spoofing_events']:
+                sp_df = pd.DataFrame(self.session_state['spoofing_events'])
+                sp_df['minute'] = sp_df['timestamp'].dt.floor('min')
+                counts = sp_df.groupby('minute').size()
+                fig_sp = go.Figure()
+                fig_sp.add_trace(go.Bar(
+                    x=counts.index,
+                    y=counts.values,
+                    name='Spoofing Events',
+                    marker=dict(color='#17becf')
+                ))
+                fig_sp.update_layout(title="Spoofing Pattern Frequency",
+                                     xaxis_title="Minute",
+                                     yaxis_title="Number of Spoofing Events")
+                st.plotly_chart(fig_sp, use_container_width=True)
+                st.caption("Spoofing Patterns: Bars show how many spoofing spikes occurred in each minute.")
+                # Dynamic commentary
+                total_spoof = len(self.session_state['spoofing_events'])
+                peak_minute = counts.max() if not counts.empty else 0
+                st.markdown(f"**Insight:** {total_spoof} spoofing events total; busiest minute saw {peak_minute} events.")
+            else:
+                st.info("No spoofing events detected.")
+        except Exception:
+            pass
 
         # 12. Regime Transitions
-        st.markdown("#### Regime Transitions")
-        st.caption("Regime Transitions: If implemented, this chart would show transitions between market regimes (normal, stressed, manipulated, breakdown) over time.")
+        try:
+            st.markdown("#### Regime Transitions")
+            # Simple regime classification based on VPIN thresholds
+            df['regime_simple'] = np.where(df['vpin'] > 0.7, 'manipulated',
+                                   np.where(df['vpin'] > 0.5, 'stressed', 'normal'))
+            regime_map = {'normal': 0, 'stressed': 1, 'manipulated': 2}
+            df['regime_code'] = df['regime_simple'].map(regime_map)
+            fig_reg = go.Figure()
+            fig_reg.add_trace(go.Scatter(
+                x=df['timestamp'],
+                y=df['regime_code'],
+                mode='lines',
+                line=dict(shape='hv'),
+                name='Regime'
+            ))
+            fig_reg.update_layout(
+                title="Regime Transitions",
+                xaxis_title="Time",
+                yaxis=dict(
+                    tickmode='array',
+                    tickvals=list(regime_map.values()),
+                    ticktext=list(regime_map.keys())
+                ),
+                showlegend=False
+            )
+            st.plotly_chart(fig_reg, use_container_width=True)
+            st.caption("Regime Transitions: The step‑line shows shifts between market regimes derived from VPIN thresholds (>0.7 = manipulated, >0.5 = stressed, else normal).")
+            # Dynamic commentary
+            regime_counts = df['regime_simple'].value_counts(normalize=True) * 100
+            breakdown = ", ".join([f"{k}: {v:.1f}%" for k, v in regime_counts.items()])
+            st.markdown(f"**Breakdown:** {breakdown}")
+        except Exception:
+            pass
 
         # Detailed Analysis Sections (unchanged)
         with st.expander("🔍 Manipulation Event Details", expanded=True):
@@ -567,6 +697,8 @@ if __name__ == "__main__":
 
     selected_file = st.sidebar.selectbox("Select Tick Data", sorted(valid_files))
     file_path = os.path.join(tick_files_directory, selected_file)
+    # DEBUG: show the resolved file path so we know exactly which file is being ingested
+    st.sidebar.info(f"📂 Reading tick file: {file_path}")
 
     # Advanced options
     st.sidebar.markdown("### Advanced Settings")
@@ -580,11 +712,18 @@ if __name__ == "__main__":
 
     # Load and analyze data
     with st.spinner("🧬 Running quantum analysis..."):
-        df = pd.read_csv(file_path, delimiter='\t', encoding_errors='ignore')
+        # Now ingesting standard comma‑separated CSV files
+        df = pd.read_csv(file_path, encoding_errors='ignore')  # default sep=','
         df['timestamp'] = pd.to_datetime(df['timestamp'])
         # Ensure data is in chronological order (oldest → newest) so all rolling/diff
         # calculations operate on the most‑recent bars instead of the earliest ones.
         df = df.sort_values('timestamp').reset_index(drop=True)
+        # DEBUG: quick peek at the data to verify timestamps and latest candles
+        with st.expander("🔎 Data preview (head & tail)", expanded=False):
+            st.write("Head of data:")
+            st.write(df.head())
+            st.write("Tail of data:")
+            st.write(df.tail())
         max_bars = st.sidebar.slider("Bars to Display", 50, len(df), min(1000, len(df)))
         df = df.tail(max_bars)
         st.caption(
@@ -600,15 +739,16 @@ if __name__ == "__main__":
                 "⚠️  The loaded file exhibits characteristics of synthetic/mock data. "
                 f"Diagnostics: {diag}"
             )
-        
+
         # Core analysis pipeline
         df = analyzer.infer_volume_from_ticks(df)
         df = analyzer.calculate_vpin(df)
-        
+
         # Detect all manipulation patterns
         analyzer.session_state['iceberg_events'] = analyzer.detect_icebergs(df)
         analyzer.session_state['spoofing_events'] = analyzer.detect_spoofing(df)
         quote_stuffing = analyzer.detect_quote_stuffing(df)
+        analyzer.session_state['quote_stuffing_events'] = quote_stuffing
         layering = analyzer.detect_layering(df)
         
         # Calculate manipulation score
