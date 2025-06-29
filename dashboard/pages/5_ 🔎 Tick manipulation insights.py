@@ -1,3 +1,116 @@
+import streamlit as st
+import pandas as pd
+import numpy as np
+from typing import Dict, List, Tuple, Optional
+# ... other imports
+
+
+class QRTDeskAnalytics:
+    def __init__(self):
+        self.session_state = {}
+
+    def detect_liquidity_sweeps(self, df: pd.DataFrame) -> Dict:
+        """
+        Detect rapid price moves that sweep through multiple price levels in a short burst (liquidity sweeps).
+        Returns a dictionary with detected sweep events and summary metrics.
+        """
+        sweep_events = []
+        threshold_move = df['price_mid'].std() * 3  # 3 std dev move
+        window = 5  # ticks
+        for i in range(window, len(df)):
+            price_window = df['price_mid'].iloc[i-window:i]
+            move = price_window.iloc[-1] - price_window.iloc[0]
+            if abs(move) > threshold_move:
+                sweep_events.append({
+                    'start_time': df['timestamp'].iloc[i-window],
+                    'end_time': df['timestamp'].iloc[i-1],
+                    'direction': 'up' if move > 0 else 'down',
+                    'magnitude': move,
+                    'volume': df['inferred_volume'].iloc[i-window:i].sum()
+                })
+        return {'sweep_events': sweep_events, 'count': len(sweep_events)}
+
+    def calculate_tick_microstructure_features(self, df: pd.DataFrame) -> pd.DataFrame:
+        """
+        Calculate microstructure features at the tick level for predictive analytics.
+        Returns the dataframe with new feature columns appended.
+        """
+        df['micro_return'] = df['price_mid'].pct_change().fillna(0)
+        df['volatility_5'] = df['price_mid'].rolling(5).std().fillna(0)
+        df['volatility_20'] = df['price_mid'].rolling(20).std().fillna(0)
+        df['spread_z'] = (df['spread'] - df['spread'].mean()) / (df['spread'].std() + 1e-9)
+        df['tick_imbalance'] = (df['bid'] - df['ask']) / (df['bid'] + df['ask'] + 1e-9)
+        return df
+
+    def compute_execution_quality_metrics(self, df: pd.DataFrame) -> Dict:
+        """Calculate execution quality metrics from tick data only"""
+        metrics = {}
+
+        # 1. Tick-based liquidity metrics (no trades needed)
+        metrics['avg_quoted_spread'] = df['spread'].mean()
+        metrics['median_spread'] = df['spread'].median()
+        metrics['spread_volatility'] = df['spread'].std()
+
+        # 2. Effective spread proxy (tick-to-tick price changes)
+        df['price_mid'] = (df['bid'] + df['ask']) / 2
+        df['tick_move'] = df['price_mid'].diff().abs()
+        metrics['avg_tick_move'] = df['tick_move'].mean()
+        metrics['effective_spread_proxy'] = 2 * metrics['avg_tick_move']
+
+        # 3. Liquidity provision cost
+        df['spread_bps'] = (df['spread'] / df['price_mid']) * 10000
+        metrics['avg_spread_bps'] = df['spread_bps'].mean()
+
+        # 4. Price impact proxy (using inferred volume)
+        if 'inferred_volume' in df.columns:
+            df['price_impact'] = df['tick_move'] / (df['inferred_volume'] + 1)
+            metrics['kyle_lambda'] = df['price_impact'].rolling(100).mean().iloc[-1]
+        else:
+            metrics['kyle_lambda'] = np.nan
+
+        # 5. Adverse selection indicator
+        df['spread_tightness'] = 1 / (df['spread'] + 0.0001)
+        df['future_volatility'] = df['price_mid'].pct_change().rolling(20).std().shift(-20)
+        tight_spread_mask = df['spread'] < df['spread'].quantile(0.25)
+        if tight_spread_mask.any() and df['future_volatility'].notna().any():
+            metrics['adverse_selection_score'] = (
+                df[tight_spread_mask]['future_volatility'].mean() /
+                df['future_volatility'].mean()
+            )
+        else:
+            metrics['adverse_selection_score'] = 1.0
+
+        # 6. Execution favorability windows
+        df['spread_volatility'] = df['spread'].rolling(20).std().fillna(method='bfill')
+        df['execution_score'] = (
+            (1 - df['spread'] / df['spread'].rolling(1000).max()) * 0.5 +
+            (1 - df['spread_volatility'].rolling(100).mean() / df['spread_volatility'].max()) * 0.5
+        )
+        metrics['current_exec_favorability'] = df['execution_score'].iloc[-1] if 'execution_score' in df.columns else 0.5
+
+        return metrics
+
+    def identify_killzone_patterns(self, df: pd.DataFrame) -> Dict:
+        """
+        Identify killzone patterns (e.g., London/NY open sweeps) in the tick data.
+        Returns a dictionary with detected killzone events and summary stats.
+        """
+        killzone_events = []
+        # Assume timestamp in UTC, killzones: London 07:00-10:00, NY 12:00-15:00 UTC
+        df['hour'] = df['timestamp'].dt.hour
+        for start, end, label in [(7, 10, 'London'), (12, 15, 'NY')]:
+            mask = (df['hour'] >= start) & (df['hour'] < end)
+            zone_df = df[mask]
+            if not zone_df.empty:
+                move = zone_df['price_mid'].iloc[-1] - zone_df['price_mid'].iloc[0]
+                killzone_events.append({
+                    'zone': label,
+                    'start_time': zone_df['timestamp'].iloc[0],
+                    'end_time': zone_df['timestamp'].iloc[-1],
+                    'move': move,
+                    'volume': zone_df['inferred_volume'].sum()
+                })
+        return {'killzone_events': killzone_events, 'count': len(killzone_events)}
 # quantum_microstructure_analyzer.py
 import streamlit as st
 import pandas as pd
@@ -19,7 +132,7 @@ class QuantumMicrostructureAnalyzer:
     def __init__(self, config_path: str):
         with open(config_path, 'r') as f:
             self.config = yaml.safe_load(f)['quantum_analysis_config']
-        
+
         self.session_state = {
             'inferred_volumes': [],
             'iceberg_events': [],
@@ -30,23 +143,23 @@ class QuantumMicrostructureAnalyzer:
             'toxic_flow_periods': [],
             'hidden_liquidity_map': {}
         }
-    
+
     def preprocess_data(self, df: pd.DataFrame) -> pd.DataFrame:
         """Ensure all required columns exist and are properly formatted"""
         # Convert spread from integer to decimal (divide by 1000 for most brokers)
         df['spread'] = df['spread'] / 1000
-        
+
         # Calculate mid price
         df['price_mid'] = (df['bid'] + df['ask']) / 2
-        
+
         # Calculate tick intervals
         df['tick_interval_ms'] = df['timestamp'].diff().dt.total_seconds() * 1000
         df['tick_interval_ms'] = df['tick_interval_ms'].fillna(0).clip(lower=0.1)  # Avoid division by zero
-        
+
         # Calculate tick rate (ticks per second)
         df['tick_rate'] = 1000 / df['tick_interval_ms']
         df['tick_rate'] = df['tick_rate'].clip(upper=1000)  # Cap at 1000 ticks/sec
-        
+
         return df
 
     def detect_mock_data(self, df: pd.DataFrame) -> Tuple[bool, Dict[str, float]]:
@@ -305,8 +418,44 @@ class QuantumMicrostructureAnalyzer:
         """Create comprehensive dashboard with all advanced analytics (each chart as its own figure)"""
         st.set_page_config(page_title="Quantum Microstructure Analyzer", layout="wide")
 
+        # QRTDeskAnalytics instance for advanced microstructure analytics
+        qrt = QRTDeskAnalytics()
+        qrt.session_state = self.session_state
+
         # Header
         st.title("🧬 Quantum Microstructure Analysis System")
+        with st.expander("🧠 Why Tick Charts Matter (Scalping Microstructure Commentary)", expanded=False):
+            st.markdown(
+                """
+**As a predictive trade researcher**, tick charts are a foundational tool for scalping engineered liquidity and identifying traps with precision.
+
+### 🎯 Tick Charts for Scalping: The Granular Edge
+
+Tick charts produce bars based on the number of trades, not time. This enables:
+- **Micro-Level Resolution**: Real-time view of supply/demand shifts.
+- **Noise Reduction**: Only prints bars during active participation.
+- **Real-Time Volatility**: Bar speed shows instant momentum.
+- **Pinpoint Precision**: Ideal for SL/TP placement in tight-range trades.
+
+### 🧬 Tick-M1-HTF Confluence with ZANFLOW
+
+- **Micro-Wyckoff Events**: Tick-based Spring/Upthrusts with volume spikes and fast rejections.
+- **Inducement & Engineered Liquidity**: Sweeps + snapbacks at POIs visible only at tick granularity.
+- **Pre-Confirmation Traps**: Tick reversal score flags setups before M1/M5 confirmation.
+- **Multi-Timeframe Context**: Tick ➝ M1/M5 ➝ H1/H4 bias from ContextAnalyzer ensures alignment.
+
+### 🔁 Volume, FVGs & SL/TP Orchestration
+
+- **Volume Delta** confirms imbalance aggression.
+- **FVGs & Order Blocks** as re-entry zones post-CHoCH.
+- **ATR + structural anchors** guide adaptive stop loss.
+- **POC + liquidity pools** guide high-R:R take profits.
+
+For implementation logic, refer to:
+- `Scalp_Inducement_Reversal_HTF_Confluence` agent profile YAML (conceptual).
+- Modules: `LiquidityEngine`, `RiskManager`, `PredictiveScorer`, `ConfluenceStacker`.
+"""
+            )
         asset = selected_file.split('_')[0] if '_' in selected_file else 'Unknown'
         st.caption(f"Asset: {asset} | File: {selected_file} | Regime: {self.session_state['market_regime'].upper()}")
 
@@ -637,6 +786,69 @@ These documents expand on engineered-liquidity traps, Wyckoff sweeps, and the VP
         except Exception:
             pass
 
+        # 13. Liquidity Sweep Detection
+        st.markdown("#### Liquidity Sweep Detection")
+        sweep_results = qrt.detect_liquidity_sweeps(df)
+        st.write(f"Detected {sweep_results['count']} liquidity sweep events.")
+        if sweep_results['sweep_events']:
+            sweep_df = pd.DataFrame(sweep_results['sweep_events'])
+            st.dataframe(sweep_df)
+            # Heatmap or chart placeholder
+            if 'create_liquidity_sweep_heatmap' in globals():
+                create_liquidity_sweep_heatmap(sweep_df)
+            else:
+                st.caption("Liquidity sweep heatmap visualization not implemented.")
+        else:
+            st.info("No major liquidity sweeps detected in this window.")
+
+        # 14. Execution Quality Metrics
+        st.markdown("#### Execution Quality Metrics")
+        exec_metrics = qrt.compute_execution_quality_metrics(df)
+        col1, col2, col3, col4 = st.columns(4)
+
+        col1.metric(
+            "Avg Spread (bps)",
+            f"{exec_metrics.get('avg_spread_bps', 0):.1f}",
+            help="Average spread in basis points"
+        )
+
+        col2.metric(
+            "Adverse Selection",
+            f"{exec_metrics.get('adverse_selection_score', 1.0):.2f}",
+            help="Higher = more adverse selection risk"
+        )
+
+        col3.metric(
+            "Price Impact (λ)",
+            f"{exec_metrics.get('kyle_lambda', 0):.4f}",
+            help="Kyle's lambda - price impact per unit volume"
+        )
+
+        col4.metric(
+            "Exec Favorability",
+            f"{exec_metrics.get('current_exec_favorability', 0.5):.1%}",
+            help="Current execution conditions (0-100%)"
+        )
+
+        # 15. Killzone Analysis
+        st.markdown("#### Killzone Analysis")
+        killzone_results = qrt.identify_killzone_patterns(df)
+        st.write(f"Detected {killzone_results['count']} killzone events.")
+        if killzone_results['killzone_events']:
+            kz_df = pd.DataFrame(killzone_results['killzone_events'])
+            st.dataframe(kz_df)
+        else:
+            st.info("No killzone patterns detected in this window.")
+
+        # 16. Predictive Setup Scanner
+        st.markdown("#### Predictive Setup Scanner")
+        df_pred = qrt.calculate_tick_microstructure_features(df)
+        # Placeholder for predictive signals visualization
+        if 'create_predictive_signals' in globals():
+            create_predictive_signals(df_pred)
+        else:
+            st.caption("Predictive setup scanner visualization not implemented.")
+
         # Detailed Analysis Sections (unchanged)
         with st.expander("🔍 Manipulation Event Details", expanded=True):
             tab1, tab2, tab3, tab4 = st.tabs(["Icebergs", "Spoofing", "Layering", "Quote Stuffing"])
@@ -741,6 +953,7 @@ if __name__ == "__main__":
             )
 
         # Core analysis pipeline
+        # Additional ZANFLOW pipeline integration point (ISPTS Instant Reversion Logic can hook here)
         df = analyzer.infer_volume_from_ticks(df)
         df = analyzer.calculate_vpin(df)
 
@@ -750,22 +963,22 @@ if __name__ == "__main__":
         quote_stuffing = analyzer.detect_quote_stuffing(df)
         analyzer.session_state['quote_stuffing_events'] = quote_stuffing
         layering = analyzer.detect_layering(df)
-        
+
         # Calculate manipulation score
-        total_events = (len(analyzer.session_state['iceberg_events']) + 
+        total_events = (len(analyzer.session_state['iceberg_events']) +
                        len(analyzer.session_state['spoofing_events']) +
                        len(quote_stuffing) + len(layering))
         analyzer.session_state['manipulation_score'] = min(total_events / 10, 10)
-        
+
         # Detect toxic flow periods
         analyzer.session_state['toxic_flow_periods'] = df[df['vpin'] > 0.7].index.tolist()
-        
+
         # Detect market regime
         analyzer.session_state['market_regime'] = analyzer.detect_market_regime(df)
-        
+
         # Create dashboard
         analyzer.create_advanced_dashboard(df, selected_file)
-    
+
     # Add session state to sidebar
     with st.sidebar.expander("Session State"):
         st.json({
@@ -774,3 +987,11 @@ if __name__ == "__main__":
             'manipulation_score': round(analyzer.session_state['manipulation_score'], 2),
             'events_detected': total_events
         })
+# Placeholder functions for referenced visualizations
+def create_liquidity_sweep_heatmap(sweep_df):
+    import streamlit as st
+    st.caption("Liquidity sweep heatmap placeholder (implement visualization here).")
+
+def create_predictive_signals(df):
+    import streamlit as st
+    st.caption("Predictive signals scanner placeholder (implement visualization here).")
