@@ -52,7 +52,7 @@ asyncio.run(main())
 
 ```bash
 # Start dashboard
-streamlit run zanalytics_dashboard.py
+streamlit run zanflow_ultimate_dashboard.py
 
 # View exports
 ls exports/

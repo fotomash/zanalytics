@@ -141,3 +141,11 @@ Run the local engine without external API keys:
 ```
 
 The script installs minimal requirements, launches `ncos_local_engine.py` on port 8000, and verifies the `/status` endpoint.
+
+## Launching the Dashboard
+
+Visualize pipeline results with the consolidated Streamlit dashboard:
+
+```bash
+streamlit run zanflow_ultimate_dashboard.py
+```
