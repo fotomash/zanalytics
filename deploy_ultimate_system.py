@@ -53,7 +53,7 @@ class SystemDeployer:
         required_scripts = [
             'ultimate_strategy_merger.py',
             'ultimate_strategy_api.py', 
-            'ultimate_strategy_dashboard.py',
+            'dashboard/app.py',
             'ncOS_ultimate_microstructure_analyzer_DEFAULTS.py'
         ]
 
@@ -99,7 +99,7 @@ class SystemDeployer:
 
         cmd = [
             sys.executable, '-m', 'streamlit', 'run', 
-            'ultimate_strategy_dashboard.py',
+            'dashboard/app.py',
             '--server.port', str(self.streamlit_port),
             '--server.headless', 'true'
         ]

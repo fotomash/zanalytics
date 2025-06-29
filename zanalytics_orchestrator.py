@@ -352,6 +352,10 @@ class Scheduler:
             schedule.every().day.do(
                 lambda: asyncio.create_task(self._run_task(task))
             )
+        elif task.schedule == 'weekly':
+            schedule.every().week.do(
+                lambda: asyncio.create_task(self._run_task(task))
+            )
 
     async def _run_task(self, task: Task):
         """Run a scheduled task"""

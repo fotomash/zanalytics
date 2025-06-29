@@ -58,7 +58,7 @@ class ComponentLoader:
             'integration': 'zanalytics_integration.py',
             'signal_generator': 'zanalytics_signal_generator.py',
             'llm_formatter': 'zanalytics_llm_formatter.py',
-            'dashboard': 'zanalytics_dashboard.py',
+            'dashboard': 'dashboard/app.py',
             'backtester': 'zanalytics_backtester.py',
             'advanced_analytics': 'zanalytics_advanced_analytics.py',
             'market_monitor': 'zanalytics_market_monitor.py',
