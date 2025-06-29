@@ -1277,12 +1277,6 @@ class UltimateZANFLOWDashboard:
             signal_strength = abs(current_signal)
             signal_direction = "🟢 BULLISH" if current_signal > 0 else "🔴 BEARISH" if current_signal < 0 else "🟡 NEUTRAL"
             
-            st.markdown(f"""
-            ### Current Market Signal
-            **Direction**: {signal_direction}  
-            **Strength**: {signal_strength:.2f}  
-            **Confidence**: {'High' if signal_strength >= 2 else 'Medium' if signal_strength >= 1 else 'Low'}
-            """)
 
 def main():
     """Main application entry point"""
