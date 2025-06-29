@@ -18,6 +18,8 @@ import importlib.util
 import traceback
 import pandas as pd
 import numpy as np
+import asyncio
+import websockets
 
 # Configure logging
 logging.basicConfig(
@@ -194,6 +196,9 @@ class ZAnalyticsIntegratedOrchestrator:
             except Exception as e:
                 logger.error(f"Failed to initialize LLM framework: {e}")
 
+        # Register internal dashboard updater
+        self.components['update_dashboard'] = self.update_dashboard
+
     def _register_workflows(self):
         """Register analysis workflows"""
         self.workflows = {
@@ -328,6 +333,20 @@ class ZAnalyticsIntegratedOrchestrator:
 
         return results
 
+    async def update_dashboard(self, data: Dict[str, Any]) -> None:
+        """Forward results to the dashboard websocket API"""
+        ws_url = self.config.get("dashboard_ws_url", "ws://localhost:5010/ws")
+        message = {
+            "type": "analysis_update",
+            "data": data,
+            "timestamp": datetime.now().isoformat(),
+        }
+        try:
+            async with websockets.connect(ws_url) as websocket:
+                await websocket.send(json.dumps(message))
+        except Exception as e:
+            logger.warning(f"Dashboard update failed: {e}")
+
     def run_workflow(self, workflow_name: str, **kwargs) -> Dict[str, Any]:
         """Execute a named workflow"""
         if workflow_name not in self.workflows:
@@ -340,6 +359,13 @@ class ZAnalyticsIntegratedOrchestrator:
             result_file = self.results_dir / f"{workflow_name}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json"
             with open(result_file, 'w') as f:
                 json.dump(result, f, indent=2, default=str)
+
+            # Forward results to dashboard if enabled
+            if self.config.get('dashboard_enabled', False):
+                try:
+                    asyncio.run(self.update_dashboard(result))
+                except Exception as e:
+                    logger.warning(f"Failed to push results to dashboard: {e}")
 
             return result
 
