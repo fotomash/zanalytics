@@ -4,6 +4,9 @@ import numpy as np
 from typing import Dict, List, Tuple, Optional
 # ... other imports
 
+# ---- Tick Vectorizer Integration ----
+from utils.tick_vectorizer import TickVectorizer, VectorizedDashboard
+
 
 class QRTDeskAnalytics:
     def __init__(self):
@@ -29,6 +32,131 @@ class QRTDeskAnalytics:
                     'volume': df['inferred_volume'].iloc[i-window:i].sum()
                 })
         return {'sweep_events': sweep_events, 'count': len(sweep_events)}
+
+    def detect_liquidity_sweeps_enhanced(self, df: pd.DataFrame) -> Dict:
+        """Enhanced liquidity sweep detection with multiple patterns"""
+        # --- Helper & pre‑compute additions (upgrade v2) ---
+        def _sigmoid(x: float) -> float:
+            """Numerically‑stable sigmoid for risk scoring."""
+            return 1 / (1 + np.exp(-x))
+
+        # Ensure pressure columns exist for imbalance calc
+        if 'bid_pressure' not in df.columns:
+            df['bid_pressure'] = df['bid'].diff()
+        if 'ask_pressure' not in df.columns:
+            df['ask_pressure'] = df['ask'].diff()
+
+        # Pre‑compute a simple price‑level liquidity heat‑map
+        vol_by_level = df.groupby(df['price_mid'].round(0))['inferred_volume'].sum().to_dict()
+
+        sweep_events = []
+
+        # Calculate rolling metrics
+        df['price_velocity'] = df['price_mid'].diff() / (df['tick_interval_ms'] + 1)
+        df['volume_surge'] = df['inferred_volume'] / df['inferred_volume'].rolling(20).mean()
+        df['directional_pressure'] = df['price_mid'].diff().rolling(5).apply(
+            lambda x: (x > 0).sum() / len(x) if len(x) > 0 else 0.5
+        )
+
+        # Pattern 1: Stop‑hunt sweeps
+        price_std = df['price_mid'].rolling(50).std()
+        df['price_deviation'] = (df['price_mid'] - df['price_mid'].rolling(50).mean()) / price_std
+
+        # Pattern 2: Volume‑driven sweeps
+        for i in range(10, len(df) - 5):
+            window = df.iloc[i-5:i+5]
+
+            # Rapid price movement
+            price_move = abs(window['price_mid'].iloc[-1] - window['price_mid'].iloc[0])
+            price_move_bps = (price_move / window['price_mid'].iloc[0]) * 10000
+
+            if price_move_bps > 10:                                       # ≥10 bps
+                t_ms = (window['timestamp'].iloc[-1] - window['timestamp'].iloc[0]).total_seconds() * 1000
+                if t_ms < 500:                                            # within 500 ms
+                    avg_vol = window['inferred_volume'].mean()
+                    baseline_vol = df['inferred_volume'].iloc[:i-5].tail(50).mean()
+
+                    if avg_vol > baseline_vol * 2.5:                      # volume surge
+                        direction = 'up' if window['price_mid'].iloc[-1] > window['price_mid'].iloc[0] else 'down'
+
+                        # reversal test for stop‑hunt
+                        if i + 10 < len(df):
+                            fut = df.iloc[i:i+10]
+                            rev_price = fut['price_mid'].iloc[-1]
+                            is_stop = (
+                                (direction == 'up' and rev_price < window['price_mid'].iloc[-1] - price_move * 0.5) or
+                                (direction == 'down' and rev_price > window['price_mid'].iloc[-1] + price_move * 0.5)
+                            )
+                        else:
+                            is_stop = False
+
+                        # --- Enriched feature set & risk scoring ---
+                        speed_ms = window['tick_interval_ms'].sum()
+                        vwap = (
+                            (window['price_mid'] * window['inferred_volume']).sum()
+                            / max(window['inferred_volume'].sum(), 1e-9)
+                        )
+                        vwap_delta_bps = ((window['price_mid'].iloc[-1] - vwap) / vwap) * 1e4
+
+                        pressure_imb = (
+                            df['bid_pressure'].iloc[i] - df['ask_pressure'].iloc[i]
+                            if ('bid_pressure' in df.columns and 'ask_pressure' in df.columns)
+                            else 0.0
+                        )
+
+                        # Liquidity heat (approx.) at sweep start/end rounded to 1‑pip
+                        lvl_start = round(window['price_mid'].iloc[0], 0)
+                        lvl_end   = round(window['price_mid'].iloc[-1], 0)
+                        heat_pre  = vol_by_level.get(lvl_start, 0.0)
+                        heat_post = vol_by_level.get(lvl_end,   0.0)
+
+                        # Feature vector for ML downstream
+                        event_features = np.array([
+                            price_move_bps,
+                            avg_vol / baseline_vol,
+                            speed_ms,
+                            vwap_delta_bps,
+                            pressure_imb,
+                            heat_post - heat_pre
+                        ])
+
+                        # Composite raw risk score
+                        risk_raw = (
+                            (price_move_bps / 10)
+                            + (avg_vol / baseline_vol)
+                            + (abs(pressure_imb) / 1e5)
+                            - (speed_ms / 500)
+                            + (abs(vwap_delta_bps) / 10)
+                        )
+                        risk_score = float(_sigmoid(risk_raw))
+
+                        sweep_events.append({
+                            'type': 'stop_hunt' if is_stop else 'liquidity_grab',
+                            'start_time': window['timestamp'].iloc[0],
+                            'end_time': window['timestamp'].iloc[-1],
+                            'direction': direction,
+                            'magnitude_bps': price_move_bps,
+                            'volume_surge': avg_vol / baseline_vol,
+                            'ms_per_sweep': speed_ms,
+                            'vwap_delta_bps': vwap_delta_bps,
+                            'pressure_imbalance': pressure_imb,
+                            'heat_pre': heat_pre,
+                            'heat_post': heat_post,
+                            'risk_score': risk_score,
+                            'features': event_features.tolist(),
+                            'tick_count': len(window),
+                            'reversal_detected': is_stop,
+                            'regime': self.session_state.get('market_regime', 'unknown'),
+                            'confidence': risk_score
+                        })
+
+        return {
+            'sweep_events': sweep_events,
+            'count': len(sweep_events),
+            'stop_hunts': sum(1 for e in sweep_events if e['type'] == 'stop_hunt'),
+            'liquidity_grabs': sum(1 for e in sweep_events if e['type'] == 'liquidity_grab'),
+            'avg_risk_score': np.mean([e['risk_score'] for e in sweep_events]) if sweep_events else 0.0
+        }
 
     def calculate_tick_microstructure_features(self, df: pd.DataFrame) -> pd.DataFrame:
         """
@@ -129,6 +257,536 @@ import warnings
 warnings.filterwarnings('ignore')
 
 class QuantumMicrostructureAnalyzer:
+    # ------------------- New Methods: UX & Automation Features -------------------
+    def setup_realtime_alerts(self):
+        """Initialize or reset real-time alert system for regime changes, trap predictions, etc."""
+        self.session_state.setdefault('regime_alerts', [])
+        self.session_state.setdefault('last_regime', None)
+        self.session_state.setdefault('trap_alerts', [])
+        self.session_state.setdefault('pattern_search_results', [])
+
+    def check_regime_alerts(self, current_regime, df):
+        """Display real-time regime alerts if regime has changed."""
+        if self.session_state.get('last_regime') != current_regime:
+            st.warning(f"⚡ Market regime changed: {current_regime.upper()}")
+            self.session_state['regime_alerts'].append({
+                'timestamp': df['timestamp'].iloc[-1] if not df.empty else None,
+                'regime': current_regime
+            })
+            self.session_state['last_regime'] = current_regime
+
+    def create_pattern_snapshot(self, df, session_state):
+        """Create a JSON-serializable snapshot of key patterns and session state."""
+        import json
+        snapshot = {
+            'timestamp': str(df['timestamp'].iloc[-1]) if not df.empty else None,
+            'iceberg_events': session_state.get('iceberg_events', []),
+            'spoofing_events': session_state.get('spoofing_events', []),
+            'trap_events': session_state.get('trap_events', []),
+            'market_regime': session_state.get('market_regime', 'unknown'),
+            'manipulation_score': session_state.get('manipulation_score', 0),
+        }
+        return json.dumps(snapshot, default=str, indent=2)
+
+    def render_download_buttons(self, snapshot):
+        """Render download buttons for exporting pattern snapshot as JSON."""
+        st.download_button(
+            label="📥 Download Pattern Snapshot (JSON)",
+            data=snapshot,
+            file_name="pattern_snapshot.json",
+            mime="application/json"
+        )
+
+    def create_pattern_search_interface(self):
+        """Render a Streamlit UI for searching patterns in session events."""
+        st.markdown("#### 🔍 Pattern Search")
+        pattern = st.text_input("Enter pattern or keyword (e.g. 'iceberg', 'trap', 'spoofing')", "")
+        if pattern:
+            results = []
+            for key in ['iceberg_events', 'spoofing_events', 'trap_events']:
+                events = self.session_state.get(key, [])
+                for e in events:
+                    if pattern.lower() in str(e).lower():
+                        results.append({'type': key, **e})
+            self.session_state['pattern_search_results'] = results
+            if results:
+                st.write(f"Found {len(results)} matching events:")
+                st.dataframe(pd.DataFrame(results))
+            else:
+                st.info("No matching events found.")
+
+    def execute_pattern_search(self, pattern):
+        """Search session events for a pattern/keyword."""
+        results = []
+        for key in ['iceberg_events', 'spoofing_events', 'trap_events']:
+            events = self.session_state.get(key, [])
+            for e in events:
+                if pattern.lower() in str(e).lower():
+                    results.append({'type': key, **e})
+        return results
+
+    def create_trap_predictor(self):
+        """Initialize a simple ML or heuristic-based trap predictor (stub example)."""
+        # This could be replaced by loading a real model
+        self.trap_predictor = lambda df: {
+            'trap_probability': np.clip(np.random.normal(0.15, 0.08), 0, 1),
+            'suggested_action': "AVOID LONG" if np.random.rand() > 0.5 else "AVOID SHORT"
+        }
+
+    def predict_next_trap(self, df):
+        """Predict the probability of a trap event in the next N ticks."""
+        if hasattr(self, 'trap_predictor'):
+            return self.trap_predictor(df)
+        else:
+            return {'trap_probability': 0.0, 'suggested_action': "NONE"}
+
+    def create_event_correlation_matrix(self, df):
+        """Display a correlation matrix of event types and microstructure features."""
+        st.markdown("#### 📈 Event Correlation Matrix")
+        # Example: correlate spoofing/iceberg/trap events with features
+        feature_cols = ['spread', 'tick_rate', 'vpin', 'inferred_volume']
+        event_cols = []
+        for key in ['iceberg_events', 'spoofing_events', 'trap_events']:
+            if self.session_state.get(key):
+                event_df = pd.DataFrame(self.session_state[key])
+                if not event_df.empty and 'timestamp' in event_df:
+                    df_key = df.set_index('timestamp')
+                    event_mask = df['timestamp'].isin(event_df['timestamp'])
+                    df.loc[event_mask, f"{key}_flag"] = 1
+                    df.loc[~event_mask, f"{key}_flag"] = 0
+                    event_cols.append(f"{key}_flag")
+        if event_cols:
+            corr = df[feature_cols + event_cols].corr()
+            st.dataframe(corr.round(2))
+        else:
+            st.info("No event flags available for correlation matrix.")
+
+    def generate_session_narrative(self, df, session_state):
+        """Generate a human-readable narrative summary for the analyzed session."""
+        from datetime import datetime
+        start = str(df['timestamp'].iloc[0]) if not df.empty else ''
+        end = str(df['timestamp'].iloc[-1]) if not df.empty else ''
+        iceberg_count = len(session_state.get('iceberg_events', []))
+        spoof_count = len(session_state.get('spoofing_events', []))
+        regime = session_state.get('market_regime', 'unknown')
+        manip_score = session_state.get('manipulation_score', 0)
+        narrative = (
+            f"**Session Analysis** ({start} → {end})\n\n"
+            f"- Market regime: **{regime.upper()}**\n"
+            f"- Manipulation score: **{manip_score:.2f}**\n"
+            f"- Iceberg orders detected: **{iceberg_count}**\n"
+            f"- Spoofing events detected: **{spoof_count}**\n"
+            f"- VPIN average: **{df['vpin'].mean():.3f}**\n"
+        )
+        if manip_score > 5:
+            narrative += "\n⚠️  High manipulation score: caution is advised for active trading."
+        return narrative
+
+    def generate_pdf_report(self, df, snapshot, narrative):
+        """Generate a simple PDF report of the analysis."""
+        from reportlab.lib.pagesizes import letter
+        from reportlab.pdfgen import canvas
+        import tempfile
+        pdf_path = tempfile.mktemp(suffix=".pdf")
+        c = canvas.Canvas(pdf_path, pagesize=letter)
+        width, height = letter
+        c.setFont("Helvetica", 12)
+        c.drawString(30, height-40, "Quantum Microstructure Analysis Report")
+        c.setFont("Helvetica", 10)
+        c.drawString(30, height-60, f"Session: {str(df['timestamp'].iloc[0])} → {str(df['timestamp'].iloc[-1])}")
+        c.drawString(30, height-80, f"Market Regime: {self.session_state.get('market_regime', 'unknown')}")
+        c.drawString(30, height-100, f"Manipulation Score: {self.session_state.get('manipulation_score', 0):.2f}")
+        c.drawString(30, height-120, f"Iceberg Orders: {len(self.session_state.get('iceberg_events', []))}")
+        c.drawString(30, height-140, f"Spoofing Events: {len(self.session_state.get('spoofing_events', []))}")
+        c.setFont("Helvetica", 9)
+        c.drawString(30, height-170, "Session Narrative:")
+        text_obj = c.beginText(30, height-190)
+        for line in narrative.split('\n'):
+            text_obj.textLine(line)
+        c.drawText(text_obj)
+        c.setFont("Helvetica", 8)
+        c.drawString(30, height-350, "Pattern Snapshot:")
+        snap_lines = snapshot.split('\n')
+        snap_text = c.beginText(30, height-370)
+        for line in snap_lines[:20]:
+            snap_text.textLine(line)
+        c.drawText(snap_text)
+        c.save()
+        return pdf_path
+    def create_liquidity_sweep_visualization(self, df: pd.DataFrame, sweep_events: List[Dict]) -> None:
+        """Comprehensive liquidity‑sweep visualisation"""
+        if not sweep_events:
+            return
+
+        sweep_df = pd.DataFrame(sweep_events)
+
+        fig = make_subplots(
+            rows=2, cols=2,
+            subplot_titles=(
+                'Price Action with Sweeps',
+                'Sweep Magnitude Distribution',
+                'Volume Surge Analysis',
+                'Sweep Type Breakdown'
+            ),
+            specs=[[{"secondary_y": True}, {}],
+                   [{}, {"type": "pie"}]]
+        )
+
+        # 1 – price trace with sweep markers
+        fig.add_trace(
+            go.Scatter(x=df['timestamp'], y=df['price_mid'],
+                       name='Price', line=dict(color='gray', width=1)),
+            row=1, col=1
+        )
+        for _, sw in sweep_df.iterrows():
+            colour = 'red' if sw['type'] == 'stop_hunt' else 'orange'
+            fig.add_trace(
+                go.Scatter(
+                    x=[sw['start_time'], sw['end_time']],
+                    y=[df.loc[df['timestamp'] == sw['start_time'], 'price_mid'].iloc[0],
+                       df.loc[df['timestamp'] == sw['end_time'],   'price_mid'].iloc[0]],
+                    mode='lines+markers',
+                    line=dict(color=colour, width=3),
+                    marker=dict(size=10),
+                    name=sw['type'],
+                    showlegend=False
+                ),
+                row=1, col=1
+            )
+
+        # 2 – magnitude histogram
+        fig.add_trace(
+            go.Histogram(x=sweep_df['magnitude_bps'], nbinsx=20, name='Magnitude (bps)'),
+            row=1, col=2
+        )
+
+        # 3 – volume‑surge scatter
+        fig.add_trace(
+            go.Scatter(
+                x=sweep_df['magnitude_bps'],
+                y=sweep_df['volume_surge'],
+                mode='markers',
+                marker=dict(size=sweep_df['confidence']*20,
+                            color=sweep_df['tick_count'],
+                            colorscale='Viridis', showscale=True),
+                text=[f"{t} ticks" for t in sweep_df['tick_count']],
+                name='Volume surge'
+            ),
+            row=2, col=1
+        )
+
+        # 4 – sweep‑type pie
+        type_counts = sweep_df['type'].value_counts()
+        fig.add_trace(
+            go.Pie(labels=type_counts.index, values=type_counts.values),
+            row=2, col=2
+        )
+
+        fig.update_layout(height=800, showlegend=True)
+        st.plotly_chart(fig, use_container_width=True)
+
+    # ---- Enhanced Micro-Wyckoff, Session Liquidity & Trap Detection ----
+
+    def detect_micro_wyckoff_events(self, df: pd.DataFrame) -> Dict:
+        """Detect tick-level Wyckoff patterns as per TickLevel_MicroWyckoff_EventScorer_v12"""
+        events = {
+            'micro_springs': [],
+            'micro_utads': [],
+            'micro_tests': [],
+            'tick_chochs': []
+        }
+        df['micro_swing_high'] = df['price_mid'].rolling(10).max()
+        df['micro_swing_low'] = df['price_mid'].rolling(10).min()
+        df['volume_ma'] = df['inferred_volume'].rolling(20).mean()
+        for i in range(20, len(df) - 5):
+            window = df.iloc[i-10:i+5]
+            # Micro-Spring detection
+            if (window['price_mid'].iloc[5] < window['micro_swing_low'].iloc[5] and
+                window['price_mid'].iloc[-1] > window['price_mid'].iloc[5] and
+                window['inferred_volume'].iloc[5] > window['volume_ma'].iloc[5] * 2):
+                events['micro_springs'].append({
+                    'timestamp': window['timestamp'].iloc[5],
+                    'sweep_price': window['price_mid'].iloc[5],
+                    'rejection_price': window['price_mid'].iloc[-1],
+                    'volume_spike': window['inferred_volume'].iloc[5] / window['volume_ma'].iloc[5],
+                    'tick_velocity': (window['price_mid'].iloc[-1] - window['price_mid'].iloc[5]) /
+                                     (window['tick_interval_ms'].iloc[5:].sum() + 1),
+                    'confidence': min(window['inferred_volume'].iloc[5] / window['volume_ma'].iloc[5] / 3, 1.0)
+                })
+            # Micro-UTAD detection
+            if (window['price_mid'].iloc[5] > window['micro_swing_high'].iloc[5] and
+                window['price_mid'].iloc[-1] < window['price_mid'].iloc[5] and
+                window['inferred_volume'].iloc[5] > window['volume_ma'].iloc[5] * 2):
+                events['micro_utads'].append({
+                    'timestamp': window['timestamp'].iloc[5],
+                    'sweep_price': window['price_mid'].iloc[5],
+                    'rejection_price': window['price_mid'].iloc[-1],
+                    'volume_spike': window['inferred_volume'].iloc[5] / window['volume_ma'].iloc[5],
+                    'confidence': min(window['inferred_volume'].iloc[5] / window['volume_ma'].iloc[5] / 3, 1.0)
+                })
+        return events
+
+    def analyze_session_liquidity_patterns(self, df: pd.DataFrame) -> Dict:
+        """Detect session-specific patterns like Judas Swing"""
+        patterns = {
+            'asia_range': None,
+            'london_judas': [],
+            'ny_continuations': []
+        }
+        df['hour'] = df['timestamp'].dt.hour
+        df['session'] = 'other'
+        df.loc[(df['hour'] >= 0) & (df['hour'] < 7), 'session'] = 'asia'
+        df.loc[(df['hour'] >= 7) & (df['hour'] < 12), 'session'] = 'london'
+        df.loc[(df['hour'] >= 12) & (df['hour'] < 20), 'session'] = 'ny'
+        asia_data = df[df['session'] == 'asia']
+        if not asia_data.empty:
+            patterns['asia_range'] = {
+                'high': asia_data['price_mid'].max(),
+                'low': asia_data['price_mid'].min(),
+                'avg_volume': asia_data['inferred_volume'].mean()
+            }
+        london_data = df[df['session'] == 'london']
+        if not london_data.empty and patterns['asia_range']:
+            london_open = london_data.iloc[:min(300, len(london_data))]
+            if london_open['price_mid'].max() > patterns['asia_range']['high']:
+                sweep_idx = london_open['price_mid'].idxmax()
+                if sweep_idx + 50 < len(df):
+                    post_sweep = df.iloc[sweep_idx:sweep_idx+50]
+                    if post_sweep['price_mid'].iloc[-1] < patterns['asia_range']['high']:
+                        patterns['london_judas'].append({
+                            'type': 'bearish_judas',
+                            'sweep_time': df.loc[sweep_idx, 'timestamp'],
+                            'sweep_price': df.loc[sweep_idx, 'price_mid'],
+                            'asia_level': patterns['asia_range']['high'],
+                            'rejection_depth': (df.loc[sweep_idx, 'price_mid'] - post_sweep['price_mid'].min()),
+                            'volume_ratio': london_open['inferred_volume'].mean() / patterns['asia_range']['avg_volume']
+                        })
+        return patterns
+
+    def detect_inducement_traps(self, df: pd.DataFrame) -> list:
+        """Detect engineered liquidity traps with tick precision"""
+        traps = []
+        df['swing_high'] = df['price_mid'].rolling(20).max()
+        df['swing_low'] = df['price_mid'].rolling(20).min()
+        price_levels = df['price_mid'].round(4).value_counts()
+        significant_levels = price_levels[price_levels >= 3].index
+        for level in significant_levels:
+            level_touches = df[abs(df['price_mid'] - level) < 0.0001]
+            if len(level_touches) >= 3:
+                sweep_candidates = df[
+                    ((df['price_mid'] > level + 0.0001) & (df.index > level_touches.index[-1])) |
+                    ((df['price_mid'] < level - 0.0001) & (df.index > level_touches.index[-1]))
+                ]
+                if not sweep_candidates.empty:
+                    sweep_idx = sweep_candidates.index[0]
+                    if sweep_idx + 20 < len(df):
+                        post_sweep = df.iloc[sweep_idx:sweep_idx+20]
+                        if ((df.loc[sweep_idx, 'price_mid'] > level and post_sweep['price_mid'].min() < level) or
+                            (df.loc[sweep_idx, 'price_mid'] < level and post_sweep['price_mid'].max() > level)):
+                            snapback_velocity = abs(
+                                post_sweep['price_mid'].iloc[-1] - df.loc[sweep_idx, 'price_mid']
+                            ) / (post_sweep['tick_interval_ms'].sum() + 1)
+                            traps.append({
+                                'type': 'inducement_sweep',
+                                'level': level,
+                                'sweep_time': df.loc[sweep_idx, 'timestamp'],
+                                'sweep_price': df.loc[sweep_idx, 'price_mid'],
+                                'snapback_velocity': snapback_velocity,
+                                'volume_surge': df.loc[sweep_idx, 'inferred_volume'] /
+                                                df['inferred_volume'].rolling(20).mean().loc[sweep_idx],
+                                'touches_before_sweep': len(level_touches),
+                                'confidence': min(snapback_velocity * 1000 *
+                                                  (df.loc[sweep_idx, 'inferred_volume'] / df['inferred_volume'].mean()), 1.0)
+                            })
+        return traps
+
+    def create_enhanced_manipulation_section(self, df: pd.DataFrame):
+        """Enhanced manipulation detection with strategy-specific patterns"""
+        import plotly.graph_objects as go
+        st.markdown("### 🎯 Advanced Pattern Recognition")
+        col1, col2 = st.columns(2)
+        with col1:
+            st.markdown("#### Micro-Wyckoff Events")
+            wyckoff_events = self.detect_micro_wyckoff_events(df)
+            total_events = sum(len(events) for events in wyckoff_events.values())
+            if total_events > 0:
+                m1, m2, m3, m4 = st.columns(4)
+                m1.metric("Micro-Springs", len(wyckoff_events['micro_springs']))
+                m2.metric("Micro-UTADs", len(wyckoff_events['micro_utads']))
+                m3.metric("Micro-Tests", len(wyckoff_events['micro_tests']))
+                m4.metric("Tick-CHoCHs", len(wyckoff_events['tick_chochs']))
+                fig_wyck = go.Figure()
+                fig_wyck.add_trace(go.Scatter(
+                    x=df['timestamp'], y=df['price_mid'],
+                    mode='lines', name='Price',
+                    line=dict(color='lightgray', width=1)
+                ))
+                if wyckoff_events['micro_springs']:
+                    springs_df = pd.DataFrame(wyckoff_events['micro_springs'])
+                    fig_wyck.add_trace(go.Scatter(
+                        x=springs_df['timestamp'],
+                        y=springs_df['sweep_price'],
+                        mode='markers',
+                        name='Micro-Springs',
+                        marker=dict(
+                            symbol='triangle-up',
+                            size=10,
+                            color='green',
+                            opacity=springs_df['confidence']
+                        )
+                    ))
+                if wyckoff_events['micro_utads']:
+                    utads_df = pd.DataFrame(wyckoff_events['micro_utads'])
+                    fig_wyck.add_trace(go.Scatter(
+                        x=utads_df['timestamp'],
+                        y=utads_df['sweep_price'],
+                        mode='markers',
+                        name='Micro-UTADs',
+                        marker=dict(
+                            symbol='triangle-down',
+                            size=10,
+                            color='red',
+                            opacity=utads_df['confidence']
+                        )
+                    ))
+                fig_wyck.update_layout(
+                    title="Micro-Wyckoff Pattern Detection",
+                    xaxis_title="Time",
+                    yaxis_title="Price",
+                    height=400
+                )
+                st.plotly_chart(fig_wyck, use_container_width=True)
+            else:
+                st.info("No micro-Wyckoff events detected")
+        with col2:
+            st.markdown("#### Session Liquidity Patterns")
+            session_patterns = self.analyze_session_liquidity_patterns(df)
+            if session_patterns['london_judas']:
+                judas_df = pd.DataFrame(session_patterns['london_judas'])
+                fig_judas = go.Figure()
+                for session in ['asia', 'london', 'ny']:
+                    session_data = df[df['session'] == session]
+                    if not session_data.empty:
+                        fig_judas.add_vrect(
+                            x0=session_data['timestamp'].iloc[0],
+                            x1=session_data['timestamp'].iloc[-1],
+                            fillcolor={'asia': 'lightblue', 'london': 'lightgreen', 'ny': 'lightyellow'}[session],
+                            opacity=0.2,
+                            layer="below",
+                            line_width=0,
+                        )
+                fig_judas.add_trace(go.Scatter(
+                    x=df['timestamp'], y=df['price_mid'],
+                    mode='lines', name='Price',
+                    line=dict(color='black', width=1)
+                ))
+                if session_patterns['asia_range']:
+                    asia_data = df[df['session'] == 'asia']
+                    if not asia_data.empty:
+                        fig_judas.add_hline(
+                            y=session_patterns['asia_range']['high'],
+                            line_dash="dash", line_color="blue",
+                            annotation_text="Asia High"
+                        )
+                        fig_judas.add_hline(
+                            y=session_patterns['asia_range']['low'],
+                            line_dash="dash", line_color="blue",
+                            annotation_text="Asia Low"
+                        )
+                for judas in session_patterns['london_judas']:
+                    fig_judas.add_trace(go.Scatter(
+                        x=[judas['sweep_time']],
+                        y=[judas['sweep_price']],
+                        mode='markers+text',
+                        name='Judas Sweep',
+                        marker=dict(
+                            symbol='x',
+                            size=15,
+                            color='red' if judas['type'] == 'bearish_judas' else 'green'
+                        ),
+                        text=[judas['type']],
+                        textposition="top center"
+                    ))
+                fig_judas.update_layout(
+                    title="Session-Based Liquidity Analysis",
+                    xaxis_title="Time",
+                    yaxis_title="Price",
+                    height=400
+                )
+                st.plotly_chart(fig_judas, use_container_width=True)
+                st.markdown("##### Judas Swing Statistics")
+                st.dataframe(judas_df[['type', 'sweep_time', 'asia_level',
+                                       'rejection_depth', 'volume_ratio']].round(4))
+            else:
+                st.info("No Judas patterns detected in current session")
+        st.markdown("#### 🪤 Inducement & Engineered Liquidity Traps")
+        trap_events = self.detect_inducement_traps(df)
+        if trap_events:
+            trap_df = pd.DataFrame(trap_events)
+            fig_traps = go.Figure()
+            fig_traps.add_trace(go.Scatter(
+                x=df['timestamp'], y=df['price_mid'],
+                mode='lines', name='Price',
+                line=dict(color='gray', width=1)
+            ))
+            for _, trap in trap_df.iterrows():
+                fig_traps.add_trace(go.Scatter(
+                    x=[trap['sweep_time']],
+                    y=[trap['sweep_price']],
+                    mode='markers+text',
+                    name='Trap',
+                    marker=dict(
+                        symbol='star',
+                        size=15,
+                        color='purple',
+                        opacity=trap['confidence']
+                    ),
+                    text=[f"Trap @ {trap['level']:.4f}"],
+                    textposition="top center",
+                    showlegend=False
+                ))
+                fig_traps.add_hline(
+                    y=trap['level'],
+                    line_dash="dot",
+                    line_color="purple",
+                    opacity=0.5
+                )
+            fig_traps.update_layout(
+                title="Inducement & Liquidity Trap Detection",
+                xaxis_title="Time",
+                yaxis_title="Price",
+                height=400
+            )
+            st.plotly_chart(fig_traps, use_container_width=True)
+            col1, col2, col3 = st.columns(3)
+            col1.metric("Total Traps", len(trap_df))
+            col2.metric("Avg Snapback Velocity", f"{trap_df['snapback_velocity'].mean():.6f}")
+            col3.metric("Avg Volume Surge", f"{trap_df['volume_surge'].mean():.2f}x")
+            st.dataframe(
+                trap_df[['sweep_time', 'level', 'snapback_velocity',
+                         'volume_surge', 'touches_before_sweep', 'confidence']].round(4),
+                use_container_width=True
+            )
+        else:
+            st.info("No inducement traps detected")
+
+    def generate_manipulation_vectors(self, df: pd.DataFrame, events: Dict) -> np.ndarray:
+        """Generate 1536-dim vectors for manipulation events"""
+        vectors = []
+        for event_type, event_list in events.items():
+            for event in event_list:
+                features = []
+                if 'confidence' in event:
+                    features.append(event['confidence'])
+                if 'volume_surge' in event:
+                    features.append(min(event['volume_surge'] / 5, 1.0))
+                if 'snapback_velocity' in event:
+                    features.append(min(event['snapback_velocity'] * 1000, 1.0))
+                feature_vector = np.zeros(1536)
+                feature_vector[:len(features)] = features
+                feature_vector[len(features):] = np.random.randn(1536 - len(features)) * 0.01
+                vectors.append(feature_vector)
+        return np.array(vectors) if vectors else np.empty((0, 1536))
     def __init__(self, config_path: str):
         with open(config_path, 'r') as f:
             self.config = yaml.safe_load(f)['quantum_analysis_config']
@@ -143,6 +801,9 @@ class QuantumMicrostructureAnalyzer:
             'toxic_flow_periods': [],
             'hidden_liquidity_map': {}
         }
+        self.setup_realtime_alerts()
+        # If you want ML trap prediction:
+        self.create_trap_predictor()
 
     def preprocess_data(self, df: pd.DataFrame) -> pd.DataFrame:
         """Ensure all required columns exist and are properly formatted"""
@@ -159,6 +820,68 @@ class QuantumMicrostructureAnalyzer:
         # Calculate tick rate (ticks per second)
         df['tick_rate'] = 1000 / df['tick_interval_ms']
         df['tick_rate'] = df['tick_rate'].clip(upper=1000)  # Cap at 1000 ticks/sec
+
+        return df
+
+    def calculate_tick_microstructure_features(self, df: pd.DataFrame) -> pd.DataFrame:
+        """
+        Calculate microstructure features at the tick level for predictive analytics.
+
+        The logic is now *defensive*: if any of the key columns are missing
+        (e.g. `bid`, `ask`, `spread`, or `price_mid`) we rebuild or safely
+        default them so that downstream computations never fail with
+        KeyError / AttributeError while still surfacing a meaningful signal.
+
+        Parameters
+        ----------
+        df : pd.DataFrame
+            Tick‑level dataframe, expected to contain at least one of:
+            * 'price_mid'  – OR –  both 'bid' and 'ask'
+
+        Returns
+        -------
+        pd.DataFrame
+            Same dataframe with these extra columns appended/updated:
+            * micro_return
+            * volatility_5 / volatility_20
+            * spread_z
+            * tick_imbalance
+        """
+        # ------- Column sanity checks & auto‑reconstruction -------
+        if 'price_mid' not in df.columns:
+            if {'bid', 'ask'}.issubset(df.columns):
+                df['price_mid'] = (df['bid'] + df['ask']) / 2
+            else:
+                raise ValueError(
+                    "Input dataframe missing 'price_mid' and cannot derive it "
+                    "because 'bid' / 'ask' are also absent."
+                )
+
+        # If spread is missing try to build it, otherwise fallback to zeros
+        if 'spread' not in df.columns:
+            if {'bid', 'ask'}.issubset(df.columns):
+                df['spread'] = (df['ask'] - df['bid']).abs()
+            else:
+                df['spread'] = 0.0
+
+        # Provide dummy bid / ask when absent so later imbalance calc is safe
+        if 'bid' not in df.columns:
+            df['bid'] = df['price_mid']
+        if 'ask' not in df.columns:
+            df['ask'] = df['price_mid']
+
+        # ------- Feature engineering -------
+        df['micro_return'] = df['price_mid'].pct_change().fillna(0)
+        df['volatility_5'] = df['price_mid'].rolling(5).std().fillna(0)
+        df['volatility_20'] = df['price_mid'].rolling(20).std().fillna(0)
+        df['spread_z'] = (
+            (df['spread'] - df['spread'].mean())
+            / (df['spread'].std() + 1e-9)
+        )
+        df['tick_imbalance'] = (
+            (df['bid'] - df['ask'])
+            / (df['bid'] + df['ask'] + 1e-9)
+        )
 
         return df
 
@@ -414,6 +1137,144 @@ class QuantumMicrostructureAnalyzer:
 
         return regime
 
+    # ---------- Predictive Setup Scanner & Enhanced Visualisations ----------
+    def create_predictive_signals(self, df: pd.DataFrame) -> Dict:
+        """Generate predictive trading signals from tick microstructure"""
+        signals: Dict[str, List] = {
+            'reversal_setups': [],
+            'breakout_setups': [],
+            'trap_setups': [],
+        }
+
+        # Pre‑compute helper columns (safe guards for missing cols)
+        if 'order_flow_imbalance' not in df.columns and 'bid_pressure' in df.columns:
+            df['order_flow_imbalance'] = (df['bid_pressure'] - df['ask_pressure']).rolling(50).mean()
+
+        df['tick_reversal_score'] = (
+            df['order_flow_imbalance'].rolling(20).std().fillna(0) *
+            df['vpin'].rolling(20).mean().fillna(0)
+        )
+
+        df['volume_acceleration'] = df['inferred_volume'].diff().rolling(10).mean().fillna(0)
+        df['breakout_score'] = df['volume_acceleration'] / (df['spread'].rolling(20).mean().fillna(1e-9) + 1e-9)
+
+        # Scan last 300 ticks (or full df if smaller)
+        lookback = min(300, len(df))
+        for i in range(50, lookback):
+            window = df.iloc[i-50:i]
+
+            # Reversal
+            if window['tick_reversal_score'].iloc[-1] > window['tick_reversal_score'].quantile(0.9):
+                direction = 'long' if window['order_flow_imbalance'].iloc[-1] < 0 else 'short'
+                signals['reversal_setups'].append({
+                    'timestamp': window['timestamp'].iloc[-1],
+                    'price': window['price_mid'].iloc[-1],
+                    'direction': direction,
+                    'confidence': float(min(window['tick_reversal_score'].iloc[-1] / 2, 1.0)),
+                })
+
+            # Break‑out
+            if window['breakout_score'].iloc[-1] > window['breakout_score'].quantile(0.95):
+                signals['breakout_setups'].append({
+                    'timestamp': window['timestamp'].iloc[-1],
+                    'price': window['price_mid'].iloc[-1],
+                    'target': window['price_mid'].iloc[-1] + (window['price_mid'].std() * 2),
+                    'confidence': float(min(window['breakout_score'].iloc[-1] / 5, 1.0)),
+                })
+
+        return signals
+
+    def render_predictive_scanner(self, df: pd.DataFrame, signals: Dict) -> None:
+        """Render predictive scanner panels"""
+        import plotly.graph_objects as go
+        col1, col2 = st.columns(2)
+
+        # --- Reversal setups plot ---
+        with col1:
+            st.markdown("##### 🔄 Reversal Setups")
+            if signals['reversal_setups']:
+                fig_rev = go.Figure()
+                # price trace
+                fig_rev.add_trace(go.Scatter(
+                    x=df['timestamp'], y=df['price_mid'],
+                    mode='lines', name='Price', line=dict(color='gray', width=1)
+                ))
+                rev_df = pd.DataFrame(signals['reversal_setups'])
+                for direction, colour, sym in [('long', 'green', 'triangle-up'), ('short', 'red', 'triangle-down')]:
+                    dir_df = rev_df[rev_df['direction'] == direction]
+                    if not dir_df.empty:
+                        fig_rev.add_trace(go.Scatter(
+                            x=dir_df['timestamp'], y=dir_df['price'],
+                            mode='markers', name=f"{direction.capitalize()}",
+                            marker=dict(symbol=sym, size=10, color=colour,
+                                        opacity=dir_df['confidence'])
+                        ))
+                fig_rev.update_layout(showlegend=True, height=300)
+                st.plotly_chart(fig_rev, use_container_width=True)
+            else:
+                st.info("No reversal setups flagged in look‑back window.")
+
+        # --- Setup metrics ---
+        with col2:
+            st.markdown("##### 📊 Setup Metrics")
+            tot_rev = len(signals['reversal_setups'])
+            tot_bo  = len(signals['breakout_setups'])
+            hi_conf = sum(1 for s in signals['reversal_setups'] if s['confidence'] > 0.7)
+            m1, m2, m3 = st.columns(3)
+            m1.metric("Reversals", tot_rev)
+            m2.metric("Break‑outs", tot_bo)
+            m3.metric("High‑conf", hi_conf)
+
+    # ---------- Layering & Quote‑stuffing tabs ----------
+    def render_layering_tab(self, layering_events: List[Dict]) -> None:
+        if layering_events:
+            layer_df = pd.DataFrame(layering_events)
+            fig = go.Figure()
+            fig.add_trace(go.Scatter(
+                x=layer_df['timestamp'], y=layer_df['pressure_imbalance'],
+                mode='markers',
+                marker=dict(size=layer_df['affected_levels']*5,
+                            color=layer_df['confidence'], colorscale='RdBu',
+                            showscale=True),
+                text=layer_df['direction'],
+                name='Layering'
+            ))
+            fig.update_layout(title="Layering Pressure Analysis",
+                              xaxis_title="Time", yaxis_title="Pressure Imbalance")
+            st.plotly_chart(fig, use_container_width=True)
+            st.dataframe(layer_df[['timestamp', 'direction',
+                                   'pressure_imbalance',
+                                   'affected_levels',
+                                   'confidence']].round(3))
+        else:
+            st.info("No layering events detected.")
+
+    def render_quote_stuffing_tab(self, stuffing_events: List[Dict]) -> None:
+        if stuffing_events:
+            q_df = pd.DataFrame(stuffing_events)
+            fig = go.Figure()
+            fig.add_trace(go.Scatter(
+                x=q_df['start_time'], y=q_df['updates_per_second'],
+                mode='markers',
+                marker=dict(size=q_df['tick_count']/10,
+                            color=q_df['confidence'],
+                            colorscale='Hot', showscale=True),
+                name='Stuffing intensity'
+            ))
+            fig.update_layout(title="Quote Stuffing Intensity Map",
+                              xaxis_title="Time", yaxis_title="Updates / s")
+            st.plotly_chart(fig, use_container_width=True)
+            c1, c2, c3 = st.columns(3)
+            c1.metric("Total events", len(q_df))
+            c2.metric("Max rate", f"{q_df['updates_per_second'].max():.0f}/s")
+            avg_dur = (q_df['end_time'] - q_df['start_time']).dt.total_seconds().mean()
+            c3.metric("Avg duration", f"{avg_dur:.1f}s")
+            st.dataframe(q_df[['start_time', 'updates_per_second',
+                               'avg_price_movement', 'tick_count',
+                               'confidence']].round(4))
+        else:
+            st.info("No quote‑stuffing events detected.")
+
     def create_advanced_dashboard(self, df: pd.DataFrame, selected_file: str):
         """Create comprehensive dashboard with all advanced analytics (each chart as its own figure)"""
         st.set_page_config(page_title="Quantum Microstructure Analyzer", layout="wide")
@@ -493,6 +1354,8 @@ These documents expand on engineered-liquidity traps, Wyckoff sweeps, and the VP
         col4.metric("Avg VPIN", f"{df['vpin'].mean():.3f}")
         col5.metric("Toxic Flow %", f"{len(self.session_state['toxic_flow_periods'])/len(df)*100:.1f}%")
         col6.metric("Hidden Liquidity", len(self.session_state['hidden_liquidity_map']))
+        # --- Realtime regime alert ---
+        self.check_regime_alerts(self.session_state['market_regime'], df)
 
         # 1. Price & Inferred Volume
         try:
@@ -786,18 +1649,17 @@ These documents expand on engineered-liquidity traps, Wyckoff sweeps, and the VP
         except Exception:
             pass
 
-        # 13. Liquidity Sweep Detection
+        # 13. Liquidity Sweep Detection (enhanced)
         st.markdown("#### Liquidity Sweep Detection")
-        sweep_results = qrt.detect_liquidity_sweeps(df)
-        st.write(f"Detected {sweep_results['count']} liquidity sweep events.")
+        sweep_results = qrt.detect_liquidity_sweeps_enhanced(df)
+        st.write(
+            f"Detected {sweep_results['count']} sweeps "
+            f"(stop‑hunts = {sweep_results['stop_hunts']}, "
+            f"liquidity‑grabs = {sweep_results['liquidity_grabs']})."
+        )
+
         if sweep_results['sweep_events']:
-            sweep_df = pd.DataFrame(sweep_results['sweep_events'])
-            st.dataframe(sweep_df)
-            # Heatmap or chart placeholder
-            if 'create_liquidity_sweep_heatmap' in globals():
-                create_liquidity_sweep_heatmap(sweep_df)
-            else:
-                st.caption("Liquidity sweep heatmap visualization not implemented.")
+            self.create_liquidity_sweep_visualization(df, sweep_results['sweep_events'])
         else:
             st.info("No major liquidity sweeps detected in this window.")
 
@@ -842,12 +1704,9 @@ These documents expand on engineered-liquidity traps, Wyckoff sweeps, and the VP
 
         # 16. Predictive Setup Scanner
         st.markdown("#### Predictive Setup Scanner")
-        df_pred = qrt.calculate_tick_microstructure_features(df)
-        # Placeholder for predictive signals visualization
-        if 'create_predictive_signals' in globals():
-            create_predictive_signals(df_pred)
-        else:
-            st.caption("Predictive setup scanner visualization not implemented.")
+        df_pred = self.calculate_tick_microstructure_features(df)
+        signals = self.create_predictive_signals(df_pred)
+        self.render_predictive_scanner(df_pred, signals)
 
         # Detailed Analysis Sections (unchanged)
         with st.expander("🔍 Manipulation Event Details", expanded=True):
@@ -868,6 +1727,13 @@ These documents expand on engineered-liquidity traps, Wyckoff sweeps, and the VP
                                          'reversal_time_ms', 'confidence']].round(2))
                 else:
                     st.info("No spoofing events detected")
+
+            with tab3:
+                layering_events = self.detect_layering(df)
+                self.render_layering_tab(layering_events)
+
+            with tab4:
+                self.render_quote_stuffing_tab(self.session_state.get('quote_stuffing_events', []))
 
         # Market Quality Metrics (unchanged)
         with st.expander("📊 Market Quality Metrics"):
@@ -976,6 +1842,28 @@ if __name__ == "__main__":
         # Detect market regime
         analyzer.session_state['market_regime'] = analyzer.detect_market_regime(df)
 
+        # ---- Vectorizer Integration ----
+        if 'vector_state' not in st.session_state:
+            st.session_state.vector_state = {
+                'last_vectorized_idx': 0,
+                'total_vectors': 0,
+                'anomaly_count': 0
+            }
+
+        vectorizer_config = {
+            'tick_vectorizer': {
+                'embedding_dim': 1536,
+                'feature_extractors': ['microstructure', 'regime', 'temporal']
+            }
+        }
+
+        tick_vectorizer = TickVectorizer(vectorizer_config)
+        vector_dashboard = VectorizedDashboard(tick_vectorizer)
+        st.session_state.vector_state = vector_dashboard.update_tick_vectors(df, st.session_state.vector_state)
+
+        with st.expander("🧬 Tick Vector Analysis", expanded=True):
+            vector_dashboard.render_vector_analytics(st)
+
         # Create dashboard
         analyzer.create_advanced_dashboard(df, selected_file)
 
@@ -995,3 +1883,159 @@ def create_liquidity_sweep_heatmap(sweep_df):
 def create_predictive_signals(df):
     import streamlit as st
     st.caption("Predictive signals scanner placeholder (implement visualization here).")
+    import json
+    from datetime import datetime
+    from reportlab.lib.pagesizes import letter
+    from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table
+    from reportlab.lib.styles import getSampleStyleSheet
+
+    def setup_realtime_alerts(self):
+        self.last_regime = None
+        self.alert_queue = []
+
+    def check_regime_alerts(self, current_regime: str, df: pd.DataFrame):
+        if hasattr(self, 'last_regime') and self.last_regime and current_regime != self.last_regime:
+            alert = {
+                'type': 'regime_change',
+                'from': self.last_regime,
+                'to': current_regime,
+                'timestamp': df['timestamp'].iloc[-1],
+                'vpin': df['vpin'].iloc[-1],
+                'confidence': 0.9
+            }
+            st.toast(f"⚠️ Regime Change: {self.last_regime} → {current_regime}", icon='🔄')
+            with st.sidebar:
+                st.error(f"REGIME ALERT: Now in {current_regime.upper()} regime")
+            if hasattr(self, 'alert_queue'):
+                self.alert_queue.append(alert)
+        self.last_regime = current_regime
+
+    def create_pattern_snapshot(self, df: pd.DataFrame, events: dict) -> dict:
+        snapshot = {
+            'metadata': {
+                'timestamp': datetime.now().isoformat(),
+                'symbol': getattr(self, 'current_symbol', 'Unknown'),
+                'tick_count': len(df),
+                'regime': self.session_state.get('market_regime', 'unknown')
+            },
+            'events': events,
+            'statistics': {
+                'manipulation_score': self.session_state.get('manipulation_score', 0),
+                'avg_vpin': df['vpin'].mean(),
+                'regime_distribution': df['regime_simple'].value_counts().to_dict() if 'regime_simple' in df else {}
+            }
+        }
+        return snapshot
+
+    def render_download_buttons(self, snapshot: dict):
+        col1, col2 = st.columns(2)
+        with col1:
+            csv_data = pd.DataFrame(snapshot['events'].get('sweep_events', [])).to_csv(index=False)
+            st.download_button(
+                label="📊 Download Events CSV",
+                data=csv_data,
+                file_name=f"patterns_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv",
+                mime="text/csv"
+            )
+        with col2:
+            json_data = json.dumps(snapshot, indent=2, default=str)
+            st.download_button(
+                label="📋 Download Events JSON",
+                data=json_data,
+                file_name=f"patterns_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json",
+                mime="application/json"
+            )
+
+    def create_pattern_search_interface(self):
+        st.markdown("### 🔍 Deep Pattern Search")
+        search_query = st.text_input(
+            "Search patterns (e.g., 'sweeps > 15bps between 09:00-11:00')",
+            key="pattern_search"
+        )
+        if search_query:
+            results = self.execute_pattern_search(search_query)
+            if results:
+                st.dataframe(pd.DataFrame(results))
+            else:
+                st.info("No patterns match your search criteria")
+
+    def execute_pattern_search(self, query: str):
+        # Basic substring match placeholder
+        all_events = []
+        for event in self.session_state.get('sweep_events', []):
+            event['event_type'] = 'sweep'
+            all_events.append(event)
+        return all_events
+
+    def create_trap_predictor(self):
+        from sklearn.ensemble import GradientBoostingClassifier
+        self.trap_predictor = GradientBoostingClassifier(
+            n_estimators=100, max_depth=3, random_state=42
+        )
+
+    def predict_next_trap(self, df: pd.DataFrame):
+        # Placeholder until the model is fitted
+        trap_probability = 0.42
+        return {
+            'trap_probability': trap_probability,
+            'confidence': 0.7,
+            'suggested_action': 'WAIT' if trap_probability > 0.7 else 'PROCEED',
+            'key_indicators': []
+        }
+
+    def create_event_correlation_matrix(self, df: pd.DataFrame):
+        event_matrix = pd.DataFrame(index=df.index)
+        for event in self.session_state.get('iceberg_events', []):
+            mask = (df['timestamp'] >= event['start_time']) & (df['timestamp'] <= event['end_time'])
+            event_matrix.loc[mask, 'iceberg'] = 1
+        event_matrix['iceberg'] = event_matrix['iceberg'].fillna(0)
+        for event in self.session_state.get('spoofing_events', []):
+            idx = df[df['timestamp'] == event['timestamp']].index
+            if not idx.empty:
+                event_matrix.loc[idx[0], 'spoofing'] = 1
+        event_matrix['spoofing'] = event_matrix['spoofing'].fillna(0)
+        corr_matrix = event_matrix.corr()
+        fig = go.Figure(data=go.Heatmap(
+            z=corr_matrix.values,
+            x=corr_matrix.columns,
+            y=corr_matrix.columns,
+            colorscale='RdBu',
+            zmid=0
+        ))
+        fig.update_layout(title="Event Correlation Matrix")
+        st.plotly_chart(fig, use_container_width=True)
+
+    def generate_session_narrative(self, df: pd.DataFrame, events: dict) -> str:
+        narrative = []
+        narrative.append(
+            f"### Session Analysis: {df['timestamp'].iloc[0].strftime('%Y-%m-%d %H:%M')} - "
+            f"{df['timestamp'].iloc[-1].strftime('%H:%M')}"
+        )
+        regime_dist = df['regime_simple'].value_counts(normalize=True) if 'regime_simple' in df else {}
+        dominant_regime = regime_dist.index[0] if hasattr(regime_dist, 'index') else 'unknown'
+        narrative.append(f"\n**Market Regime**: Predominantly {dominant_regime}")
+        total_events = sum(len(events.get(k, [])) for k in events)
+        narrative.append(f"\n**Manipulation Events**: {total_events} total events detected")
+        price_change = df['price_mid'].iloc[-1] - df['price_mid'].iloc[0]
+        price_change_pct = (price_change / df['price_mid'].iloc[0]) * 10000
+        narrative.append(f"\n**Price Action**: {price_change_pct:+.1f} bps move")
+        avg_vpin = df['vpin'].mean() if 'vpin' in df else 0
+        narrative.append(f"\n**Flow Toxicity**: Average VPIN {avg_vpin:.3f}")
+        return '\n'.join(narrative)
+
+    def generate_pdf_report(self, df: pd.DataFrame, snapshot: dict, narrative: str):
+        pdf_path = f"quantum_analysis_{datetime.now().strftime('%Y%m%d_%H%M%S')}.pdf"
+        doc = SimpleDocTemplate(pdf_path, pagesize=letter)
+        story = []
+        styles = getSampleStyleSheet()
+        story.append(Paragraph("Quantum Microstructure Analysis Report", styles['Title']))
+        story.append(Spacer(1, 12))
+        story.append(Paragraph(narrative, styles['Normal']))
+        story.append(Spacer(1, 12))
+        event_data = [
+            ['Event Type', 'Count'],
+            *[[k, len(snapshot['events'].get(k, []))] for k in snapshot['events']]
+        ]
+        story.append(Table(event_data))
+        doc.build(story)
+        return pdf_path
