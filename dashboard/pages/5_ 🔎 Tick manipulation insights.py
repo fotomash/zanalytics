@@ -1,4 +1,8 @@
 import streamlit as st
+st.set_page_config(
+    page_title="Quantum Microstructure Analyzer",
+    layout="wide"
+)
 import pandas as pd
 import numpy as np
 from typing import Dict, List, Tuple, Optional
@@ -1277,7 +1281,6 @@ class QuantumMicrostructureAnalyzer:
 
     def create_advanced_dashboard(self, df: pd.DataFrame, selected_file: str):
         """Create comprehensive dashboard with all advanced analytics (each chart as its own figure)"""
-        st.set_page_config(page_title="Quantum Microstructure Analyzer", layout="wide")
 
         # QRTDeskAnalytics instance for advanced microstructure analytics
         qrt = QRTDeskAnalytics()

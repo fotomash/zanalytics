@@ -16,8 +16,21 @@ from datetime import datetime, timedelta, date
 import warnings
 from typing import Dict, List, Tuple, Optional
 import logging
+# --- PATCH: Wyckoff JSON Support ---
 import json
 from pathlib import Path
+# --- PATCH: Wyckoff JSON Support ---
+def load_comprehensive_json(symbol):
+    json_path = Path(f"./processed/{symbol}_comprehensive.json")
+    if json_path.exists():
+        try:
+            with open(json_path, "r") as f:
+                return json.load(f)
+        except Exception as e:
+            st.warning(f"Could not parse comprehensive JSON: {e}")
+            return None
+    else:
+        return None
 
 # Configure warnings and logging
 warnings.filterwarnings('ignore')
@@ -832,8 +845,46 @@ def export_analysis_report(analysis: Dict, symbol: str) -> str:
         'timestamp': datetime.now().isoformat(),
         'analysis': analysis
     }
-
     return json.dumps(report, indent=2, default=str)
+
+# --- PATCH: Render trade setups from JSON or CSV ---
+def render_trade_setups(symbol, json_data):
+    if json_data and "trade_setups" in json_data:
+        setups_iter = json_data["trade_setups"]
+    else:
+        try:
+            setup_path = f"./processed/{symbol}_trade_setups.csv"
+            setups_iter = pd.read_csv(setup_path).to_dict('records')
+        except Exception as e:
+            st.warning(f"No trade-setup data found: {e}")
+            setups_iter = []
+
+    for setup in setups_iter:
+        targets_raw = setup.get("targets") or setup.get("Targets", "")
+        if isinstance(targets_raw, str):
+            targets = [t.strip() for t in targets_raw.split(",") if t.strip()]
+        else:
+            targets = targets_raw
+        card = {
+            "name":        setup.get("name")        or setup.get("Name", "Unnamed"),
+            "entry":       setup.get("entry")       or setup.get("Entry", "—"),
+            "stop":        setup.get("stop")        or setup.get("Stop", "—"),
+            "targets":     targets,
+            "rr":          setup.get("rr")          or setup.get("RR", "—"),
+            "confidence":  setup.get("confidence")  or setup.get("Confidence", "—"),
+            "status":      setup.get("status")      or setup.get("Status", "Pending"),
+            "color":       setup.get("color",       "#ffc13b")
+        }
+        # Render in a visually distinct card
+        with st.container():
+            st.markdown(
+                f"<div style='border-left:8px solid {card['color']};padding:0.7em 1em;margin:0.5em 0;background:rgba(80,80,80,0.1);border-radius:8px'>"
+                f"<b>{card['name']}</b> | <b>Entry:</b> {card['entry']} | <b>Stop:</b> {card['stop']} | "
+                f"<b>Targets:</b> {', '.join(card['targets']) if card['targets'] else '—'} | "
+                f"<b>RR:</b> {card['rr']} | <b>Confidence:</b> {card['confidence']} | "
+                f"<b>Status:</b> {card['status']}"
+                f"</div>", unsafe_allow_html=True
+            )
 
 # ============================================================================
 # MAIN APPLICATION
@@ -909,6 +960,9 @@ def main():
             volume_threshold = st.slider("volume Spike Threshold", 1.5, 3.0, 2.0, 0.1)
             volatility_threshold = st.slider("Volatility Threshold", 0.2, 1.0, 0.3, 0.1)
             phase_sensitivity = st.slider("Phase Detection Sensitivity", 0.5, 2.0, 1.0, 0.1)
+
+    # --- PATCH: Try to load enriched JSON for the selected symbol ---
+    comprehensive_json = load_comprehensive_json(selected_symbol)
 
     # Main content area
     if st.button("🚀 Run Analysis", type="primary"):
@@ -986,6 +1040,10 @@ def main():
                 st.subheader("🎯 Composite Operator")
                 co_gauge = create_composite_operator_gauge(analysis)
                 st.plotly_chart(co_gauge, use_container_width=True)
+
+            # --- PATCH: Show trade setups from JSON/CSV ---
+            st.subheader("📑 Trade Setups")
+            render_trade_setups(selected_symbol, comprehensive_json)
 
             # Detailed analysis results
             st.subheader("📋 Detailed Analysis")

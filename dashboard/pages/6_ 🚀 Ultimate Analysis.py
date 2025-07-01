@@ -437,7 +437,17 @@ class UltimateZANFLOWDashboard:
 
         with col3:
             atr = df['atr_14'].iloc[-1] if 'atr_14' in df.columns else 0
-            st.metric("ATR (14)", f"{atr:.4f}")
+            try:
+                if hasattr(atr, "__iter__") and not isinstance(atr, str):
+                    # handle Series
+                    if len(atr) == 1:
+                        atr = float(atr.item())
+                    else:
+                        atr = float(atr.values[-1])
+                atr_value = f"{float(atr):.4f}"
+            except Exception:
+                atr_value = "—"
+            st.metric("ATR (14)", atr_value)
 
         with col4:
             rsi = df['rsi_14'].iloc[-1] if 'rsi_14' in df.columns else 50

@@ -1,5 +1,12 @@
 import streamlit as st
 
+st.set_page_config(
+    page_title="Zanflow Analytics Dashboard",
+    page_icon="📊",
+    layout="wide",
+    initial_sidebar_state="expanded"
+)
+
 from streamlit_autorefresh import st_autorefresh
 
 with open("custom_theme.css") as f:
@@ -279,6 +286,18 @@ class QRTQuantumAnalyzer(QuantumMicrostructureAnalyzer):
 
     def create_qrt_dashboard(self, df: pd.DataFrame, selected_file: str):
         """Create QRT-level professional dashboard"""
+        import base64
+
+        def get_image_as_base64(path):
+            """Reads an image file and returns its base64 encoded string."""
+            try:
+                with open(path, "rb") as image_file:
+                    return base64.b64encode(image_file.read()).decode()
+            except FileNotFoundError:
+                st.warning(
+                    f"Background image not found at '{path}'. Please ensure it's in the same directory as the script.")
+                return None
+
         # --- QRT Dashboard Streamlit Implementation ---
         import streamlit as st
         import plotly.graph_objects as go
@@ -398,12 +417,6 @@ class WyckoffQuantumAnalyzer:
 # =================== END QRT ANALYZER DEFINITIONS =====================
 
 # ============================ MAIN UI & LOGIC SECTION (REPLACEMENT) ============================
-st.set_page_config(
-    page_title="Zanflow Analytics Dashboard",
-    page_icon="📊",
-    layout="wide",
-    initial_sidebar_state="expanded"
-)
 
 # Custom CSS for styling
 st.markdown("""
@@ -428,6 +441,38 @@ st.markdown("""
     }
 </style>
 """, unsafe_allow_html=True)
+
+# --- PATCH: Add background image logic after CSS and before UI logic ---
+import base64
+
+def get_image_as_base64(path):
+    """Reads an image file and returns its base64 encoded string."""
+    try:
+        with open(path, "rb") as image_file:
+            return base64.b64encode(image_file.read()).decode()
+    except FileNotFoundError:
+        st.warning(f"Background image not found at '{path}'. Please ensure it's in the same directory as the script.")
+        return None
+
+img_base64 = get_image_as_base64("theme/image_af247b.jpg")
+if img_base64:
+    background_style = f"""
+    <style>
+    [data-testid="stAppViewContainer"] > .main {{
+        background: linear-gradient(rgba(0,0,0,0.85), rgba(0,0,0,0.85)), url(data:image/jpeg;base64,{img_base64}) !important;
+        background-size: cover !important;
+        background-position: center !important;
+        background-repeat: no-repeat !important;
+        background-attachment: fixed !important;
+        background-color: transparent !important;
+    }}
+    body, .block-container {{
+        background: none !important;
+        background-color: transparent !important;
+    }}
+    </style>
+    """
+    st.markdown(background_style, unsafe_allow_html=True)
 
 # Initialize session state
 if 'df_to_use' not in st.session_state:
