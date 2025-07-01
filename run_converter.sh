@@ -23,35 +23,39 @@ cd /Users/tom/Documents/_trade/_exports/_tick
   --directory ./ \
   --no_compression \
   --output_dir /Users/tom/Documents/GitHub/zanalytics/dashboard/data \
-  --max_candles 150 \
+  --max_candles 500 \
   --json_dir /Users/tom/Documents/GitHub/zanalytics/dashboard/data \
   --csv_dir /Users/tom/Documents/GitHub/zanalytics/dashboard/data \
-    --file GBPUSD_M1_bars.csv
+    --file GBPUSD_M1_bars.csv \
+    --no-summary-report
 
     /Users/tom/Documents/GitHub/venv2/bin/python \
   /Users/tom/Documents/_trade/_exports/_tick/ncOS_ultimate_microstructure_analyzer_DEFAULTS.py \
   --directory ./ \
   --no_compression \
   --output_dir /Users/tom/Documents/GitHub/zanalytics/dashboard/data/EURUSD \
-  --max_candles 150 \
-  --file EURUSD_M1_bars.csv
+  --max_candles 500 \
+  --file EURUSD_M1_bars.csv \
+  --no-summary-report
 
     /Users/tom/Documents/GitHub/venv2/bin/python \
   /Users/tom/Documents/_trade/_exports/_tick/ncOS_ultimate_microstructure_analyzer_DEFAULTS.py \
   --directory ./ \
   --no_compression \
   --output_dir /Users/tom/Documents/GitHub/zanalytics/dashboard/data/XAUUSD \
-  --max_candles 150 \
-  --file XAUUSD_M1_bars.csv
+  --max_candles 500 \
+  --file XAUUSD_M1_bars.csv \
+  --no-summary-report
 
       /Users/tom/Documents/GitHub/venv2/bin/python \
   /Users/tom/Documents/_trade/_exports/_tick/ncOS_ultimate_microstructure_analyzer_DEFAULTS.py \
   --directory ./ \
   --no_compression \
   --output_dir /Users/tom/Documents/GitHub/zanalytics/dashboard/data/BTCUSD \
-  --max_candles 150 \
+  --max_candles 500 \
   --file BTCUSD_M1_bars.csv \
-  --json_dir /Users/tom/Documents/GitHub/zanalytics/dashboard/data/BTCUSD
+  --json_dir /Users/tom/Documents/GitHub/zanalytics/dashboard/data/BTCUSD \
+  --no-summary-report
 
       /Users/tom/Documents/GitHub/venv2/bin/python \
  /Users/tom/Documents/_trade/_exports/_tick/ncos_enhanced_analyzer.py \

@@ -1,4 +1,9 @@
 import streamlit as st
+
+from streamlit_autorefresh import st_autorefresh
+
+with open("custom_theme.css") as f:
+    st.markdown(f"<style>{f.read()}</style>", unsafe_allow_html=True)
 import json
 import pandas as pd
 import numpy as np
@@ -274,19 +279,21 @@ class QRTQuantumAnalyzer(QuantumMicrostructureAnalyzer):
 
     def create_qrt_dashboard(self, df: pd.DataFrame, selected_file: str):
         """Create QRT-level professional dashboard"""
-        # [ Full Streamlit dashboard code from user snippet goes here ]
         # --- QRT Dashboard Streamlit Implementation ---
         import streamlit as st
         import plotly.graph_objects as go
         from plotly.subplots import make_subplots
-        st.title("🚀 QRT Quantum Microstructure Dashboard")
-        st.markdown(f"**Instrument:** `{selected_file}`")
-        st.divider()
-        # Calculate metrics
+        # Calculate metrics and signals before the heading
         df = self.calculate_tiquidity_metrics(df)
         wyckoff = self.detect_wyckoff_structures(df)
         liquidity = self.detect_liquidity_patterns(df)
         footprint = self.calculate_orderflow_footprint(df)
+        signals = self.generate_qrt_signals(df, wyckoff, liquidity)
+        # Only show the styled QRT Trading Signal headline (remove any dashboard header here)
+        st.markdown(
+            f"<h2>QRT Trading Signal: <span style='color:#FFD700'>{signals.get('signal', 'N/A').upper()}</span></h2>",
+            unsafe_allow_html=True
+        )
         # Metrics row
         col1, col2, col3, col4 = st.columns(4)
         with col1:
@@ -306,9 +313,14 @@ class QRTQuantumAnalyzer(QuantumMicrostructureAnalyzer):
         fig.add_trace(go.Scatter(
             x=df['timestamp'], y=df['cumulative_delta'], name="Cumulative Delta", line=dict(color='orange')), row=2,
             col=1)
-        fig.add_trace(go.Bar(
-            x=df['timestamp'], y=df['inferred_volume'], name="Volume", marker_color='rgba(50,150,255,0.2)'), row=2,
-            col=1)
+        # Volume bar chart with robust auto-detection of usable volume column
+        volume_candidates = [col for col in df.columns if 'vol' in col.lower() or 'volume' in col.lower()]
+        volume_col = next((col for col in volume_candidates if col in df.columns and df[col].sum() > 0), None)
+        if volume_col:
+            fig.add_trace(go.Bar(
+                x=df['timestamp'], y=df[volume_col], name=f"Volume ({volume_col})", marker_color='rgba(50,150,255,0.2)'), row=2, col=1)
+        else:
+            st.warning("⚠️ No usable volume column found in data.")
         fig.update_layout(height=600, showlegend=False)
         st.plotly_chart(fig, use_container_width=True)
         # Wyckoff Patterns
@@ -320,10 +332,10 @@ class QRTQuantumAnalyzer(QuantumMicrostructureAnalyzer):
         # Orderflow Footprint
         with st.expander("🦶 Orderflow Footprint"):
             st.dataframe(footprint.head(30))
-        # Generate signals
-        signals = self.generate_qrt_signals(df, wyckoff, liquidity)
-        st.success(f"**QRT Trading Signal:** {signals.get('signal', 'N/A').upper()}")
-        st.json(signals)
+        # QRT Trading Signal details (JSON, reasons, etc.) in expander
+        with st.expander("🧠 QRT Trading Signal"):
+            st.success(f"**QRT Trading Signal:** {signals.get('signal', 'N/A').upper()}")
+            st.json(signals)
         # End QRT Dashboard
 
     def generate_qrt_signals(self, df: pd.DataFrame, wyckoff: Dict, liquidity: Dict) -> Dict:
@@ -385,7 +397,7 @@ class WyckoffQuantumAnalyzer:
 
 # =================== END QRT ANALYZER DEFINITIONS =====================
 
-# Page configuration
+# ============================ MAIN UI & LOGIC SECTION (REPLACEMENT) ============================
 st.set_page_config(
     page_title="Zanflow Analytics Dashboard",
     page_icon="📊",
@@ -393,7 +405,7 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# Custom CSS
+# Custom CSS for styling
 st.markdown("""
 <style>
     .main {
@@ -424,16 +436,14 @@ if 'analysis_results' not in st.session_state:
     st.session_state.analysis_results = {}
 
 # Header
-# st.title("🏛️ Zanflow Multi-Timeframe Analysis Dashboard")
 st.markdown(
     "<small>Institutional-Grade Market Analysis with Smart Money Concepts & Wyckoff Methodology</small>",
     unsafe_allow_html=True
 )
 
-# Modernized Parquet-only sidebar
+# Sidebar: Data Selection and Analysis Controls
 with st.sidebar:
     st.header("📁 Data Selection")
-    # Set parquet_dir to the value from secrets.toml, fallback to './data' if not found
     parquet_dir = st.secrets.get("PARQUET_DATA_DIR", "./data")
     file_info = scan_parquet_files(parquet_dir)
     symbols = sorted({sym for sym, _, _ in file_info})
@@ -460,27 +470,30 @@ with st.sidebar:
             st.error(f"⚠️ File `{full_path.name}` is not a valid Parquet file or is corrupted. Please check your files.\n\nError: {e}")
             st.session_state.df_to_use = None
 
+    # --- Auto-Refresh controls ---
+    enable_auto_refresh = st.checkbox("Enable Auto-Refresh", value=True)
+    refresh_interval = st.number_input("Refresh Interval (seconds)", min_value=10, max_value=600, value=60, step=10)
+
+    if enable_auto_refresh:
+        st_autorefresh(interval=refresh_interval * 1000, limit=None, key="autorefresh")
+
     # Analysis settings (only show if data loaded)
     if st.session_state.df_to_use is not None:
         st.divider()
         st.header("⚙️ Analysis Settings")
-        # Analysis options
         st.subheader("Analysis Modules")
         show_smc = st.checkbox("Smart Money Concepts", value=True)
         show_wyckoff = st.checkbox("Wyckoff Analysis", value=True)
         show_volume_profile = st.checkbox("Volume Profile", value=True)
         show_indicators = st.checkbox("Technical Indicators", value=True)
-        # Visualization options
         st.subheader("Visualization Options")
         chart_type = st.selectbox("Chart Type", ["Candlestick", "Heikin Ashi", "Line"])
         show_volume = st.checkbox("Show Volume", value=True)
         show_orderflow = st.checkbox("Show Order Flow", value=True)
-        # Run analysis button
         if st.button("🔍 Run Analysis", type="primary"):
             with st.spinner("Running comprehensive analysis..."):
                 try:
                     tf_data = st.session_state.df_to_use
-                    # Initialize analyzers
                     smc = SMCAnalyzer() if show_smc else None
                     wyckoff = WyckoffAnalyzer() if show_wyckoff else None
                     volume_profile = VolumeProfileAnalyzer() if show_volume_profile else None
@@ -499,15 +512,12 @@ with st.sidebar:
                 except Exception as e:
                     st.error(f"Analysis error: {str(e)}")
 
-# Main content area
+# Main Content Area
 if st.session_state.df_to_use is not None:
-    # Create tabs for different views
-    tab1, tab2, tab3, tab4 = st.tabs(["📊 Chart Analysis", "📈 Market Structure", "📋 Reports", "🧠 QRT Dashboard"])
+    tab1, tab2, tab3, tab4 = st.tabs(["📊 Chart", "📈 Market Structure", "📋 Reports", "🧠 QRT Dashboard"])
 
     with tab1:
-        # Main chart analysis
         tf_data = st.session_state.df_to_use
-        # Metrics row
         col1, col2, col3, col4, col5 = st.columns(5)
         with col1:
             current_price = tf_data['close'].iloc[-1]
@@ -519,7 +529,6 @@ if st.session_state.df_to_use is not None:
                 st.metric("24h Volume", f"{tf_data[volume_col].tail(24).sum():,.0f}")
             else:
                 st.metric("24h Volume", "N/A")
-
         with col3:
             st.metric("Volatility", f"{tf_data['close'].pct_change().std() * 100:.2f}%")
         with col4:
@@ -529,7 +538,6 @@ if st.session_state.df_to_use is not None:
             low_24h = tf_data['low'].tail(24).min()
             st.metric("24h Low", f"${low_24h:.5f}")
 
-        # Main chart
         chart_builder = ChartBuilder()
         fig = chart_builder.create_main_chart(
             tf_data,
@@ -540,27 +548,22 @@ if st.session_state.df_to_use is not None:
         )
         st.plotly_chart(fig, use_container_width=True)
 
-        # Analysis panel
         if st.session_state.analysis_results:
             analysis_panel = AnalysisPanel()
             analysis_panel.display_results(st.session_state.analysis_results)
 
     with tab2:
-        # Market Structure Analysis
         st.header("Market Structure Analysis")
         tf_data = st.session_state.df_to_use
-        # Structure visualization
         col1, col2 = st.columns(2)
         with col1:
             st.subheader("Smart Money Concepts")
             if 'smc' in st.session_state.analysis_results:
                 smc_results = st.session_state.analysis_results['smc']
-                # Display liquidity zones
                 st.markdown("#### Liquidity Zones")
                 for zone in smc_results.get('liquidity_zones', [])[:5]:
                     zone_type = "🔴 Sell-side" if zone['type'] == 'SSL' else "🟢 Buy-side"
                     st.write(f"{zone_type}: ${zone['level']:.5f} (Strength: {zone['strength']:.2f})")
-                # Display order blocks
                 st.markdown("#### Order Blocks")
                 for ob in smc_results.get('order_blocks', [])[:5]:
                     ob_type = "🟢 Bullish" if ob['type'] == 'bullish' else "🔴 Bearish"
@@ -569,7 +572,6 @@ if st.session_state.df_to_use is not None:
             st.subheader("Wyckoff Analysis")
             if 'wyckoff' in st.session_state.analysis_results:
                 wyckoff_results = st.session_state.analysis_results['wyckoff']
-                # Current phase
                 st.markdown("#### Current Phase")
                 phase = wyckoff_results.get('current_phase', 'Unknown')
                 phase_emoji = {
@@ -579,19 +581,15 @@ if st.session_state.df_to_use is not None:
                     'Markdown': '💥'
                 }.get(phase, '❓')
                 st.write(f"{phase_emoji} **{phase}**")
-                # Key events
                 st.markdown("#### Recent Events")
                 for event in wyckoff_results.get('events', [])[:5]:
                     st.write(f"• {event['type']} at ${event['price']:.5f}")
 
     with tab3:
-        # Reports and Export
         st.header("Analysis Reports")
         tf_data = st.session_state.df_to_use
-        # Generate report
         if st.button("📄 Generate Full Report"):
             with st.spinner("Generating comprehensive report..."):
-                # Create report content
                 report = f"""
 # Zanflow Analysis Report
 Generated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
@@ -602,22 +600,17 @@ Generated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
 
 ## Analysis Summary
 """
-                # Add analysis results to report
                 if st.session_state.analysis_results:
                     for module, results in st.session_state.analysis_results.items():
                         report += f"\n### {module.upper()} Analysis\n"
                         report += str(results)[:500] + "...\n"
-                # Display report
                 st.text_area("Report Preview", report, height=400)
-                # Download button
                 st.download_button(
                     label="📥 Download Report",
                     data=report,
                     file_name=f"zanflow_report_{datetime.now().strftime('%Y%m%d_%H%M%S')}.txt",
                     mime="text/plain"
                 )
-
-        # JSON Breakdown Commentary Expander
         with st.expander("🗂 JSON Breakdown Commentary"):
             st.markdown("The following is a human-readable explanation of the core analysis JSON output.")
             if st.session_state.analysis_results:
@@ -626,21 +619,17 @@ Generated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
                     st.json(results)
             st.download_button(
                 label="📥 Download Full JSON",
-                data=json.dumps(st.session_state.analysis_results, indent=2),
+                data=json.dumps(st.session_state.analysis_results, indent=2, default=str),
                 file_name=f"zanflow_analysis_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json",
                 mime="application/json"
             )
 
     with tab4:
-        # QRT Dashboard (shortcut)
-        st.header("QRT Quantum Microstructure Dashboard")
         qrt_analyzer = QRTQuantumAnalyzer(config_path="./config/qrt_config.yaml")
         qrt_analyzer.create_qrt_dashboard(st.session_state.df_to_use, f"{selected_symbol} {selected_timeframe}")
 
 else:
-    # Welcome screen
     st.info("👈 Please select and load a Parquet data file from the sidebar to begin analysis")
-    # Instructions
     with st.expander("📖 How to Use This Dashboard"):
         st.markdown('''
         1. **Load Data**: Place your Parquet files in the configured data folder and select from the sidebar

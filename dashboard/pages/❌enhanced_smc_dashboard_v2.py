@@ -14,8 +14,11 @@ from scipy.signal import find_peaks
 # Import from utils folder
 from utils.analysis_engines import SMCAnalyzer, WyckoffAnalyzer
 
-# Bar data directory from your config
-BAR_DATA_DIRECTORY = "/Users/tom/Documents/_trade/_exports/_tick/"
+# Parquet base directory (from secrets if present)
+try:
+    PARQUET_DATA_DIR = st.secrets["PARQUET_DATA_DIR"]
+except Exception:
+    PARQUET_DATA_DIR = "/Users/tom/Documents/_trade/_exports/_tick/out/parquet"
 
 # Data classes for Wyckoff analysis
 @dataclass
@@ -128,6 +131,7 @@ CUSTOM_CSS = """
 </style>
 """
 
+
 def scan_available_symbols(directory):
     """Scans the directory for available CSV files and extracts symbols."""
     symbols = []
@@ -142,49 +146,68 @@ def scan_available_symbols(directory):
         st.error(f"Error scanning directory: {e}")
     return symbols
 
-@st.cache_data
-def load_and_process_data(symbol, directory):
-    """Loads, processes, and analyzes the bar data for a given symbol."""
-    possible_files = [
-        f"{symbol}_M1_bars.csv",
-        f"{symbol}_bars.csv",
-        f"{symbol}_ticks.csv"
-    ]
-    
-    for filename in possible_files:
-        file_path = os.path.join(directory, filename)
-        if os.path.exists(file_path):
-            try:
-                df = pd.read_csv(file_path, sep='\t', engine='python')
-                df.columns = [col.strip() for col in df.columns]
-                df['timestamp'] = pd.to_datetime(df['timestamp'])
-                df.set_index('timestamp', inplace=True)
-                df.sort_index(inplace=True)
-                
-                if 'volume' in df.columns and df['volume'].sum() == 0 and 'tickvol' in df.columns:
-                    df['volume'] = df['tickvol']
 
-                # Run both SMC and Wyckoff analysis
-                smc_analyzer = SMCAnalyzer()
-                smc_results = smc_analyzer.analyze(df)
-                
-                wyckoff_analyzer = WyckoffAnalyzer()
-                wyckoff_results = wyckoff_analyzer.analyze(df)
-                
-                return df, smc_results, wyckoff_results, filename
-            except Exception as e:
-                st.error(f"Error processing {filename}: {e}")
-                continue
-    
-    st.error(f"No data file found for symbol {symbol}")
-    return None, None, None, None
+# ----------- Parquet structure scan -----------
+def scan_parquet_structure(base_dir: str) -> Dict[str, List[str]]:
+    """
+    Walk the parquet directory and build a mapping of {symbol: [timeframes]}.
+    Expects files like  {SYMBOL}/{SYMBOL}_{TF}.parquet
+    """
+    mapping: Dict[str, List[str]] = {}
+    base = Path(base_dir)
+    if not base.exists():
+        return mapping
+    for symbol_dir in base.iterdir():
+        if symbol_dir.is_dir():
+            symbol = symbol_dir.name.upper()
+            tfs = []
+            for f in symbol_dir.glob(f"{symbol}_*.parquet"):
+                # extract timeframe part e.g. BTCUSD_4h.parquet -> 4H
+                tf = f.stem.replace(f"{symbol}_", "").upper()
+                tfs.append(tf)
+            if tfs:
+                mapping[symbol] = sorted(list(set(tfs)))
+    return mapping
+
+
+@st.cache_data
+def load_and_process_data(symbol: str, timeframe: str, base_dir: str):
+    """
+    Load parquet file {base_dir}/{symbol}/{symbol}_{timeframe}.parquet
+    Returns (df, smc_results, wyckoff_results, filename)
+    """
+    file_path = Path(base_dir) / symbol / f"{symbol}_{timeframe}.parquet"
+    if not file_path.exists():
+        st.error(f"File not found: {file_path}")
+        return None, None, None, None
+    try:
+        df = pd.read_parquet(file_path)
+        # ensure timestamp index
+        if 'timestamp' in df.columns:
+            df['timestamp'] = pd.to_datetime(df['timestamp'])
+            df.set_index('timestamp', inplace=True)
+        df.sort_index(inplace=True)
+
+        # ensure volume column
+        vol_cols = [c for c in df.columns if 'vol' in c.lower() or 'volume' in c.lower()]
+        if vol_cols:
+            df['volume'] = df[vol_cols[0]]
+
+        smc_analyzer = SMCAnalyzer()
+        wyckoff_analyzer = WyckoffAnalyzer()
+        smc_results = smc_analyzer.analyze(df)
+        wyckoff_results = wyckoff_analyzer.analyze(df)
+        return df, smc_results, wyckoff_results, file_path.name
+    except Exception as e:
+        st.error(f"Error loading {file_path.name}: {e}")
+        return None, None, None, None
 
 class EnhancedWyckoffAnalysis:
     """Enhanced Wyckoff analysis module"""
-    
+
     def __init__(self):
         self.config = self.load_wyckoff_config()
-    
+
     def load_wyckoff_config(self):
         """Load Wyckoff-specific configuration"""
         return {
@@ -201,7 +224,7 @@ class EnhancedWyckoffAnalysis:
                 'node_threshold': 0.15
             }
         }
-    
+
     def create_wyckoff_chart(self, df, wyckoff_results):
         """Create comprehensive Wyckoff analysis chart"""
         fig = make_subplots(
@@ -211,22 +234,22 @@ class EnhancedWyckoffAnalysis:
             row_heights=[0.5, 0.2, 0.15, 0.15],
             subplot_titles=['Wyckoff Price Action', 'Volume Analysis', 'Effort vs Result', 'Composite Operator']
         )
-        
+
         # Price chart with Wyckoff events
         fig.add_trace(go.Candlestick(
             x=df.index, open=df['open'], high=df['high'], low=df['low'], close=df['close'],
             name='Price', increasing_line_color='#00d084', decreasing_line_color='#ff3860'
         ), row=1, col=1)
-        
+
         # Add Wyckoff events
         for event in wyckoff_results.get('events', [])[:10]:
             event_time = pd.to_datetime(event['time'])
             event_type = event['type']
-            
+
             # Event markers
             color = '#00d084' if event_type in ['Spring', 'PS', 'AR'] else '#ff3860'
             symbol = 'triangle-up' if event_type in ['Spring', 'PS'] else 'triangle-down'
-            
+
             fig.add_trace(go.Scatter(
                 x=[event_time],
                 y=[event['price']],
@@ -236,7 +259,7 @@ class EnhancedWyckoffAnalysis:
                 textposition="top center",
                 showlegend=False
             ), row=1, col=1)
-        
+
         # Trading ranges
         for tr in wyckoff_results.get('trading_ranges', [])[:3]:
             fig.add_shape(
@@ -248,7 +271,7 @@ class EnhancedWyckoffAnalysis:
                 layer='below',
                 row=1, col=1
             )
-        
+
         # Volume with color coding
         volume_patterns = wyckoff_results.get('volume_analysis', {})
         colors = []
@@ -256,20 +279,20 @@ class EnhancedWyckoffAnalysis:
             # Check if this bar is a volume surge or dry-up
             is_surge = any(p['index'] == i for p in volume_patterns.get('volume_surge', []))
             is_dryup = any(p['index'] == i for p in volume_patterns.get('volume_dry_up', []))
-            
+
             if is_surge:
                 colors.append('#9c27b0')  # Purple for surge
             elif is_dryup:
                 colors.append('#ffc13b')  # Yellow for dry-up
             else:
                 colors.append('#00d084' if df['close'].iloc[i] > df['open'].iloc[i] else '#ff3860')
-        
+
         fig.add_trace(go.Bar(
             x=df.index, y=df['volume'],
             marker_color=colors,
             name='Volume'
         ), row=2, col=1)
-        
+
         # Effort vs Result indicator
         effort_result = []
         for pattern in volume_patterns.get('effort_vs_result', []):
@@ -278,7 +301,7 @@ class EnhancedWyckoffAnalysis:
                     'time': pd.to_datetime(pattern['time']),
                     'value': pattern['volume_ratio']
                 })
-        
+
         if effort_result:
             fig.add_trace(go.Scatter(
                 x=[e['time'] for e in effort_result],
@@ -287,10 +310,10 @@ class EnhancedWyckoffAnalysis:
                 marker=dict(size=8, color='orange'),
                 name='High Effort/Low Result'
             ), row=3, col=1)
-        
+
         # Composite Operator activity
         co_analysis = wyckoff_results.get('composite_operator', {})
-        
+
         # Accumulation signs
         for sign in co_analysis.get('accumulation_signs', []):
             if 'range' in sign:
@@ -302,7 +325,7 @@ class EnhancedWyckoffAnalysis:
                     arrowcolor='green',
                     row=4, col=1
                 )
-        
+
         # Distribution signs
         for sign in co_analysis.get('distribution_signs', []):
             fig.add_annotation(
@@ -313,27 +336,27 @@ class EnhancedWyckoffAnalysis:
                 arrowcolor='red',
                 row=4, col=1
             )
-        
+
         fig.update_layout(
             template='plotly_dark',
             height=1000,
             showlegend=False,
             xaxis_rangeslider_visible=False
         )
-        
+
         return fig
-    
+
     def create_volume_profile_chart(self, vp_data):
         """Create volume profile visualization"""
         if not vp_data or 'profile' not in vp_data:
             return None
-        
+
         profile = vp_data['profile']
         prices = list(profile.keys())
         volumes = list(profile.values())
-        
+
         fig = go.Figure()
-        
+
         # Volume profile bars
         fig.add_trace(go.Bar(
             x=volumes,
@@ -342,7 +365,7 @@ class EnhancedWyckoffAnalysis:
             marker_color='rgba(156,39,176,0.5)',
             name='Volume Profile'
         ))
-        
+
         # POC line
         fig.add_hline(
             y=vp_data['poc']['price'],
@@ -350,7 +373,7 @@ class EnhancedWyckoffAnalysis:
             line_width=3,
             annotation_text=f"POC: ${vp_data['poc']['price']:.2f}"
         )
-        
+
         # Value Area
         fig.add_hrect(
             y0=vp_data['val'],
@@ -360,7 +383,7 @@ class EnhancedWyckoffAnalysis:
             annotation_text=f"Value Area ({vp_data['value_area_pct']:.1f}%)",
             annotation_position="right"
         )
-        
+
         # High volume nodes
         for node in vp_data.get('high_volume_nodes', []):
             fig.add_hline(
@@ -369,7 +392,7 @@ class EnhancedWyckoffAnalysis:
                 line_width=1,
                 line_dash='dot'
             )
-        
+
         # Low volume nodes
         for node in vp_data.get('low_volume_nodes', []):
             fig.add_hline(
@@ -378,7 +401,7 @@ class EnhancedWyckoffAnalysis:
                 line_width=1,
                 line_dash='dot'
             )
-        
+
         fig.update_layout(
             template='plotly_dark',
             height=600,
@@ -386,13 +409,14 @@ class EnhancedWyckoffAnalysis:
             xaxis_title="Volume",
             yaxis_title="Price"
         )
-        
+
         return fig
 
 class EnhancedSMCDashboard:
     def __init__(self):
         self.config = self.load_config()
-        self.available_symbols = scan_available_symbols(BAR_DATA_DIRECTORY)
+        self.symbol_timeframes = scan_parquet_structure(PARQUET_DATA_DIR)
+        self.available_symbols = list(self.symbol_timeframes.keys())
         self.wyckoff_module = EnhancedWyckoffAnalysis()
 
     def load_config(self):
@@ -413,36 +437,38 @@ class EnhancedSMCDashboard:
         st.set_page_config(page_title="ZANFLOW Dashboard", page_icon="🎯", layout="wide")
         st.markdown(CUSTOM_CSS, unsafe_allow_html=True)
 
-        # Sidebar with symbol selection
+        # Sidebar with symbol, timeframe, and bars slider
         with st.sidebar:
             st.title("📊 Dashboard Controls")
-            
+
             if self.available_symbols:
-                selected_symbol = st.selectbox(
-                    "Select Symbol",
-                    self.available_symbols,
-                    index=0
-                )
-                
-                st.info(f"📁 Data Directory:\n`{BAR_DATA_DIRECTORY}`")
-                st.info(f"📈 Available Symbols: {len(self.available_symbols)}")
+                selected_symbol = st.selectbox("Select Symbol", self.available_symbols, index=0)
+                tfs = self.symbol_timeframes.get(selected_symbol, [])
+                selected_tf = st.selectbox("Select Timeframe", tfs, index=0) if tfs else None
+                bars_slider = st.slider("Bars to Display", 100, 5000, 500, step=100)
+                st.info(f"📁 Data Dir: `{PARQUET_DATA_DIR}`")
             else:
-                st.error("No symbol files found in the data directory")
-                selected_symbol = None
+                st.error("No parquet data found")
+                selected_symbol = selected_tf = None
+                bars_slider = 500
+
+        self.bars_slider = bars_slider
 
         self.render_header()
-        
-        if selected_symbol:
-            # Load data for selected symbol
-            df, smc_results, wyckoff_results, filename = load_and_process_data(selected_symbol, BAR_DATA_DIRECTORY)
+
+        if selected_symbol and selected_tf:
+            # Load data for selected symbol/timeframe
+            df, smc_results, wyckoff_results, filename = load_and_process_data(
+                selected_symbol, selected_tf, PARQUET_DATA_DIR
+            )
 
             if df is not None and smc_results is not None and wyckoff_results is not None:
                 st.success(f"✅ Loaded: {filename}")
                 self.render_main_content(df, smc_results, wyckoff_results, selected_symbol)
             else:
-                st.warning(f"Could not load data for {selected_symbol}")
+                st.warning(f"Could not load data for {selected_symbol} {selected_tf}")
         else:
-            st.warning("Please check your data directory configuration")
+            st.warning("Please check your parquet data directory/configuration")
 
     def render_header(self):
         st.markdown("""
@@ -454,28 +480,23 @@ class EnhancedSMCDashboard:
 
     def render_main_content(self, df, smc_results, wyckoff_results, symbol):
         tab1, tab2, tab3 = st.tabs(["📊 Advanced Chart", "🏦 SMC Analysis", "🎭 Wyckoff Analysis"])
-        
+
         with tab1:
             self.render_advanced_chart(df, smc_results, wyckoff_results, symbol)
-        
+
         with tab2:
             self.render_smc_analysis_panel(smc_results)
-        
+
         with tab3:
             self.render_wyckoff_analysis(df, wyckoff_results)
 
     def render_advanced_chart(self, df, smc_results, wyckoff_results, symbol):
         """Render the main chart with both SMC and Wyckoff overlays"""
         st.markdown(f"<div class='analysis-card'><div class='card-header'><span class='card-icon'>📈</span>Advanced Price Action - {symbol}</div></div>", unsafe_allow_html=True)
-        
-        # Data range selector
-        col1, col2 = st.columns([1, 3])
-        with col1:
-            bars_to_show = st.slider("Bars to Display", 100, min(2000, len(df)), 500)
-        
+
         # Limit data for plotting performance
-        plot_df = df.tail(bars_to_show)
-        
+        plot_df = df.tail(self.bars_slider)
+
         fig = self.create_advanced_chart(plot_df, smc_results, wyckoff_results)
         st.plotly_chart(fig, use_container_width=True, config={'displayModeBar': True})
 
