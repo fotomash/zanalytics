@@ -1,4 +1,21 @@
 import streamlit as st
+
+# --- PATCH: Add full-page background image via Streamlit markdown ---
+st.markdown(
+    """
+    <style>
+    .stApp {
+        background-image: url("https://images.unsplash.com/photo-1612831455542-b812f6e33a7f?auto=format&fit=crop&w=2850&q=80");
+        background-size: cover;
+        background-position: center;
+        background-repeat: no-repeat;
+        background-attachment: fixed;
+    }
+    </style>
+    """,
+    unsafe_allow_html=True
+)
+
 st.set_page_config(
     page_title="Quantum Microstructure Analyzer",
     layout="wide"

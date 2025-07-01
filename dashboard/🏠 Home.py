@@ -41,23 +41,15 @@ class EconomicDataManager:
     """ Manages fetching live economic data using yfinance. """
 
     def get_dxy_data(self) -> Optional[pd.DataFrame]:
-        """ Fetches weekly OHLC data for DXY for the last year. """
+        """ Fetches 15-min OHLC data for DXY for the last 60 days. """
         try:
             ticker = yf.Ticker("DX-Y.NYB")
-            hist = ticker.history(period="1y", interval="1d")
+            hist = ticker.history(period="60d", interval="15m")
             if not hist.empty:
-                # Resample to weekly
-                hist_weekly = hist.resample('W').agg({
-                    'Open': 'first',
-                    'High': 'max',
-                    'Low': 'min',
-                    'Close': 'last'
-                }).dropna()
-                return hist_weekly.tail(26)  # Last 6 months of weekly data
+                return hist.tail(100)  # Last 100 M15 bars
             return None
         except Exception:
             return None
-
 
 class ZanalyticsDashboard:
     def __init__(self):
@@ -85,6 +77,14 @@ class ZanalyticsDashboard:
     def run(self):
         st.set_page_config(page_title="Zanalytics Dashboard", page_icon="🚀", layout="wide",
                            initial_sidebar_state="expanded")
+        st.markdown("""
+        <style>
+        section[data-testid="stSidebar"] {
+            background-color: rgba(0,0,0,0.8) !important;
+            box-shadow: none !important;
+        }
+        </style>
+        """, unsafe_allow_html=True)
 
         img_base64 = get_image_as_base64("image_af247b.jpg")
         if img_base64:
@@ -102,6 +102,14 @@ class ZanalyticsDashboard:
             </style>
             """
             st.markdown(background_style, unsafe_allow_html=True)
+        # Patch: Add semi-transparent panel background after image is set
+        st.markdown("""
+        <style>
+        .main .block-container {
+            background-color: rgba(0,0,0,0.05) !important;
+        }
+        </style>
+        """, unsafe_allow_html=True)
 
         if not self.data_dir.exists():
             st.error(f"Data directory not found at: `{self.data_dir}`")
@@ -124,11 +132,15 @@ class ZanalyticsDashboard:
                 max-width: 900px;
                 text-align: center;
                 padding: 0.2em 0 0.1em 0;
+                background: linear-gradient(to right, rgba(103,116,255,0.25), rgba(176,66,255,0.25));
+                border-radius: 12px;
+                border: 2px solid rgba(251,213,1,0.4);
+                box-shadow: 0 2px 12px rgba(103,116,255,0.10);
             '>
                 <span style='
                     font-size: 1.65rem;
                     font-weight: 700;
-                    color: #4ff4de;
+                    color: #fff;
                     letter-spacing: -0.02em;
                     display: block;
                     margin-bottom: 0.15em;
@@ -137,7 +149,7 @@ class ZanalyticsDashboard:
                 </span>
                 <span style='
                     font-size: 1.09rem;
-                    color: #b2d9e8;
+                    color: #eee;
                     font-weight: 600;
                     display: block;
                     margin-bottom: 0.2em;
@@ -146,7 +158,7 @@ class ZanalyticsDashboard:
                 </span>
                 <span style='
                     font-size: 1.01rem;
-                    color: #90b5b5;
+                    color: #dbeafe;
                     display: block;
                     margin-bottom: 0.25em;
                 '>
@@ -165,14 +177,14 @@ class ZanalyticsDashboard:
             unsafe_allow_html=True
         )
 
-        # --- Microstructure 3D Surface Demo (BTCUSD only) ---
+        # --- Microstructure 3D Surface Demo (XAUUSD) ---
         import plotly.graph_objects as go
 
-        btc_ticks_path = Path(st.secrets["raw_data_directory"]) / "BTCUSD_ticks.csv"
-        if btc_ticks_path.exists():
+        xau_ticks_path = Path(st.secrets["raw_data_directory"]) / "XAUUSD_ticks.csv"
+        if xau_ticks_path.exists():
             try:
                 # Ingest standard comma‑separated CSV (no custom delimiter)
-                df_ticks = pd.read_csv(btc_ticks_path, nrows=1000, encoding_errors='ignore')
+                df_ticks = pd.read_csv(xau_ticks_path, nrows=1000, encoding_errors='ignore')
                 if 'timestamp' in df_ticks.columns:
                     df_ticks['timestamp'] = pd.to_datetime(df_ticks['timestamp'], errors='coerce')
                 if 'bid' in df_ticks.columns and 'ask' in df_ticks.columns:
@@ -199,7 +211,7 @@ class ZanalyticsDashboard:
                         )]
                     )
                     fig.update_layout(
-                        title="BTCUSD Microstructure 3D Volume Map (Recent Tick Data)",
+                        title="XAUUSD Microstructure 3D Volume Map (Recent Tick Data)",
                         autosize=True,
                         height=400,
                         margin=dict(l=40, r=40, t=60, b=40),
@@ -208,16 +220,17 @@ class ZanalyticsDashboard:
                             xaxis_title="Time Bin",
                             yaxis_title="Price Bin",
                             zaxis_title="Inferred Volume"
-                        )
+                        ),
+                        paper_bgcolor="rgba(0,0,0,0.05)",
+                        plot_bgcolor="rgba(0,0,0,0.05)",
                     )
-                    # Only show the Plotly chart title for the BTCUSD 3D chart (remove st.markdown title)
                     st.plotly_chart(fig, use_container_width=True)
                 else:
                     st.info("Not enough tick data for 3D surface.")
             except Exception as e:
-                st.warning(f"Error loading or plotting BTC tick file: {e}")
+                st.warning(f"Error loading or plotting XAU tick file: {e}")
         else:
-            st.info("BTCUSD tick data not found for 3D surface demo.")
+            st.info("XAUUSD tick data not found for 3D surface demo.")
 
         self.create_dxy_chart()
         st.markdown(
@@ -250,6 +263,8 @@ class ZanalyticsDashboard:
                 margin=dict(l=20, r=20, t=40, b=20),
                 template=st.session_state.get('chart_theme', 'plotly_dark'),
                 height=440,
+                paper_bgcolor="rgba(0,0,0,0.05)",
+                plot_bgcolor="rgba(0,0,0,0.05)",
             )
             # Only show the Plotly chart title for the DXY 3D chart (remove st.markdown title)
             st.plotly_chart(fig3d, use_container_width=True)
@@ -257,14 +272,14 @@ class ZanalyticsDashboard:
         st.markdown("<hr style='margin-top:1.5rem'>", unsafe_allow_html=True)
 
         latest_yields, previous_yields = self.get_10y_yields()
-        st.markdown("""xx
+        st.markdown("""
 <style>
 .yields-table {
-    background: #1a222d;
+    background: rgba(26,34,45,0.85);
     color: #e7eaf0;
     font-size: 1.05rem;
     border-radius: 8px;
-    border: 1px solid #253047;
+    border: 1px solid rgba(37,48,71,0.4);
     box-shadow: 0 2px 8px rgba(0,0,0,0.06);
     margin-bottom: 1.5rem;
     margin-top: 0.5rem;
@@ -279,6 +294,15 @@ class ZanalyticsDashboard:
 """, unsafe_allow_html=True)
 
         st.markdown("<h5 style='text-align:center;'>🌍 10‑Year Government Bond Yields</h5>", unsafe_allow_html=True)
+        st.markdown("""
+<div style='
+    background-color: rgba(0, 0, 0, 0.25);
+    padding: 1.1rem;
+    margin: 0.8rem 0 1.4rem 0;
+    border-radius: 12px;
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.12);
+'>
+""", unsafe_allow_html=True)
         cols = st.columns(len(latest_yields))
         for i, (country, val) in enumerate(latest_yields.items()):
             prev_val = previous_yields.get(country)
@@ -286,6 +310,7 @@ class ZanalyticsDashboard:
             if prev_val is not None and val != "N/A":
                 delta = round(val - prev_val, 3)
             cols[i].metric(country, f"{val}%" if val != 'N/A' else val, delta)
+        st.markdown("</div>", unsafe_allow_html=True)
 
         # Move the "About Zanalytics Trading Frameworks" expander here, after yields table, before datasets and footer
         with st.expander("ℹ️ About Zanalytics Trading Frameworks"):
@@ -394,7 +419,9 @@ class ZanalyticsDashboard:
                 showlegend=False,
                 yaxis_title="DXY Value",
                 xaxis_title="Date",
-                xaxis_rangeslider_visible=False
+                xaxis_rangeslider_visible=False,
+                paper_bgcolor="rgba(0,0,0,0.05)",
+                plot_bgcolor="rgba(0,0,0,0.05)",
             )
             st.plotly_chart(fig, use_container_width=True)
         else:

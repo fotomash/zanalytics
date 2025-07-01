@@ -51,6 +51,34 @@ class MultiTimeframeDashboard:
         st.set_page_config(page_title="Zanalytics - Multi-Timeframe", page_icon="⏱️", layout="wide",
                            initial_sidebar_state="expanded")
 
+        import base64
+        def get_image_as_base64(path):
+            try:
+                with open(path, "rb") as image_file:
+                    return base64.b64encode(image_file.read()).decode()
+            except FileNotFoundError:
+                st.warning(f"Background image not found at '{path}'")
+                return None
+
+        img_base64 = get_image_as_base64("theme/image_af247b.jpg")
+        if img_base64:
+            st.markdown(f"""
+            <style>
+            [data-testid="stAppViewContainer"] > .main {{
+                background: linear-gradient(rgba(0,0,0,0.85), rgba(0,0,0,0.85)), url(data:image/jpeg;base64,{img_base64}) !important;
+                background-size: cover !important;
+                background-position: center !important;
+                background-repeat: no-repeat !important;
+                background-attachment: fixed !important;
+                background-color: transparent !important;
+            }}
+            body, .block-container {{
+                background: none !important;
+                background-color: transparent !important;
+            }}
+            </style>
+            """, unsafe_allow_html=True)
+
         st.markdown("""
             <style>
             #MainMenu {visibility: hidden;}
@@ -207,22 +235,32 @@ class MultiTimeframeDashboard:
         if df is None or df.empty:
             return metrics
 
-        last_row = df.iloc[-1]
-        for col in columns_to_extract:
-            if col in df.columns and pd.notna(last_row[col]):
-                val = last_row[col]
-                if isinstance(val, (int, float)):
-                    if abs(val) > 1000:
-                        metrics[col] = f"{val:,.0f}"
+        try:
+            last_row = df.iloc[-1]
+            for col in columns_to_extract:
+                if col in df.columns:
+                    value = last_row[col]
+                    if isinstance(value, pd.Series):
+                        value = value.iloc[0]
+                    if pd.notna(value):
+                        val = value
+                        if isinstance(val, (int, float)):
+                            if abs(val) > 1000:
+                                metrics[col] = f"{val:,.0f}"
+                            else:
+                                metrics[col] = f"{val:.4f}"
+                        else:
+                            metrics[col] = val
                     else:
-                        metrics[col] = f"{val:.4f}"
+                        metrics[col] = np.nan
                 else:
-                    metrics[col] = val
-            else:
+                    metrics[col] = np.nan
+        except Exception:
+            # Ensure the method always returns a dictionary even if something goes wrong
+            for col in columns_to_extract:
                 metrics[col] = np.nan
 
         return metrics
-
     def scan_all_data_sources(self) -> Dict[str, Dict[str, str]]:
         """Scans for data files in the configured directory and its subdirectories."""
         data_sources = {}

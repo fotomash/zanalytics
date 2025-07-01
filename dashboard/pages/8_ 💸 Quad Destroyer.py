@@ -1,9 +1,9 @@
+#!/usr/bin/env python3
 def price_fmt(val, symbol):
     """Return price formatted for symbol: 5dp for forex, 2dp for XAUUSD."""
     if symbol.upper() == "XAUUSD":
         return f"{val:,.2f}"
     return f"{val:,.5f}"
-#!/usr/bin/env python3
 """
 ZANFLOW v12 - Institutional Grade Visual Trading Dashboard
 Advanced SMC • Midas Model • London Killzone • Wyckoff Analysis
@@ -24,6 +24,43 @@ import logging
 import json
 from pathlib import Path
 import math
+# st.set_page_config(
+#     page_title="🏛️ ZANFLOW v12 - Institutional Trading Dashboard",
+#     page_icon="🏛️",
+#     layout="wide",
+#     initial_sidebar_state="expanded"
+# )
+
+# --- Add background image as base64 and style ---
+import base64
+def get_image_as_base64(path):
+    try:
+        with open(path, "rb") as image_file:
+            return base64.b64encode(image_file.read()).decode()
+    except FileNotFoundError:
+        # Only warn after config is set
+        return None
+
+img_base64 = get_image_as_base64("theme/image_af247b.jpg")
+if img_base64:
+    st.markdown(f"""
+    <style>
+    [data-testid="stAppViewContainer"] > .main {{
+        background: linear-gradient(rgba(0,0,0,0.85), rgba(0,0,0,0.85)), url(data:image/jpeg;base64,{img_base64}) !important;
+        background-size: cover !important;
+        background-position: center !important;
+        background-repeat: no-repeat !important;
+        background-attachment: fixed !important;
+        background-color: transparent !important;
+    }}
+    body, .block-container {{
+        background: none !important;
+        background-color: transparent !important;
+    }}
+    </style>
+    """, unsafe_allow_html=True)
+elif img_base64 is None:
+    st.warning(f"Background image not found at 'theme/image_af247b.jpg'")
 
 # === DYNAMIC PARQUET LOADING FOR MULTI-SYMBOL SUPPORT ===
 PARQUET_DATA_DIR = Path(st.secrets.get("PARQUET_DATA_DIR", "/Users/tom/Documents/_trade/_exports/_tick/out/parquet"))
@@ -43,19 +80,8 @@ warnings.filterwarnings('ignore')
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# ============================================================================
-# PAGE CONFIGURATION - INSTITUTIONAL GOLD TRADING THEME
-# ============================================================================
-
 def setup_institutional_page():
-    """Setup institutional-grade page configuration"""
-    st.set_page_config(
-        page_title="🏛️ ZANFLOW v12 - Institutional Trading Dashboard",
-        page_icon="🏛️",
-        layout="wide",
-        initial_sidebar_state="expanded"
-    )
-
+    """Setup institutional-grade page configuration (styling only)"""
     # Ultra-Professional Institutional Styling
     st.markdown("""
         <style>
@@ -1393,7 +1419,7 @@ def generate_zbar_logs(df: pd.DataFrame, analysis: Dict, timeframe: str) -> List
 def main():
     """Main ZANFLOW v12 Institutional Dashboard Application"""
 
-    # Setup institutional page
+    # Setup institutional page (styling only)
     setup_institutional_page()
 
     # Institutional Header

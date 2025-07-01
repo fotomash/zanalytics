@@ -19,17 +19,61 @@ import math
 warnings.filterwarnings('ignore')
 
 # ============================================================================
+# BACKGROUND IMAGE SETUP
+# ============================================================================
+import base64
+
+def get_image_as_base64(path):
+    try:
+        with open(path, "rb") as image_file:
+            return base64.b64encode(image_file.read()).decode()
+    except FileNotFoundError:
+        st.warning(f"Background image not found at '{path}'")
+        return None
+
+img_base64 = get_image_as_base64("theme/image_af247b.jpg")
+if img_base64:
+    st.markdown(f"""
+    <style>
+    [data-testid="stAppViewContainer"] > .main {{
+        background: linear-gradient(rgba(0,0,0,0.85), rgba(0,0,0,0.85)), url(data:image/jpeg;base64,{img_base64}) !important;
+        background-size: cover !important;
+        background-position: center !important;
+        background-repeat: no-repeat !important;
+        background-attachment: fixed !important;
+        background-color: transparent !important;
+    }}
+    body, .block-container {{
+        background: none !important;
+        background-color: transparent !important;
+    }}
+    </style>
+    """, unsafe_allow_html=True)
+
+# Set main content width to exactly 998px
+st.markdown("""
+<style>
+/* Set main content width to exactly 998px */
+.main .block-container {
+    max-width: 998px !important;
+    padding-left: 1.5vw;
+    padding-right: 1.5vw;
+}
+</style>
+""", unsafe_allow_html=True)
+
+# ============================================================================
 # PAGE CONFIGURATION
 # ============================================================================
 
 def setup_page():
     """Setup page with professional gold trading theme"""
-    st.set_page_config(
-        page_title="🥇 XAUUSD Professional Trading Dashboard",
-        page_icon="🥇",
-        layout="wide",
-        initial_sidebar_state="expanded"
-    )
+    # st.set_page_config(
+    #     page_title="🥇 XAUUSD Professional Trading Dashboard",
+    #     page_icon="🥇",
+    #     layout="wide",
+    #     initial_sidebar_state="expanded"
+    # )
 
     # Professional Gold Trading CSS
     st.markdown("""
