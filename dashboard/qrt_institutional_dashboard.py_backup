@@ -1,0 +1,1361 @@
+# qrt_institutional_dashboard.py
+import streamlit as st
+import pandas as pd
+import numpy as np
+import plotly.graph_objects as go
+from plotly.subplots import make_subplots
+from datetime import datetime, timedelta
+from typing import Dict, List, Tuple, Optional
+import yaml
+from dataclasses import dataclass
+from scipy.signal import find_peaks
+import csv
+
+# Flexible CSV loader with delimiter detection and column normalization
+def load_any_csv(file):
+    # Try to auto-detect delimiter: comma or tab or semicolon
+    sample = file.read(1024)
+    file.seek(0)
+    dialect = csv.Sniffer().sniff(sample.decode() if isinstance(sample, bytes) else sample, delimiters=',\t;')
+    sep = dialect.delimiter
+    df = pd.read_csv(file, sep=sep)
+    df.columns = [c.strip().lower().replace(" ", "") for c in df.columns]
+    return df
+
+@dataclass
+class MarketMetrics:
+    current_price: float
+    change_24h: float
+    volume_24h: float
+    volatility: float
+    high_24h: float
+    low_24h: float
+
+@dataclass
+class LiquidityZone:
+    price: float
+    type: str  # 'buy_side' or 'sell_side'
+    strength: float
+    touches: int
+    swept: bool = False
+
+@dataclass
+class OrderBlock:
+    type: str  # 'bullish' or 'bearish'
+    high: float
+    low: float
+    strength: float
+    volume: float
+    mitigated: bool = False
+    timestamp: pd.Timestamp = None
+
+@dataclass
+class FairValueGap:
+    type: str  # 'bullish' or 'bearish'
+    high: float
+    low: float
+    size: float
+    filled: bool = False
+    timestamp: pd.Timestamp = None
+
+class QRTInstitutionalAnalyzer:
+    def __init__(self, config_path: str):
+        with open(config_path, 'r') as f:
+            self.config = yaml.safe_load(f)
+
+        self.session_state = {
+            'market_metrics': None,
+            'liquidity_zones': [],
+            'order_blocks': [],
+            'fvg_zones': [],
+            'wyckoff_phase': 'Unknown',
+            'wyckoff_events': [],
+            'volume_profile': {},
+            'market_structure': [],
+            'current_bias': 'Neutral'
+        }
+
+    def calculate_market_metrics(self, df: pd.DataFrame) -> MarketMetrics:
+        """Calculate current market metrics"""
+        current_price = df['close'].iloc[-1]
+
+        # 24h data (assuming we have at least 24h of data)
+        df_24h = df.tail(1440) if len(df) > 1440 else df  # 1440 minutes in 24h
+
+        high_24h = df_24h['high'].max()
+        low_24h = df_24h['low'].min()
+        volume_24h = df_24h['volume'].sum()
+
+        # Calculate 24h change
+        price_24h_ago = df_24h['close'].iloc[0]
+        change_24h = ((current_price - price_24h_ago) / price_24h_ago) * 100
+
+        # Calculate volatility (using ATR-based approach)
+        df['tr'] = np.maximum(
+            df['high'] - df['low'],
+            np.maximum(
+                abs(df['high'] - df['close'].shift()),
+                abs(df['low'] - df['close'].shift())
+            )
+        )
+        volatility = (df['tr'].tail(24).mean() / current_price) * 100
+
+        return MarketMetrics(
+            current_price=current_price,
+            change_24h=change_24h,
+            volume_24h=volume_24h,
+            volatility=volatility,
+            high_24h=high_24h,
+            low_24h=low_24h
+        )
+
+    def detect_liquidity_zones(self, df: pd.DataFrame) -> List[LiquidityZone]:
+        """Detect buy-side and sell-side liquidity zones"""
+        zones = []
+        lookback = (
+            self.config.get('modules', {})
+            .get('smc_detector', {})
+            .get('liquidity_zones', {})
+            .get('lookback', 50)
+        )
+
+        # Find swing highs and lows
+        highs = df['high'].rolling(window=20, center=True).max()
+        lows = df['low'].rolling(window=20, center=True).min()
+
+        # Identify equal highs/lows (liquidity pools)
+        for i in range(lookback, len(df)):
+            window_high = df['high'].iloc[i-lookback:i]
+            window_low = df['low'].iloc[i-lookback:i]
+
+            # Check for equal highs (sell-side liquidity)
+            high_counts = window_high.round(2).value_counts()
+            for price, count in high_counts.items():
+                if count >= 2:  # At least 2 touches
+                    strength = count / lookback * self.config.get('modules', {}).get('smc_detector', {}).get('liquidity_zones', {}).get('strength_decay', 0.8)
+                    zones.append(LiquidityZone(
+                        price=price,
+                        type='sell_side',
+                        strength=min(strength, 1.0),
+                        touches=count
+                    ))
+
+            # Check for equal lows (buy-side liquidity)
+            low_counts = window_low.round(2).value_counts()
+            for price, count in low_counts.items():
+                if count >= 2:
+                    strength = count / lookback * self.config.get('modules', {}).get('smc_detector', {}).get('liquidity_zones', {}).get('strength_decay', 0.8)
+                    zones.append(LiquidityZone(
+                        price=price,
+                        type='buy_side',
+                        strength=min(strength, 1.0),
+                        touches=count
+                    ))
+
+        # Remove duplicates and sort by strength
+        unique_zones = {}
+        for zone in zones:
+            key = (zone.price, zone.type)
+            if key not in unique_zones or zone.strength > unique_zones[key].strength:
+                unique_zones[key] = zone
+
+        return sorted(unique_zones.values(), key=lambda x: x.strength, reverse=True)[:10]
+
+    def detect_order_blocks(self, df: pd.DataFrame) -> List[OrderBlock]:
+        """Detect institutional order blocks"""
+        order_blocks = []
+        min_strength = self.config.get('modules', {}).get('smc_detector', {}).get('order_blocks', {}).get('min_strength', 0.01)
+        vol_multiplier = self.config.get('modules', {}).get('smc_detector', {}).get('order_blocks', {}).get('volume_multiplier', 1.2)
+
+        # Calculate volume moving average
+        df['vol_ma'] = df['volume'].rolling(20).mean()
+
+        for i in range(3, len(df) - 3):
+            # Bullish order block: Down candle before strong up move
+            if (df['close'].iloc[i] < df['open'].iloc[i] and  # Down candle
+                df['close'].iloc[i+1] > df['high'].iloc[i] and  # Strong up move
+                df['volume'].iloc[i] > df['vol_ma'].iloc[i] * vol_multiplier):
+
+                strength = (df['close'].iloc[i+1] - df['high'].iloc[i]) / df['high'].iloc[i]
+                if strength > min_strength:
+                    order_blocks.append(OrderBlock(
+                        type='bullish',
+                        high=df['high'].iloc[i],
+                        low=df['low'].iloc[i],
+                        strength=strength,
+                        volume=df['volume'].iloc[i],
+                        timestamp=df.index[i]
+                    ))
+
+            # Bearish order block: Up candle before strong down move
+            elif (df['close'].iloc[i] > df['open'].iloc[i] and  # Up candle
+                  df['close'].iloc[i+1] < df['low'].iloc[i] and  # Strong down move
+                  df['volume'].iloc[i] > df['vol_ma'].iloc[i] * vol_multiplier):
+
+                strength = (df['low'].iloc[i] - df['close'].iloc[i+1]) / df['low'].iloc[i]
+                if strength > min_strength:
+                    order_blocks.append(OrderBlock(
+                        type='bearish',
+                        high=df['high'].iloc[i],
+                        low=df['low'].iloc[i],
+                        strength=strength,
+                        volume=df['volume'].iloc[i],
+                        timestamp=df.index[i]
+                    ))
+
+        # Keep only the strongest order blocks
+        return sorted(order_blocks, key=lambda x: x.strength, reverse=True)[:10]
+
+    def detect_fvg(self, df: pd.DataFrame) -> List[FairValueGap]:
+        """Detect Fair Value Gaps (Imbalances)"""
+        gaps = []
+        min_gap_size = self.config.get('modules', {}).get('smc_detector', {}).get('fvg_scanner', {}).get('min_gap_size', 0.0002)
+
+        for i in range(2, len(df)):
+            # Bullish FVG: Gap between current low and previous high
+            gap_up = df['low'].iloc[i] - df['high'].iloc[i-2]
+            if gap_up > df['close'].iloc[i] * min_gap_size:
+                gaps.append(FairValueGap(
+                    type='bullish',
+                    high=df['low'].iloc[i],
+                    low=df['high'].iloc[i-2],
+                    size=gap_up,
+                    timestamp=df.index[i]
+                ))
+
+            # Bearish FVG: Gap between previous low and current high
+            gap_down = df['low'].iloc[i-2] - df['high'].iloc[i]
+            if gap_down > df['close'].iloc[i] * min_gap_size:
+                gaps.append(FairValueGap(
+                    type='bearish',
+                    high=df['low'].iloc[i-2],
+                    low=df['high'].iloc[i],
+                    size=gap_down,
+                    timestamp=df.index[i]
+                ))
+
+        return sorted(gaps, key=lambda x: x.size, reverse=True)[:10]
+
+    def analyze_wyckoff_phase(self, df: pd.DataFrame) -> Tuple[str, List[Dict]]:
+        """Determine current Wyckoff phase and detect events"""
+        window = self.config.get('modules', {}).get('wyckoff_analyzer', {}).get('phase_detection', {}).get('window', 120)
+        recent = df.tail(window)
+
+        # Volume analysis
+        volume_trend = np.polyfit(range(len(recent)), recent['volume'].values, 1)[0]
+
+        # Price range analysis
+        price_range = recent['high'].max() - recent['low'].min()
+        avg_range = (recent['high'] - recent['low']).mean()
+
+        # Determine phase
+        if volume_trend > 0 and price_range < avg_range * 2:
+            phase = "Accumulation"
+        elif volume_trend < 0 and price_range < avg_range * 2:
+            phase = "Distribution"
+        elif volume_trend > 0 and price_range > avg_range * 2.5:
+            phase = "Markup"
+        elif volume_trend < 0 and price_range > avg_range * 2.5:
+            phase = "Markdown"
+        else:
+            phase = "Trading Range"
+
+        # Detect Wyckoff events
+        events = self._detect_wyckoff_events(df)
+
+        return phase, events
+
+    def _detect_wyckoff_events(self, df: pd.DataFrame) -> List[Dict]:
+        """Detect specific Wyckoff events"""
+        events = []
+        vol_threshold = self.config.get('modules', {}).get('wyckoff_analyzer', {}).get('event_detection', {}).get('volume_threshold', 1.2)
+
+        # Recent price and volume
+        df['vol_ma'] = df['volume'].rolling(20).mean()
+
+        for i in range(50, len(df) - 5):
+            # Spring detection
+            support_level = df['low'].iloc[i-50:i].min()
+            if (df['low'].iloc[i] < support_level * 0.998 and  # Break below support
+                df['close'].iloc[i] > support_level and  # Close back above
+                df['volume'].iloc[i] > df['vol_ma'].iloc[i] * vol_threshold):
+
+                events.append({
+                    'type': 'Spring',
+                    'timestamp': df.index[i],
+                    'price': df['low'].iloc[i],
+                    'description': 'Spring detected'
+                })
+
+            # Upthrust detection
+            resistance_level = df['high'].iloc[i-50:i].max()
+            if (df['high'].iloc[i] > resistance_level * 1.002 and  # Break above resistance
+                df['close'].iloc[i] < resistance_level and  # Close back below
+                df['volume'].iloc[i] > df['vol_ma'].iloc[i] * vol_threshold):
+
+                events.append({
+                    'type': 'Upthrust',
+                    'timestamp': df.index[i],
+                    'price': df['high'].iloc[i],
+                    'description': 'Upthrust detected'
+                })
+
+            # Secondary Test
+            if i > 0 and len(events) > 0:
+                last_event = events[-1]
+                if (last_event['type'] in ['Spring', 'Upthrust'] and
+                    i - df.index.get_loc(last_event['timestamp']) < 20):
+
+                    test_vol_ratio = self.config.get('modules', {}).get('wyckoff_analyzer', {}).get('event_detection', {}).get('test_volume_ratio', 0.5)
+                    if df['volume'].iloc[i] < df['vol_ma'].iloc[i] * test_vol_ratio:
+                        events.append({
+                            'type': 'ST',
+                            'timestamp': df.index[i],
+                            'price': df['close'].iloc[i],
+                            'description': 'Secondary Test'
+                        })
+
+        return sorted(events, key=lambda x: x['timestamp'], reverse=True)[:10]
+
+    def calculate_volume_profile(self, df: pd.DataFrame) -> Dict:
+        """Calculate volume profile with POC, VAH, VAL"""
+        bins = self.config.get('modules', {}).get('volume_profiler', {}).get('bins', 48)
+        value_area_pct = self.config.get('modules', {}).get('volume_profiler', {}).get('value_area_percent', 0.7)
+
+        # Create price bins
+        price_min = df['low'].min()
+        price_max = df['high'].max()
+        price_bins = np.linspace(price_min, price_max, bins)
+
+        # Calculate volume at each price level
+        volume_profile = {}
+        for i in range(len(price_bins) - 1):
+            mask = (df['low'] <= price_bins[i+1]) & (df['high'] >= price_bins[i])
+            volume_profile[price_bins[i]] = df.loc[mask, 'volume'].sum()
+
+        # Find POC (Point of Control)
+        poc_price = max(volume_profile, key=volume_profile.get)
+        poc_volume = volume_profile[poc_price]
+
+        # Calculate Value Area
+        sorted_prices = sorted(volume_profile.items(), key=lambda x: x[1], reverse=True)
+        total_volume = sum(v for _, v in sorted_prices)
+        value_area_volume = total_volume * value_area_pct
+
+        cumulative_volume = 0
+        value_area_prices = []
+        for price, vol in sorted_prices:
+            cumulative_volume += vol
+            value_area_prices.append(price)
+            if cumulative_volume >= value_area_volume:
+                break
+
+        vah = max(value_area_prices)
+        val = min(value_area_prices)
+
+        # Find high/low volume nodes
+        threshold = self.config.get('modules', {}).get('volume_profiler', {}).get('node_threshold', 0.15)
+        avg_volume = total_volume / len(volume_profile)
+
+        high_volume_nodes = [p for p, v in volume_profile.items()
+                            if v > avg_volume * (1 + threshold)]
+        low_volume_nodes = [p for p, v in volume_profile.items()
+                           if v < avg_volume * (1 - threshold)]
+
+        return {
+            'profile': volume_profile,
+            'poc': {'price': poc_price, 'volume': poc_volume},
+            'vah': vah,
+            'val': val,
+            'value_area_pct': (cumulative_volume / total_volume) * 100,
+            'high_volume_nodes': sorted(high_volume_nodes)[:5],
+            'low_volume_nodes': sorted(low_volume_nodes)[:5]
+        }
+
+    def analyze_market_structure(self, df: pd.DataFrame) -> List[Dict]:
+        """Analyze market structure breaks and bias"""
+        structure_events = []
+
+        # Find swing highs and lows
+        for i in range(20, len(df) - 20):
+            # Swing high
+            if df['high'].iloc[i] == df['high'].iloc[i-20:i+20].max():
+                structure_events.append({
+                    'type': 'swing_high',
+                    'price': df['high'].iloc[i],
+                    'timestamp': df.index[i],
+                    'index': i
+                })
+
+            # Swing low
+            if df['low'].iloc[i] == df['low'].iloc[i-20:i+20].min():
+                structure_events.append({
+                    'type': 'swing_low',
+                    'price': df['low'].iloc[i],
+                    'timestamp': df.index[i],
+                    'index': i
+                })
+
+        # Identify structure breaks
+        for i in range(2, len(structure_events)):
+            curr = structure_events[i]
+            prev = structure_events[i-1]
+            prev_prev = structure_events[i-2]
+
+            # Bullish structure break
+            if (curr['type'] == 'swing_high' and
+                prev['type'] == 'swing_low' and
+                prev_prev['type'] == 'swing_high' and
+                curr['price'] > prev_prev['price']):
+
+                structure_events.append({
+                    'type': 'bullish_break',
+                    'price': curr['price'],
+                    'timestamp': curr['timestamp'],
+                    'description': 'Bullish structure break'
+                })
+
+            # Bearish structure break
+            elif (curr['type'] == 'swing_low' and
+                  prev['type'] == 'swing_high' and
+                  prev_prev['type'] == 'swing_low' and
+                  curr['price'] < prev_prev['price']):
+
+                structure_events.append({
+                    'type': 'bearish_break',
+                    'price': curr['price'],
+                    'timestamp': curr['timestamp'],
+                    'description': 'Bearish structure break'
+                })
+
+        # Get latest structure break for bias
+        breaks = [e for e in structure_events if 'break' in e['type']]
+        if breaks:
+            latest_break = max(breaks, key=lambda x: x['timestamp'])
+            self.session_state['current_bias'] = 'Bullish' if 'bullish' in latest_break['type'] else 'Bearish'
+
+        return sorted(structure_events, key=lambda x: x['timestamp'], reverse=True)[:20]
+
+    def create_main_chart(self, df: pd.DataFrame):
+        """Create the main price chart with all SMC/Wyckoff elements"""
+        fig = make_subplots(
+            rows=3, cols=1,
+            shared_xaxes=True,
+            vertical_spacing=0.03,
+            row_heights=[0.7, 0.15, 0.15],
+            subplot_titles=['Price Action with SMC & Wyckoff', 'Volume', 'Market Structure']
+        )
+
+        # Candlestick chart
+        fig.add_trace(
+            go.Candlestick(
+                x=df.index,
+                open=df['open'],
+                high=df['high'],
+                low=df['low'],
+                close=df['close'],
+                name='Price',
+                increasing=dict(line=dict(color='#26a69a')),
+                decreasing=dict(line=dict(color='#ef5350'))
+            ),
+            row=1, col=1
+        )
+
+        # Add order blocks
+        for ob in self.session_state['order_blocks']:
+            color = 'rgba(38,166,154,0.2)' if ob.type == 'bullish' else 'rgba(239,83,80,0.2)'
+            fig.add_shape(
+                type="rect",
+                x0=ob.timestamp,
+                x1=df.index[-1],
+                y0=ob.low,
+                y1=ob.high,
+                fillcolor=color,
+                line=dict(width=1, color=color.replace('0.2', '0.8')),
+                layer="below",
+                row=1, col=1
+            )
+
+            # Add label
+            fig.add_annotation(
+                x=ob.timestamp,
+                y=ob.high if ob.type == 'bearish' else ob.low,
+                text=f"OB {ob.strength:.1%}",
+                showarrow=False,
+                font=dict(size=10),
+                row=1, col=1
+            )
+
+        # Add FVG zones
+        for fvg in self.session_state['fvg_zones']:
+            if not fvg.filled:
+                color = 'rgba(33,150,243,0.15)' if fvg.type == 'bullish' else 'rgba(255,152,0,0.15)'
+                fig.add_shape(
+                    type="rect",
+                    x0=fvg.timestamp,
+                    x1=df.index[-1],
+                    y0=fvg.low,
+                    y1=fvg.high,
+                    fillcolor=color,
+                    line=dict(width=1, dash='dot', color=color.replace('0.15', '0.5')),
+                    row=1, col=1
+                )
+
+        # Add liquidity zones
+        for lz in self.session_state['liquidity_zones'][:5]:  # Top 5 zones
+            color = '#4caf50' if lz.type == 'buy_side' else '#f44336'
+            fig.add_hline(
+                y=lz.price,
+                line_color=color,
+                line_dash="dash",
+                line_width=1,
+                opacity=0.7,
+                annotation_text=f"{lz.type} ({lz.touches}x)",
+                annotation_position="right",
+                row=1, col=1
+            )
+
+        # Add Wyckoff events
+        for event in self.session_state['wyckoff_events'][:5]:
+            symbol = 'triangle-up' if event['type'] == 'Spring' else 'triangle-down' if event['type'] == 'Upthrust' else 'circle'
+            color = 'lime' if event['type'] == 'Spring' else 'orange' if event['type'] == 'Upthrust' else 'blue'
+
+            fig.add_trace(
+                go.Scatter(
+                    x=[event['timestamp']],
+                    y=[event['price']],
+                    mode='markers+text',
+                    marker=dict(symbol=symbol, size=12, color=color),
+                    text=event['type'],
+                    textposition="top center",
+                    showlegend=False
+                ),
+                row=1, col=1
+            )
+
+        # Volume Profile on y-axis
+        vp = self.session_state['volume_profile']
+        if vp:
+            vol_x = list(vp['profile'].values())
+            vol_y = list(vp['profile'].keys())
+
+            # Normalize volume for display
+            max_vol = max(vol_x) if vol_x else 1
+            vol_x_norm = [v/max_vol * 0.3 for v in vol_x]  # Scale to 30% of chart width
+
+            fig.add_trace(
+                go.Scatter(
+                    x=vol_x_norm,
+                    y=vol_y,
+                    mode='lines',
+                    fill='tozerox',
+                    fillcolor='rgba(156,39,176,0.2)',
+                    line=dict(color='#9c27b0', width=1),
+                    xaxis='x2',
+                    name='Volume Profile',
+                    showlegend=False
+                ),
+                row=1, col=1
+            )
+
+            # POC line
+            fig.add_hline(
+                y=vp['poc']['price'],
+                line_color='#9c27b0',
+                line_width=2,
+                annotation_text=f"POC: ${vp['poc']['price']:.2f}",
+                annotation_position="left",
+                row=1, col=1
+            )
+
+            # Value Area
+            fig.add_hrect(
+                y0=vp['val'],
+                y1=vp['vah'],
+                fillcolor='rgba(156,39,176,0.1)',
+                line_width=0,
+                row=1, col=1
+            )
+
+        # Volume bars
+        colors = ['#26a69a' if df['close'].iloc[i] > df['open'].iloc[i] else '#ef5350'
+                  for i in range(len(df))]
+        fig.add_trace(
+            go.Bar(
+                x=df.index,
+                y=df['volume'],
+                marker_color=colors,
+                name='Volume',
+                showlegend=False
+            ),
+            row=2, col=1
+        )
+
+        # Market structure indicator
+        structure_values = []
+        for i in range(len(df)):
+            if any(e['timestamp'] == df.index[i] and 'bullish' in e['type']
+                   for e in self.session_state['market_structure']):
+                structure_values.append(1)
+            elif any(e['timestamp'] == df.index[i] and 'bearish' in e['type']
+                     for e in self.session_state['market_structure']):
+                structure_values.append(-1)
+            else:
+                structure_values.append(0)
+
+        fig.add_trace(
+            go.Scatter(
+                x=df.index,
+                y=structure_values,
+                mode='lines',
+                fill='tozeroy',
+                line=dict(color='#673ab7', width=2),
+                name='Structure',
+                showlegend=False
+            ),
+            row=3, col=1
+        )
+
+        # Update layout
+        fig.update_layout(
+            title=dict(
+                text="Institutional-Grade Market Analysis",
+                font=dict(size=24, color='#1a237e')
+            ),
+            height=1000,
+            xaxis2=dict(
+                overlaying='x',
+                side='right',
+                range=[0, 0.4],
+                showgrid=False,
+                showticklabels=False
+            ),
+            showlegend=True,
+            legend=dict(
+                orientation="h",
+                yanchor="bottom",
+                y=1.02,
+                xanchor="right",
+                x=1
+            ),
+            hovermode='x unified',
+            plot_bgcolor='rgba(250,250,250,1)',
+            paper_bgcolor='white'
+        )
+
+        fig.update_xaxes(rangeslider_visible=False, gridcolor='rgba(200,200,200,0.3)')
+        fig.update_yaxes(gridcolor='rgba(200,200,200,0.3)')
+
+        return fig
+
+    def create_dashboard(self, df: pd.DataFrame):
+        """Create the complete institutional dashboard"""
+        st.set_page_config(
+            page_title="QRT Smart Money Analyzer",
+            layout="wide",
+            initial_sidebar_state="expanded"
+        )
+
+        # Custom CSS for professional styling
+        st.markdown("""
+        <style>
+        .main {
+            padding: 0rem 1rem;
+        }
+        .stMetric {
+            background-color: #f8f9fa;
+            padding: 1rem;
+            border-radius: 0.5rem;
+            border: 1px solid #e0e0e0;
+        }
+        .metric-label {
+            font-size: 0.9rem;
+            color: #666;
+        }
+        .metric-value {
+            font-size: 1.5rem;
+            font-weight: bold;
+        }
+        .section-header {
+            font-size: 1.2rem;
+            font-weight: bold;
+            color: #1a237e;
+            margin-bottom: 1rem;
+            border-bottom: 2px solid #3f51b5;
+            padding-bottom: 0.5rem;
+        }
+        .info-box {
+            background-color: #e3f2fd;
+            padding: 1rem;
+            border-radius: 0.5rem;
+            border-left: 4px solid #2196f3;
+            margin: 1rem 0;
+        }
+        </style>
+        """, unsafe_allow_html=True)
+
+        # Header
+        st.markdown("""
+        <h1 style='text-align: center; color: #1a237e;'>
+        🏛️ Institutional-Grade Market Analysis with Smart Money Concepts & Wyckoff Methodology
+        </h1>
+        """, unsafe_allow_html=True)
+
+        # Tabs for different views
+        tab1, tab2, tab3, tab4 = st.tabs([
+            "📊 Chart Analysis",
+            "🔄 Multi-Timeframe",
+            "📈 Market Structure",
+            "📋 Reports"
+        ])
+
+        # Calculate all metrics
+        self.session_state['market_metrics'] = self.calculate_market_metrics(df)
+        self.session_state['liquidity_zones'] = self.detect_liquidity_zones(df)
+        self.session_state['order_blocks'] = self.detect_order_blocks(df)
+        self.session_state['fvg_zones'] = self.detect_fvg(df)
+        self.session_state['wyckoff_phase'], self.session_state['wyckoff_events'] = self.analyze_wyckoff_phase(df)
+        self.session_state['volume_profile'] = self.calculate_volume_profile(df)
+        self.session_state['market_structure'] = self.analyze_market_structure(df)
+
+        with tab1:
+            # Market metrics row
+            metrics = self.session_state['market_metrics']
+            col1, col2, col3, col4, col5, col6 = st.columns(6)
+
+            col1.metric(
+                "Current Price",
+                f"${metrics.current_price:,.2f}",
+                f"{metrics.change_24h:+.2f}%"
+            )
+            col2.metric("24h Volume", f"{metrics.volume_24h:,.0f}")
+            col3.metric("Volatility", f"{metrics.volatility:.2f}%")
+            col4.metric("24h High", f"${metrics.high_24h:,.2f}")
+            col5.metric("24h Low", f"${metrics.low_24h:,.2f}")
+            col6.metric("Bias", self.session_state['current_bias'])
+
+            # Main chart
+            fig = self.create_main_chart(df)
+            st.plotly_chart(fig, use_container_width=True)
+
+            # Analysis sections in columns
+            col1, col2, col3, col4 = st.columns(4)
+
+            with col1:
+                st.markdown("### 🏛️ Smart Money Concepts")
+
+                # Liquidity Zones
+                st.markdown("**Liquidity Zones**")
+                for lz in self.session_state['liquidity_zones'][:5]:
+                    icon = "🟢" if lz.type == 'buy_side' else "🔴"
+                    st.markdown(f"{icon} {lz.type.replace('_', '-').title()}: ${lz.price:.2f}")
+
+                # Order Blocks
+                st.markdown("**Order Blocks**")
+                for ob in self.session_state['order_blocks'][:5]:
+                    icon = "🟢" if ob.type == 'bullish' else "🔴"
+                    st.markdown(f"{icon} {ob.type.title()}: ${ob.low:.2f} - ${ob.high:.2f}")
+                    st.caption(f"Strength: {ob.strength:.1%}")
+
+            with col2:
+                st.markdown("### 📊 Wyckoff Analysis")
+
+                # Current phase
+                phase = self.session_state['wyckoff_phase']
+                phase_color = {
+                    'Accumulation': '🟢',
+                    'Markup': '🟩',
+                    'Distribution': '🔴',
+                    'Markdown': '🟥',
+                    'Trading Range': '🟨'
+                }.get(phase, '⚪')
+
+                st.markdown(f"**Current Phase**")
+                st.markdown(f"{phase_color} {phase}")
+
+                # Recent events
+                st.markdown("**Recent Events**")
+                for event in self.session_state['wyckoff_events'][:5]:
+                    st.markdown(f"{event['type']} - {event['description']}")
+                    st.caption(f"Price: ${event['price']:.2f}")
+
+            with col3:
+                st.markdown("### 📈 Volume Profile")
+
+                vp = self.session_state['volume_profile']
+                if vp:
+                    st.markdown("**Point of Control**")
+                    st.markdown(f"POC Price: ${vp['poc']['price']:.2f}")
+                    st.caption(f"Volume: {vp['poc']['volume']:,.0f}")
+
+                    st.markdown("**Value Area**")
+                    st.markdown(f"VAH: ${vp['vah']:.2f}")
+                    st.markdown(f"VAL: ${vp['val']:.2f}")
+                    st.caption(f"Contains {vp['value_area_pct']:.1f}% of volume")
+
+            with col4:
+                st.markdown("### 📉 Technical Indicators")
+
+                # Add more technical indicators here
+                st.markdown("**Fair Value Gaps**")
+                for fvg in self.session_state['fvg_zones'][:5]:
+                    icon = "🟢" if fvg.type == 'bullish' else "🔴"
+                    st.markdown(f"{icon} {fvg.type.title()} FVG: ${fvg.low:.2f} - ${fvg.high:.2f}")
+                    st.caption(f"Size: ${fvg.size:.2f}")
+
+                st.markdown("**Market Structure**")
+                latest_break = next((e for e in self.session_state['market_structure']
+                                   if 'break' in e['type']), None)
+                if latest_break:
+                    icon = "🟢" if 'bullish' in latest_break['type'] else "🔴"
+                    st.markdown(f"Latest: {icon} {latest_break['description']}")
+                    st.caption(f"Price: ${latest_break['price']:.2f}")
+
+        with tab2:
+            st.markdown("### Multi-Timeframe Analysis")
+            st.info("Multi-timeframe analysis would show synchronized views across different timeframes (M1, M5, M15, H1, H4, D1)")
+
+            # Placeholder for MTF analysis
+            mtf_col1, mtf_col2 = st.columns(2)
+            with mtf_col1:
+                st.markdown("#### Higher Timeframe Bias")
+                st.markdown("- **Daily**: Bullish structure intact")
+                st.markdown("- **4H**: Testing key resistance")
+                st.markdown("- **1H**: Accumulation phase")
+
+            with mtf_col2:
+                st.markdown("#### Key Confluence Zones")
+                st.markdown("- **Resistance**: $108,500 (D1 + H4 + Volume)")
+                st.markdown("- **Support**: $106,000 (W1 POC + D1 OB)")
+
+        with tab3:
+            st.markdown("### Market Structure Analysis")
+
+            # Create structure visualization
+            structure_events = [e for e in self.session_state['market_structure']
+                              if e['type'] in ['swing_high', 'swing_low', 'bullish_break', 'bearish_break']]
+
+            if structure_events:
+                # Create a simple line chart showing structure
+                fig_struct = go.Figure()
+
+                # Add swing points
+                swings = [e for e in structure_events if 'swing' in e['type']]
+                if swings:
+                    fig_struct.add_trace(go.Scatter(
+                        x=[e['timestamp'] for e in swings],
+                        y=[e['price'] for e in swings],
+                        mode='lines+markers',
+                        name='Market Structure',
+                        line=dict(color='#3f51b5', width=2),
+                        marker=dict(size=8)
+                    ))
+
+                # Add structure breaks
+                breaks = [e for e in structure_events if 'break' in e['type']]
+                for brk in breaks:
+                    color = 'green' if 'bullish' in brk['type'] else 'red'
+                    fig_struct.add_annotation(
+                        x=brk['timestamp'],
+                        y=brk['price'],
+                        text=brk['description'],
+                        showarrow=True,
+                        arrowcolor=color,
+                        arrowsize=2,
+                        arrowwidth=2
+                    )
+
+                fig_struct.update_layout(
+                    title="Market Structure Evolution",
+                    height=500,
+                    showlegend=True
+                )
+
+                st.plotly_chart(fig_struct, use_container_width=True)
+
+            # Structure statistics
+            st_col1, st_col2, st_col3 = st.columns(3)
+            with st_col1:
+                st.metric("Structure Breaks Today",
+                         len([e for e in breaks if e['timestamp'].date() == df.index[-1].date()]))
+            with st_col2:
+                st.metric("Current Trend", self.session_state['current_bias'])
+            with st_col3:
+                st.metric("Trend Strength", "Strong" if len(breaks) > 3 else "Moderate")
+
+        with tab4:
+            st.markdown("### Comprehensive Market Report")
+
+            # Generate report
+            report = f"""
+            ## Market Analysis Report
+            **Generated**: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
+            
+            ### Executive Summary
+            - **Current Price**: ${metrics.current_price:,.2f} ({metrics.change_24h:+.2f}%)
+            - **Market Bias**: {self.session_state['current_bias']}
+            - **Wyckoff Phase**: {self.session_state['wyckoff_phase']}
+            - **Volatility**: {metrics.volatility:.2f}%
+            
+            ### Smart Money Analysis
+            - **Active Order Blocks**: {len(self.session_state['order_blocks'])}
+            - **Liquidity Zones**: {len(self.session_state['liquidity_zones'])}
+            - **Unfilled FVGs**: {len([f for f in self.session_state['fvg_zones'] if not f.filled])}
+            
+            ### Volume Profile Insights
+            - **POC**: ${self.session_state['volume_profile']['poc']['price']:.2f}
+            - **Value Area**: ${self.session_state['volume_profile']['val']:.2f} - ${self.session_state['volume_profile']['vah']:.2f}
+            - **High Volume Nodes**: {len(self.session_state['volume_profile']['high_volume_nodes'])}
+            
+            ### Trading Recommendations
+            """
+
+            # Add trading recommendations based on analysis
+            if self.session_state['current_bias'] == 'Bullish':
+                report += """
+                1. **Primary Bias**: Look for long opportunities at key support levels
+                2. **Key Levels**: Watch for reactions at order blocks and liquidity zones
+                3. **Risk Management**: Place stops below recent structure lows
+                """
+            else:
+                report += """
+                1. **Primary Bias**: Look for short opportunities at key resistance levels
+                2. **Key Levels**: Watch for reactions at bearish order blocks
+                3. **Risk Management**: Place stops above recent structure highs
+                """
+
+            st.markdown(report)
+
+            # Download button for report
+            st.download_button(
+                label="Download Full Report",
+                data=report,
+                file_name=f"market_analysis_{datetime.now().strftime('%Y%m%d_%H%M%S')}.md",
+                mime="text/markdown"
+            )
+
+# Vector representation for ncOS integration
+class InstitutionalVectorizer:
+    def __init__(self, embedding_dim: int = 1536):
+        self.embedding_dim = embedding_dim
+
+    def vectorize_market_state(self, analyzer: QRTInstitutionalAnalyzer) -> np.ndarray:
+        """Convert complete market state to vector embedding"""
+        features = []
+
+        # Market metrics features (100 dims)
+        metrics = analyzer.session_state['market_metrics']
+        features.extend([
+            metrics.current_price / 100000,  # Normalized price
+            metrics.change_24h / 100,
+            metrics.volume_24h / 1000000,
+            metrics.volatility / 100,
+            metrics.high_24h / metrics.low_24h - 1  # Range ratio
+        ])
+
+        # SMC features (300 dims)
+        # Liquidity zones
+        lz_features = np.zeros(100)
+        for i, lz in enumerate(analyzer.session_state['liquidity_zones'][:20]):
+            lz_features[i*5] = lz.price / metrics.current_price
+            lz_features[i*5+1] = 1.0 if lz.type == 'buy_side' else -1.0
+            lz_features[i*5+2] = lz.strength
+            lz_features[i*5+3] = lz.touches / 10
+            lz_features[i*5+4] = 1.0 if lz.swept else 0.0
+        features.extend(lz_features)
+
+        # Order blocks (100 dims)
+        ob_features = np.zeros(100)
+        for i, ob in enumerate(analyzer.session_state['order_blocks'][:10]):
+            ob_features[i*10] = ob.high / metrics.current_price
+            ob_features[i*10+1] = ob.low / metrics.current_price
+            ob_features[i*10+2] = 1.0 if ob.type == 'bullish' else -1.0
+            ob_features[i*10+3] = ob.strength
+            ob_features[i*10+4] = ob.volume / metrics.volume_24h
+        features.extend(ob_features)
+
+        # FVG features (100 dims)
+        fvg_features = np.zeros(100)
+        for i, fvg in enumerate(analyzer.session_state['fvg_zones'][:10]):
+            fvg_features[i*10] = fvg.high / metrics.current_price
+            fvg_features[i*10+1] = fvg.low / metrics.current_price
+            fvg_features[i*10+2] = 1.0 if fvg.type == 'bullish' else -1.0
+            fvg_features[i*10+3] = fvg.size / metrics.current_price
+            fvg_features[i*10+4] = 0.0 if fvg.filled else 1.0
+        features.extend(fvg_features)
+
+        # Wyckoff features (200 dims)
+        wyckoff_phases = {
+            'Accumulation': [1, 0, 0, 0, 0],
+            'Markup': [0, 1, 0, 0, 0],
+            'Distribution': [0, 0, 1, 0, 0],
+            'Markdown': [0, 0, 0, 1, 0],
+            'Trading Range': [0, 0, 0, 0, 1]
+        }
+        phase_vector = wyckoff_phases.get(analyzer.session_state['wyckoff_phase'], [0, 0, 0, 0, 0])
+        features.extend(phase_vector)
+
+# Volume profile features (200 dims)
+        vp = analyzer.session_state['volume_profile']
+        if vp:
+            vp_features = np.zeros(200)
+            vp_features[0] = vp['poc']['price'] / metrics.current_price
+            vp_features[1] = vp['vah'] / metrics.current_price
+            vp_features[2] = vp['val'] / metrics.current_price
+            vp_features[3] = vp['value_area_pct'] / 100
+            vp_features[4] = vp['poc']['volume'] / metrics.volume_24h
+
+            # High/low volume nodes
+            for i, node in enumerate(vp['high_volume_nodes'][:10]):
+                vp_features[10 + i*2] = node / metrics.current_price
+                vp_features[11 + i*2] = 1.0  # High volume indicator
+
+            for i, node in enumerate(vp['low_volume_nodes'][:10]):
+                vp_features[30 + i*2] = node / metrics.current_price
+                vp_features[31 + i*2] = -1.0  # Low volume indicator
+
+            features.extend(vp_features)
+        else:
+            features.extend(np.zeros(200))
+
+        # Market structure features (300 dims)
+        struct_features = np.zeros(300)
+        structure_events = analyzer.session_state['market_structure']
+
+        # Encode structure bias
+        struct_features[0] = 1.0 if analyzer.session_state['current_bias'] == 'Bullish' else -1.0
+
+        # Encode recent structure points
+        for i, event in enumerate(structure_events[:20]):
+            if i < 20:
+                struct_features[10 + i*10] = event['price'] / metrics.current_price
+                struct_features[11 + i*10] = 1.0 if event['type'] == 'swing_high' else -1.0
+                if 'break' in event['type']:
+                    struct_features[12 + i*10] = 2.0 if 'bullish' in event['type'] else -2.0
+
+        features.extend(struct_features)
+
+        # Pad to embedding dimension
+        features = np.array(features)
+        if len(features) < self.embedding_dim:
+            features = np.pad(features, (0, self.embedding_dim - len(features)))
+        else:
+            features = features[:self.embedding_dim]
+
+        # Normalize
+        return features / (np.linalg.norm(features) + 1e-8)
+
+    def compute_similarity(self, vec1: np.ndarray, vec2: np.ndarray) -> float:
+        """Compute cosine similarity between market states"""
+        return np.dot(vec1, vec2) / (np.linalg.norm(vec1) * np.linalg.norm(vec2) + 1e-8)
+
+# Main execution function for Streamlit
+def main():
+    """Main function to run the institutional dashboard"""
+    # Initialize session state
+    if 'analyzer' not in st.session_state:
+        st.session_state.analyzer = QRTInstitutionalAnalyzer('qrt_smc_wyckoff_config.yaml')
+
+    if 'vectorizer' not in st.session_state:
+        st.session_state.vectorizer = InstitutionalVectorizer()
+
+    # File uploader in sidebar
+    st.sidebar.title("📊 Data Input")
+    uploaded_file = st.sidebar.file_uploader(
+        "Upload OHLCV data (CSV)",
+        type=['csv'],
+        help="Upload a CSV file with columns: timestamp, open, high, low, close, volume"
+    )
+
+    # Use uploaded file or default ETHUSD_ticks.csv
+    if uploaded_file is not None:
+        df = load_any_csv(uploaded_file)
+    else:
+        # Try to load the default file
+        try:
+            with open('ETHUSD_ticks.csv', 'rb') as f:
+                df = load_any_csv(f)
+            # Convert tick data to OHLCV if needed
+            if 'open' not in df.columns:
+                df = convert_ticks_to_ohlcv(df)
+        except Exception as e:
+            st.error("Please upload a CSV file with OHLCV data")
+            st.stop()
+    
+    # Ensure proper data types
+    if 'timestamp' in df.columns:
+        df['timestamp'] = pd.to_datetime(df['timestamp'])
+        df.set_index('timestamp', inplace=True)
+    
+    # Data preprocessing
+    df = preprocess_data(df)
+    
+    # Create dashboard
+    st.session_state.analyzer.create_dashboard(df)
+    
+    # Sidebar analysis options
+    st.sidebar.markdown("---")
+    st.sidebar.title("🎯 Analysis Options")
+    
+    # Time range selector
+    time_range = st.sidebar.selectbox(
+        "Time Range",
+        ["Last 24 Hours", "Last 7 Days", "Last 30 Days", "All Data"],
+        index=0
+    )
+    
+    # Apply time filter
+    if time_range == "Last 24 Hours":
+        df_filtered = df.tail(1440)  # Assuming 1-minute data
+    elif time_range == "Last 7 Days":
+        df_filtered = df.tail(10080)
+    elif time_range == "Last 30 Days":
+        df_filtered = df.tail(43200)
+    else:
+        df_filtered = df
+    
+    # Advanced settings
+    with st.sidebar.expander("⚙️ Advanced Settings"):
+        show_vectors = st.checkbox("Show Vector Analysis", value=False)
+        export_data = st.checkbox("Enable Data Export", value=False)
+        
+    # Vector analysis section
+    if show_vectors:
+        st.sidebar.markdown("---")
+        st.sidebar.title("🧬 Vector Analysis")
+        
+        # Generate market state vector
+        market_vector = st.session_state.vectorizer.vectorize_market_state(
+            st.session_state.analyzer
+        )
+        
+        st.sidebar.markdown("**Market State Vector**")
+        st.sidebar.text(f"Dimension: {market_vector.shape[0]}")
+        st.sidebar.text(f"Non-zero: {np.count_nonzero(market_vector)}")
+        st.sidebar.text(f"Magnitude: {np.linalg.norm(market_vector):.4f}")
+        
+        # Vector visualization
+        if st.sidebar.button("Visualize Vector"):
+            fig_vec = go.Figure()
+            fig_vec.add_trace(go.Scatter(
+                y=market_vector[:100],  # Show first 100 dimensions
+                mode='lines',
+                name='Market Vector',
+                line=dict(color='#3f51b5', width=2)
+            ))
+            fig_vec.update_layout(
+                title="Market State Vector (First 100 Dimensions)",
+                xaxis_title="Dimension",
+                yaxis_title="Value",
+                height=300
+            )
+            st.sidebar.plotly_chart(fig_vec, use_container_width=True)
+    
+    # Data export section
+    if export_data:
+        st.sidebar.markdown("---")
+        st.sidebar.title("💾 Export Data")
+        
+        # Export options
+        export_format = st.sidebar.selectbox(
+            "Export Format",
+            ["CSV", "JSON", "Parquet"]
+        )
+        
+        if st.sidebar.button("Export Analysis"):
+            export_analysis_data(
+                st.session_state.analyzer,
+                df_filtered,
+                format=export_format
+            )
+
+def convert_ticks_to_ohlcv(tick_df: pd.DataFrame, timeframe: str = '1T') -> pd.DataFrame:
+    """Convert tick data to OHLCV format"""
+    # Ensure timestamp is datetime
+    tick_df['timestamp'] = pd.to_datetime(tick_df['timestamp'])
+    
+    # Use bid/ask midpoint as price if no 'price' column
+    if 'price' not in tick_df.columns:
+        tick_df['price'] = (tick_df['bid'] + tick_df['ask']) / 2
+    
+    # Resample to OHLCV
+    ohlcv = tick_df.set_index('timestamp').resample(timeframe).agg({
+        'price': ['first', 'max', 'min', 'last'],
+        'inferred_volume': 'sum'
+    })
+    
+    # Flatten column names
+    ohlcv.columns = ['open', 'high', 'low', 'close', 'volume']
+    
+    # Forward fill any missing values
+    ohlcv = ohlcv.fillna(method='ffill')
+    
+    return ohlcv
+
+def preprocess_data(df: pd.DataFrame) -> pd.DataFrame:
+    """Preprocess data for analysis"""
+    # Ensure required columns exist
+    required_columns = ['open', 'high', 'low', 'close', 'volume']
+    for col in required_columns:
+        if col not in df.columns:
+            st.error(f"Missing required column: {col}")
+            return df
+    
+    # Calculate additional features
+    df['price_mid'] = (df['high'] + df['low']) / 2
+    df['price_typical'] = (df['high'] + df['low'] + df['close']) / 3
+    df['price_weighted'] = (df['high'] + df['low'] + df['close'] * 2) / 4
+    
+    # Ensure volume is positive
+    df['volume'] = df['volume'].abs()
+    
+    # Remove any rows with NaN values
+    df = df.dropna()
+    
+    return df
+
+def export_analysis_data(analyzer: QRTInstitutionalAnalyzer, df: pd.DataFrame, format: str = 'CSV'):
+    """Export analysis results"""
+    # Prepare export data
+    export_data = {
+        'market_metrics': {
+            'current_price': analyzer.session_state['market_metrics'].current_price,
+            'change_24h': analyzer.session_state['market_metrics'].change_24h,
+            'volume_24h': analyzer.session_state['market_metrics'].volume_24h,
+            'volatility': analyzer.session_state['market_metrics'].volatility
+        },
+        'liquidity_zones': [
+            {
+                'price': lz.price,
+                'type': lz.type,
+                'strength': lz.strength,
+                'touches': lz.touches
+            }
+            for lz in analyzer.session_state['liquidity_zones']
+        ],
+        'order_blocks': [
+            {
+                'type': ob.type,
+                'high': ob.high,
+                'low': ob.low,
+                'strength': ob.strength,
+                'volume': ob.volume
+            }
+            for ob in analyzer.session_state['order_blocks']
+        ],
+        'wyckoff_analysis': {
+            'phase': analyzer.session_state['wyckoff_phase'],
+            'events': analyzer.session_state['wyckoff_events']
+        },
+        'volume_profile': analyzer.session_state['volume_profile']
+    }
+    
+    timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+    
+    if format == 'CSV':
+        # Convert to DataFrame for CSV export
+        analysis_df = pd.DataFrame([export_data['market_metrics']])
+        filename = f'market_analysis_{timestamp}.csv'
+        csv = analysis_df.to_csv(index=False)
+        st.download_button(
+            label="Download CSV",
+            data=csv,
+            file_name=filename,
+            mime='text/csv'
+        )
+    
+    elif format == 'JSON':
+        import json
+        filename = f'market_analysis_{timestamp}.json'
+        json_str = json.dumps(export_data, indent=2, default=str)
+        st.download_button(
+            label="Download JSON",
+            data=json_str,
+            file_name=filename,
+            mime='application/json'
+        )
+    
+    elif format == 'Parquet':
+        # Create comprehensive DataFrame
+        analysis_records = []
+        for i in range(len(df)):
+            record = {
+                'timestamp': df.index[i],
+                'open': df['open'].iloc[i],
+                'high': df['high'].iloc[i],
+                'low': df['low'].iloc[i],
+                'close': df['close'].iloc[i],
+                'volume': df['volume'].iloc[i],
+                'wyckoff_phase': analyzer.session_state['wyckoff_phase'],
+                'market_bias': analyzer.session_state['current_bias']
+            }
+            analysis_records.append(record)
+        
+        analysis_df = pd.DataFrame(analysis_records)
+        filename = f'market_analysis_{timestamp}.parquet'
+        analysis_df.to_parquet(filename)
+        
+        with open(filename, 'rb') as f:
+            st.download_button(
+                label="Download Parquet",
+                data=f,
+                file_name=filename,
+                mime='application/octet-stream'
+            )
+
+# Integration with ncOS
+class DashboardAgent:
+    """ncOS-compatible dashboard agent"""
+    def __init__(self, config: Dict):
+        self.config = config
+        self.analyzer = QRTInstitutionalAnalyzer(config['config_path'])
+        self.vectorizer = InstitutionalVectorizer()
+        self.session_vectors = {}
+    
+    def process_market_data(self, df: pd.DataFrame) -> Dict:
+        """Process market data and return analysis results"""
+        # Run analysis
+        self.analyzer.session_state['market_metrics'] = self.analyzer.calculate_market_metrics(df)
+        self.analyzer.session_state['liquidity_zones'] = self.analyzer.detect_liquidity_zones(df)
+        self.analyzer.session_state['order_blocks'] = self.analyzer.detect_order_blocks(df)
+        self.analyzer.session_state['fvg_zones'] = self.analyzer.detect_fvg(df)
+        self.analyzer.session_state['wyckoff_phase'], self.analyzer.session_state['wyckoff_events'] = self.analyzer.analyze_wyckoff_phase(df)
+        self.analyzer.session_state['volume_profile'] = self.analyzer.calculate_volume_profile(df)
+        self.analyzer.session_state['market_structure'] = self.analyzer.analyze_market_structure(df)
+        
+        # Generate vector
+        market_vector = self.vectorizer.vectorize_market_state(self.analyzer)
+        
+        # Store in session
+        session_id = datetime.now().isoformat()
+        self.session_vectors[session_id] = market_vector
+        
+        return {
+            'session_id': session_id,
+            'market_vector': market_vector.tolist(),
+            'analysis': self.analyzer.session_state,
+            'vector_stats': {
+                'dimension': market_vector.shape[0],
+                'magnitude': float(np.linalg.norm(market_vector)),
+                'sparsity': float(np.count_nonzero(market_vector) / market_vector.shape[0])
+            }
+        }
+    
+    def find_similar_states(self, query_vector: np.ndarray, k: int = 5) -> List[Tuple[str, float]]:
+        """Find similar market states from session history"""
+        similarities = []
+        
+        for session_id, vector in self.session_vectors.items():
+            similarity = self.vectorizer.compute_similarity(query_vector, vector)
+            similarities.append((session_id, similarity))
+        
+        # Sort by similarity
+        similarities.sort(key=lambda x: x[1], reverse=True)
+        
+        return similarities[:k]
+
+# Run the dashboard
+if __name__ == "__main__":
+    # For Streamlit execution
+    main()
+    

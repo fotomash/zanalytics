@@ -1,0 +1,21 @@
+dashboard_agent_config:
+  name: MarketDashboardAgent
+  type: visualization_coordinator
+  vector_dims: 1536
+  session_scope: single
+  
+  embeddings:
+    chart_types:
+      - candlestick: [0.8, 0.2, 0.1, ...]  # 1536-dim
+      - volume_profile: [0.3, 0.9, 0.2, ...]
+      - smc_levels: [0.7, 0.4, 0.8, ...]
+    
+    analysis_modules:
+      smc_analyzer: embed_id_001
+      wyckoff_analyzer: embed_id_002
+      volume_profiler: embed_id_003
+  
+  interfaces:
+    - SignalCoordinator
+    - RiskMonitor
+    - CorrelationEngine
