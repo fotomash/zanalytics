@@ -505,6 +505,54 @@ with st.sidebar:
         try:
             df = pd.read_parquet(full_path)
             df.columns = [c.lower() for c in df.columns]
+
+            # -- PATCH: Robust cleaning for 1-minute chart data --
+            if 'timestamp' in df.columns:
+                df['timestamp'] = pd.to_datetime(df['timestamp'], errors='coerce')
+            elif 'datetime' in df.columns:
+                df['timestamp'] = pd.to_datetime(df['datetime'], errors='coerce')
+            elif 'date' in df.columns:
+                df['timestamp'] = pd.to_datetime(df['date'], errors='coerce')
+            elif 'time' in df.columns:
+                df['timestamp'] = pd.to_datetime(df['time'], errors='coerce')
+            else:
+                raise KeyError("No timestamp/datetime/date/time column found in data.")
+
+            # Drop rows with missing timestamps
+            df = df.dropna(subset=['timestamp'])
+
+            # Remove duplicates: Only keep first occurrence of any timestamp (1-min chart must be unique per bar)
+            df = df.sort_values('timestamp').drop_duplicates(subset=['timestamp'])
+
+            # Fill missing OHLC columns only if they don't exist
+            ohlc_cols = ['open', 'high', 'low', 'close']
+            missing_ohlc = [col for col in ohlc_cols if col not in df.columns]
+            if missing_ohlc:
+                # Try to use 'last' or 'price_mid' as fallback for all missing OHLC fields
+                base_price = df['last'] if 'last' in df.columns else df['price_mid'] if 'price_mid' in df.columns else None
+                if base_price is not None:
+                    if 'open' not in df.columns:
+                        df['open'] = base_price.shift().fillna(base_price)
+                    if 'close' not in df.columns:
+                        df['close'] = base_price
+                    if 'high' not in df.columns:
+                        df['high'] = pd.concat([df['open'], df['close']], axis=1).max(axis=1)
+                    if 'low' not in df.columns:
+                        df['low'] = pd.concat([df['open'], df['close']], axis=1).min(axis=1)
+                else:
+                    raise ValueError("Cannot fill missing OHLC columns: no 'last' or 'price_mid' found.")
+
+            # Force all price columns to float for consistency
+            for price_col in ['open', 'high', 'low', 'close']:
+                df[price_col] = pd.to_numeric(df[price_col], errors='coerce')
+
+            # If any OHLC field still has NaN, drop those rows—they are not valid bars
+            df = df.dropna(subset=['open', 'high', 'low', 'close'])
+
+            # (Optional) Debug: show last 30 cleaned bars in expander
+            with st.expander("🧪 Raw 1-Minute Data After Cleaning"):
+                st.dataframe(df[['timestamp', 'open', 'high', 'low', 'close']].tail(30))
+
             max_bars = len(df)
             bars_to_use = st.slider("Last N Bars", min_value=20, max_value=max_bars, value=min(500, max_bars))
             if st.button("📥 Load Data", type="primary"):

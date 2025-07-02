@@ -138,19 +138,6 @@ class ZanalyticsDashboard:
         </style>
         """, unsafe_allow_html=True)
 
-        # PATCH: Show .cache folder files in the sidebar
-        def show_cache_files():
-            st.sidebar.markdown("### 🗂️ Cache Folder Files")
-            cache_dir = ".cache"
-            if not os.path.exists(cache_dir):
-                st.sidebar.info("No cache folder found yet.")
-                return
-            files = os.listdir(cache_dir)
-            if not files:
-                st.sidebar.info("Cache folder is empty.")
-            else:
-                st.sidebar.write("\n".join(sorted(files)))
-        show_cache_files()
 
         if not self.data_dir.exists():
             st.error(f"Data directory not found at: `{self.data_dir}`")

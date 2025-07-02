@@ -1,50 +1,66 @@
-def show_cache_files():
-    import os
-    st.sidebar.markdown("### 🗂️ Cache Folder Files")
-    cache_dir = ".cache"
-    if not os.path.exists(cache_dir):
-        st.sidebar.info("No cache folder found yet.")
-        return
-    files = os.listdir(cache_dir)
-    if not files:
-        st.sidebar.info("Cache folder is empty.")
-    else:
-        st.sidebar.write("\n".join(sorted(files)))
+ # Maps internal keys to readable symbol names for dashboard display
+DISPLAY_NAMES = {
+    'dxy_quote': 'DXY',
+    'vix_quote': 'VIX',
+    'gold_quote': 'Gold',
+    'oil_quote': 'Oil',
+    'us10y_quote': 'US 10Y',
+    'de10y_quote': 'Germany 10Y',
+    'nasdaq_quote': 'NASDAQ',
+    'spx_quote': 'S&P 500',
+    'dax_quote': 'DAX',
+    'gbpusd_quote': 'GBP/USD',
+    'eurusd_quote': 'EUR/USD',
+    # Add other keys if needed
+}
 
 import os
 import pickle
+import hashlib
+import json
 
 # --- PATCH: Ensure .cache directory exists ---
 def ensure_cache_dir():
     os.makedirs(".cache", exist_ok=True)
 ensure_cache_dir()
 
-# --- PATCH: auto_cache and macro sentiment cache use .cache/ ---
-def auto_cache(key, fetch_fn, refresh=False):
+# --- PATCH: Improved cache logic ---
+def make_cache_key(key, *args, **kwargs):
+    # Always produce a unique string, even if key is a dict or list
+    if isinstance(key, (dict, list)):
+        keystr = json.dumps(key, sort_keys=True)
+    else:
+        keystr = str(key)
+    if args or kwargs:
+        argstr = json.dumps({'args': args, 'kwargs': kwargs}, sort_keys=True)
+        keystr += "|" + argstr
+    return hashlib.md5(keystr.encode('utf-8')).hexdigest()
+
+def auto_cache(key, fetch_fn, refresh=False, *args, **kwargs):
     ensure_cache_dir()
-    cache_file = os.path.join(".cache", f"{key}.pkl")
+    cache_hash = make_cache_key(key, *args, **kwargs)
+    cache_file = os.path.join(".cache", f"{cache_hash}.pkl")
     if not refresh and os.path.exists(cache_file):
         with open(cache_file, "rb") as f:
             return pickle.load(f)
-    result = fetch_fn()
+    result = fetch_fn(*args, **kwargs)
     with open(cache_file, "wb") as f:
         pickle.dump(result, f)
     return result
 
-def load_or_fetch_macro_sentiment(snapshot, refresh=False):
+
+# --- PATCH: Macro Sentiment v2 with context and deduplication ---
+import hashlib, json
+def load_or_fetch_macro_sentiment(snapshot, asset_news, today_econ_events, market_movers, refresh=False):
     ensure_cache_dir()
-    cache_file = os.path.join(".cache", "macro_sentiment_cache.txt")
+    # Use a hash of the snapshot+asset_news+today_econ_events+market_movers for unique caching
+    context = json.dumps({'snapshot': snapshot, 'asset_news': asset_news, 'today_econ_events': today_econ_events, 'market_movers': market_movers}, sort_keys=True)
+    cache_hash = hashlib.md5(context.encode('utf-8')).hexdigest()
+    cache_file = os.path.join(".cache", f"macro_sentiment_{cache_hash}.txt")
     if not refresh and os.path.exists(cache_file):
         with open(cache_file, "r") as f:
             return f.read()
-    result = fetch_openai_macro_sentiment(
-        dxy_price=snapshot['dxy']['current'],
-        vix_price=snapshot['vix']['current'],
-        gold_price=edm.get_index_quote("GC=F", "Gold")['current'],
-        oil_price=edm.get_index_quote("CL=F", "Oil")['current'],
-        us10y=edm.get_bond_yields()["US 10Y"]["current"],
-        de10y=edm.get_bond_yields()["DE 10Y"]["current"],
-    )
+    result = fetch_openai_macro_sentiment_v2(snapshot, asset_news, today_econ_events, market_movers, refresh=refresh)
     with open(cache_file, "w") as f:
         f.write(result)
     return result
@@ -58,36 +74,267 @@ from openai import OpenAI
 
 st.set_page_config(page_title="Zanalyttics Dashboard", page_icon="🚀", layout="wide", initial_sidebar_state="expanded")
 
-client = OpenAI(api_key=st.secrets["opanai_API"])
+client = OpenAI(api_key=st.secrets["openai_API"])
 
-def fetch_openai_macro_sentiment(dxy_price, vix_price, gold_price, oil_price, us10y, de10y):
-    prompt = f"""
-    Perform a real-time intermarket sentiment analysis based on:
+def get_market_movers(quotes_cache):
+    # Find top 3 biggest % movers among the main assets
+    movers = []
+    for label, quote in quotes_cache.items():
+        if isinstance(quote, dict) and "current" in quote and "change" in quote and quote.get("current") not in ("N/A", None) and quote.get("change") not in ("N/A", None):
+            try:
+                pct = 100 * float(quote["change"]) / float(quote["current"]) if float(quote["current"]) != 0 else 0
+                movers.append((label, float(quote["current"]), float(quote["change"]), pct))
+            except Exception:
+                continue
+    # Sort by absolute % change, descending
+    movers = sorted(movers, key=lambda x: abs(x[3]), reverse=True)
+    return movers[:3]
 
-    - DXY: {dxy_price}
-    - VIX: {vix_price}
-    - GOLD (XAUUSD): {gold_price}
-    - OIL (WTI Crude): {oil_price}
-    - US 10Y Yield: {us10y}
-    - German 10Y Bund: {de10y}
-
-    Analyze current behavior vs historical reactions to macro events (CPI, FOMC, NFP).
-    Cover volatility risks, correlations, and cross-asset rotations.
-
-    Format output in markdown with clear sections like:
-    - 📊 VIX Insight
-    - 🪙 Gold Macro Context
-    - 🛢️ Oil Macro Context
-    - ⚠️ Key Takeaways for Traders
+# --- PATCH: Macro Sentiment Prompt V2 ---
+def fetch_openai_macro_sentiment_v2(snapshot, asset_news, today_econ_events, market_movers, refresh=False):
     """
+    snapshot: dict with keys dxy, vix, gold, oil, us10y, de10y (each is a quote dict)
+    asset_news: dict with keys as asset label, values as headlines/catalyst (str)
+    """
+    # --- DYNAMIC SUMMARY TABLE SECTION ---
+    # Instruments for the summary table
+    summary_instruments = [
+        ("DXY", "dxy", False),
+        ("VIX", "vix", False),
+        ("Gold", "gold", False),
+        ("Oil", "oil", False),
+        ("US 10Y", "us10y", True),
+        ("DE 10Y", "de10y", True),
+        ("GBP/USD", "gbpusd", False),
+        ("EUR/USD", "eurusd", False),
+    ]
+    summary_table_lines = []
+    summary_table_lines.append("## 🧾 Summary Table (Macro Context Focus)\n")
+    summary_table_lines.append("| Instrument | Current Price | Trend | Action | Key Macro Context |")
+    summary_table_lines.append("|------------|----------------|--------|--------|-------------------|")
+    for display, key, is_yield in summary_instruments:
+        # Current price, add % for yields
+        price = snapshot.get(key, {}).get("current", "N/A")
+        # Filter out missing prices ("N/A" or empty)
+        if price in ("N/A", "", None):
+            continue
+        if is_yield and price != "N/A":
+            price = f"{price}%"
+        # Macro context: first line of asset_news, or em dash
+        news_val = asset_news.get(key, "")
+        if news_val:
+            macro_context = news_val.splitlines()[0] if news_val.splitlines() else news_val
+        else:
+            macro_context = "—"
+        # Table row
+        summary_table_lines.append(
+            f"| {display} | {price} | TBD | TBD | {macro_context} |"
+        )
+    summary_table_md = "\n".join(summary_table_lines) + "\n"
+    # --- END DYNAMIC SUMMARY TABLE SECTION ---
+
+    # --- PATCH: Macro Calendar/Economic Events: Parse and format upcoming major events ---
+    # Only show if at least one relevant event is found within 72h
+    event_summaries = ""
+    macro_events_block = ""
+    try:
+        df_events = None
+        if today_econ_events is not None and isinstance(today_econ_events, dict) and today_econ_events:
+            import pandas as pd
+            df_events = pd.DataFrame(today_econ_events)
+            # If dict-of-lists, transpose if needed
+            if set(df_events.columns) >= {"date", "country", "event"}:
+                pass
+            elif set(df_events.index) >= {"date", "country", "event"}:
+                df_events = df_events.T
+        if df_events is not None and not df_events.empty:
+            # Only keep events within 72 hours from now
+            now = pd.Timestamp.now(tz=None)
+            in_72h = now + pd.Timedelta(hours=72)
+            df_events['date'] = pd.to_datetime(df_events['date'], errors='coerce')
+            df_events = df_events[df_events['date'].notnull()]
+            df_events_72h = df_events[(df_events['date'] >= now) & (df_events['date'] <= in_72h)]
+            # Only keep high-impact events for central banks or major macro
+            relevant_words = ["fed", "fomc", "powell", "ecb", "lagarde", "boe", "boj", "kuroda", "rate", "cpi", "nfp", "payroll", "unemployment", "inflation", "policy", "decision", "minutes", "interest"]
+            def is_relevant(ev):
+                evl = str(ev).lower()
+                return any(w in evl for w in relevant_words)
+            if not df_events_72h.empty:
+                filtered = df_events_72h[df_events_72h['event'].map(is_relevant)]
+                # Format as bullet list
+                event_lines = []
+                for _, row in filtered.iterrows():
+                    dstr = row['date'].strftime("%Y-%m-%d")
+                    desc = row['event']
+                    # Optionally annotate central bank
+                    event_lines.append(f"• {dstr}: {desc}")
+                if event_lines:
+                    event_summaries = "  \n".join(event_lines)
+                    macro_events_block = f"""- Upcoming Events (Next 72h):  
+{event_summaries}
+"""
+    except Exception:
+        macro_events_block = ""
+    # macro_events_block is empty if no relevant events
+    prompt = f"""
+You are a professional cross-asset market analyst. 
+
+### MANDATORY OUTPUT STRUCTURE — Do not skip any section.
+
+1. For EACH of these instruments:
+   - DXY (Dollar Index), VIX (Volatility Index), Gold (XAU/USD), Oil (WTI), US10Y, DE10Y, NASDAQ, S&P 500, DAX, EUR/USD, GBP/USD, EUR/GBP
+   
+   For each:
+   - **Current Price/Level**: [exact number and today’s movement]
+   - **Key Levels**: Support [number], Resistance [number]
+   - **Trend**: [Bullish/Bearish/Neutral] with clear, specific reason
+   - **Action**: [Buy/Sell/Hold] at [level], with suggested stop/target
+
+2. **Cross-Market Analysis**
+   - *What is driving flows, risk-on/off regime, biggest correlations/divergences TODAY?*
+   - Highlight safe havens, vol outliers, and if any asset’s move is unexplained.
+
+3. **Breaking Macro News**
+   - List 3-5 specific headlines impacting markets RIGHT NOW (no old news)
+   - *Explain the market impact of each headline.*
+
+4. **Trading Opportunities**
+   - Give 2-3 high-conviction trades (entry, stop, target, rationale, R/R)
+
+5. **Macro Calendar/Economic Events**
+   {"- Upcoming Events (Next 72h): " + event_summaries if macro_events_block else "- What’s upcoming for US/EUR/UK/JPY macro? Highlight Fed, ECB, BOE, BOJ, CPI, NFP, etc."}
+   {" " if not macro_events_block else ""}
+   - Is there a central bank or major data event in the next 72h? *State when.*
+
+6. **Sentiment/Volatility/Special**
+   - What’s the “fear/greed” or sentiment index today? Any sector, asset, or FX pair showing extreme sentiment or volatility?
+   - Which asset class is outperforming?
+
+7. **Summary Table**
+   - Tabulate all current prices, trends, and trade recommendations for each instrument above.
+
+8. **RISK/SCENARIO WARNING**
+   - Briefly note 1-2 plausible market scenarios and cross-asset risks for the next session.
+
+**Formatting**:  
+- Use markdown.  
+- Bold key levels.  
+- Use bullet points for news, actions, and trades.  
+- Be specific, clear, and forward-looking.  
+- Avoid any vague commentary.
+
+**Your goal: actionable, trader-oriented intelligence, not a bland summary.**
+
+## Market Snapshot
+DXY: {snapshot['dxy']['current']}, VIX: {snapshot['vix']['current']}, Gold: {snapshot['gold']['current']}, Oil: {snapshot['oil']['current']}, US 10Y: {snapshot['us10y']['current']}%, DE 10Y: {snapshot['de10y']['current']}%
+
+---
+{summary_table_md}
+---
+### 💵 DXY (US Dollar Index)
+- Price: {snapshot['dxy']['current']} ({snapshot['dxy']['change']:+})
+- News/Catalyst:  
+    **NEWS:**  
+{asset_news['dxy']}
+- Sentiment: (fill with your inference)
+- Commentary: (reason for price move, impact on risk assets, actionable idea)
+
+### 📉 VIX (Volatility Index)
+- Price: {snapshot['vix']['current']} ({snapshot['vix']['change']:+})
+- News/Catalyst:  
+    **NEWS:**  
+{asset_news['vix']}
+- Sentiment: (inference)
+- Commentary: (reasons for vol moves, implications for equities/FX)
+
+### 💷 GBP/USD (Pound Sterling)
+- **Price:** {snapshot['gbpusd']['current']} ({snapshot['gbpusd']['change']:+})
+- **Chart:** _[insert sparkline/chart here]_
+- **News/Catalyst:**  
+    **NEWS:**  
+{asset_news['gbpusd']}
+- **BOE Policy/UK Macro:**  
+  (BOE tone, inflation, wage data, Brexit risk)
+- **UK 10Y Gilt:**  
+    - **Yield:** {snapshot['uk10y']['current']} ({snapshot['uk10y']['change']:+})
+    - **Chart:** _[insert sparkline/chart here]_
+    - **Macro Commentary:**  
+      Discuss recent UK macroeconomic events, BOE policy signals, or fiscal developments affecting Gilt yields.
+
+### 💶 EUR/USD (Euro)
+- **Price:** {snapshot['eurusd']['current']} ({snapshot['eurusd']['change']:+})
+- **Chart:** _[insert sparkline/chart here]_
+- **News/Catalyst:**  
+    **NEWS:**  
+{asset_news['eurusd']}
+- **ECB Policy/Euro Macro:**  
+  (ECB hawkish/dovish, EU growth, French/German spread)
+- **Cross-Asset Impact:**  
+  (Effects on commodities, equities, DAX, etc)
+- **Actionable Insight:**  
+  (Rising euro = DAX/Euro stocks outperformance, falling = flows to USD)
+
+### 🪙 Gold (XAUUSD)
+- Price: {snapshot['gold']['current']} ({snapshot['gold']['change']:+})
+- News/Catalyst:  
+    **NEWS:**  
+{asset_news['gold']}
+- Sentiment: (hedging, safe haven, or other flows)
+- Commentary: (macro context, USD/yield impact)
+
+### 🛢️ Oil (WTI)
+- Price: {snapshot['oil']['current']} ({snapshot['oil']['change']:+})
+- News/Catalyst:  
+    **NEWS:**  
+{asset_news['oil']}
+- Sentiment: (demand/supply, OPEC, geopolitical, etc)
+- Commentary: (macro theme, risk asset readthrough)
+
+### 🇺🇸 US 10Y Yield
+- Yield: {snapshot['us10y']['current']} ({snapshot['us10y']['change']:+})
+- News/Catalyst:  
+    **NEWS:**  
+{asset_news['us10y']}
+- Sentiment: (rates, bonds, central bank)
+- Commentary: (yield moves and impact on macro/risk)
+
+### 🇩🇪 DE 10Y Bund
+- Yield: {snapshot['de10y']['current']} ({snapshot['de10y']['change']:+})
+- News/Catalyst:  
+    **NEWS:**  
+{asset_news['de10y']}
+- Sentiment: (rates, ECB, bunds, Europe macro)
+- Commentary: (reason for move, impact on EUR/USD, etc)
+
+---
+**Cross-Market Summary:**  
+- Briefly summarize regime (risk-on/off, flow, major cross-asset relationships, and biggest driver today).  
+- List any asset with an unexplained move and say so.  
+- Provide actionable takeaways for traders at the end.
+
+*Output markdown, clear headers, actionable comments.*
+
+"""
     try:
         response = client.chat.completions.create(
-            model="o3-mini",
+            model="gpt-4-turbo",
             messages=[{"role": "user", "content": prompt}]
         )
         return response.choices[0].message.content
     except Exception as e:
         return f"⚠️ Could not fetch macro sentiment: {e}"
+def get_asset_news(asset_keywords):
+    # This uses Finnhub and NewsAPI to pull headlines for a given asset
+    news = []
+    finnhub_df = edm.get_finnhub_headlines(symbols=tuple(asset_keywords), max_articles=4)
+    if not finnhub_df.empty:
+        for _, row in finnhub_df.iterrows():
+            news.append(f"- {row['datetime']}: [{row['headline']}]({row['url']})")
+    articles = edm.get_newsapi_headlines(page_size=4)
+    for article in articles:
+        if any(k.lower() in article['title'].lower() for k in asset_keywords):
+            news.append(f"- {article['publishedAt'][:10]}: [{article['title']}]({article['url']})")
+    return "\n".join(news[:4]) if news else "No major headlines for this asset."
 
 def get_high_impact_news():
     keywords = ["FOMC", "CPI", "NFP", "unemployment", "GDP", "central bank", "rate hike", "inflation"]
@@ -125,6 +372,23 @@ class EconomicDataManager:
             return df[["date", "short_volume_ratio", "short_volume", "total_volume"]]
         except Exception as e:
             st.error(f"Failed to fetch short volume: {e}")
+            return pd.DataFrame()
+
+    def get_today_econ_events():
+        today = pd.Timestamp.now().normalize()
+        tomorrow = today + pd.Timedelta(days=1)
+        try:
+            df = edm.get_economic_events_api(
+                country_list=['united states', 'germany', 'japan', 'united kingdom', 'euro area'],
+                importance="high"
+            )
+            if not df.empty:
+                mask = (df['date'].dt.date >= today.date()) & (df['date'].dt.date <= tomorrow.date())
+                today_events = df[mask]
+                if not today_events.empty:
+                    return today_events[['date', 'country', 'event', 'actual', 'forecast', 'previous']]
+            return pd.DataFrame()
+        except Exception as e:
             return pd.DataFrame()
     def get_finnhub_headlines(
         self,
@@ -255,10 +519,18 @@ class EconomicDataManager:
     def get_bond_yields(self) -> Dict[str, Dict[str, Any]]:
         """Fetch latest 10‑year bond yields from FRED."""
         tickers = {
+            "US 2Y": "DGS2",
             "US 10Y": "DGS10",
+            "US 30Y": "DGS30",
+            "DE 2Y": "IRLTLT02DEM156N",
             "DE 10Y": "IRLTLT01DEM156N",
+            "DE 30Y": "IRLTLT03DEM156N",
+            "GB 2Y": "IRLTLT02GBM156N",
             "GB 10Y": "IRLTLT01GBM156N",
+            "GB 30Y": "IRLTLT03GBM156N",
+            "JP 2Y": "IRLTLT02JPM156N",
             "JP 10Y": "IRLTLT01JPM156N",
+            "JP 30Y": "IRLTLT03JPM156N",
         }
         yield_data = {}
         for name, code in tickers.items():
@@ -343,12 +615,6 @@ edm = EconomicDataManager()
 # --- Original Dashboard Below ---
 
 #!/usr/bin/env python3
-"""
-Zanalyttics Market Overview Dashboard
-
-A focused dashboard for at-a-glance market intelligence, featuring a multi-timeframe
-performance heatmap and correlation analysis.
-"""
 import streamlit as st
 import pandas as pd
 import numpy as np
@@ -533,6 +799,26 @@ class EconomicDataManager:
         except Exception as e:
             return {'name': 'SVIX', 'error': str(e)}
 
+    def get_macro_indicators(self):
+        indicators = {}
+        try:
+            indicators['CPI'] = float(self.fred.get_series('CPIAUCSL').dropna().iloc[-1])
+        except:
+            indicators['CPI'] = 'N/A'
+        try:
+            indicators['Unemployment'] = float(self.fred.get_series('UNRATE').dropna().iloc[-1])
+        except:
+            indicators['Unemployment'] = 'N/A'
+        try:
+            indicators['GDP'] = float(self.fred.get_series('GDP').dropna().iloc[-1])
+        except:
+            indicators['GDP'] = 'N/A'
+        try:
+            indicators['ISM'] = float(self.fred.get_series('NAPM').dropna().iloc[-1])
+        except:
+            indicators['ISM'] = 'N/A'
+        return indicators
+
     def get_bond_yields(self) -> Dict[str, Dict[str, Any]]:
         """Fetch latest 10‑year bond yields from FRED."""
         tickers = {
@@ -620,14 +906,10 @@ class EconomicDataManager:
 
 class MarketOverviewDashboard:
     def display_bond_yields_sparklines(self):
-        """
-        Display US, Germany, Japan, and UK 10Y yields with sparklines and deltas,
-        using the exact style and structure from HOME.py.
-        """
         import plotly.graph_objects as go
+        import yfinance as yf
 
-        # Title and panel styling block (identical to HOME.py)
-        st.markdown("<h5 style='text-align:center;'>🌍 10‑Year Government Bond Yields</h5>", unsafe_allow_html=True)
+        st.markdown("<h5 style='text-align:center;'>🌍 Bond Yields & Key FX Rates</h5>", unsafe_allow_html=True)
         st.markdown(
             '''
             <div style='
@@ -641,65 +923,57 @@ class MarketOverviewDashboard:
             unsafe_allow_html=True,
         )
 
-        yield_tickers = {
-            "US": "DGS10",
-            "Germany": "IRLTLT01DEM156N",
-            "Japan": "IRLTLT01JPM156N",
-            "UK": "IRLTLT01GBM156N",
-        }
-        # --- Get latest and previous yields exactly as in HOME.py ---
-        latest_yields = {}
-        previous_yields = {}
-        for country, ticker in yield_tickers.items():
-            try:
-                series = self.economic_manager.fred.get_series(ticker).dropna()
-                latest = float(series.iloc[-1])
-                prev = float(series.iloc[-2]) if len(series) > 1 else None
-                latest_yields[country] = round(latest, 3)
-                previous_yields[country] = round(prev, 3) if prev else None
-            except Exception:
-                latest_yields[country] = "N/A"
-                previous_yields[country] = None
-
-        cols = st.columns(len(latest_yields))
-        for i, (country, val) in enumerate(latest_yields.items()):
-            prev_val = previous_yields.get(country)
-            delta = None
-            if prev_val is not None and val != "N/A":
-                delta = round(val - prev_val, 3)
+        panel_assets = [
+            ("US 10Y", "DGS10", "bond"),
+            ("Germany 10Y", "IRLTLT01DEM156N", "bond"),
+            ("Japan 10Y", "IRLTLT01JPM156N", "bond"),
+            ("UK 10Y", "IRLTLT01GBM156N", "bond"),
+            ("EUR/USD", "EURUSD=X", "fx"),
+            ("GBP/USD", "GBPUSD=X", "fx"),
+        ]
+        cols = st.columns(len(panel_assets))
+        for i, (label, ticker, kind) in enumerate(panel_assets):
             with cols[i]:
-                # Metric (value + delta)
-                st.metric(country, f"{val}%" if val != 'N/A' else val, delta)
-
-                # Sparkline directly below the metric
                 try:
-                    ticker = yield_tickers.get(country)
-                    if ticker:
+                    if kind == "bond":
                         series = self.economic_manager.fred.get_series(ticker).dropna()
-                        if len(series) >= 2:
-                            yvals = series.iloc[-50:].values
-                            xvals = list(range(len(yvals)))
-                            fig_spark = go.Figure()
-                            fig_spark.add_trace(go.Scatter(
-                                x=xvals,
-                                y=yvals,
-                                mode="lines",
-                                line=dict(color="#FFD600", width=2),
-                                showlegend=False,
-                                hoverinfo="skip",
-                            ))
-                            fig_spark.update_layout(
-                                margin=dict(l=0, r=0, t=10, b=10),
-                                height=80,
-                                width=160,
-                                paper_bgcolor="rgba(0,0,0,0.0)",
-                                plot_bgcolor="rgba(0,0,0,0.0)",
-                            )
-                            fig_spark.update_xaxes(visible=False, showgrid=False, zeroline=False)
-                            fig_spark.update_yaxes(visible=False, showgrid=False, zeroline=False)
-                            st.plotly_chart(fig_spark, use_container_width=True)
+                        latest = float(series.iloc[-1])
+                        prev = float(series.iloc[-2]) if len(series) > 1 else latest
+                        val = round(latest, 3)
+                        delta = round(latest - prev, 3)
+                    else:
+                        fx_hist = yf.Ticker(ticker).history(period="60d")['Close']
+                        latest = float(fx_hist.iloc[-1])
+                        prev = float(fx_hist.iloc[-2]) if len(fx_hist) > 1 else latest
+                        val = round(latest, 4)
+                        delta = round(latest - prev, 4)
+                        series = fx_hist
+                    st.metric(label, f"{val}%" if kind == "bond" else f"{val}", delta)
+                    # Sparkline
+                    if len(series) >= 2:
+                        yvals = series[-50:].values
+                        xvals = list(range(len(yvals)))
+                        fig_spark = go.Figure()
+                        fig_spark.add_trace(go.Scatter(
+                            x=xvals,
+                            y=yvals,
+                            mode="lines",
+                            line=dict(color="#FFD600", width=2),
+                            showlegend=False,
+                            hoverinfo="skip",
+                        ))
+                        fig_spark.update_layout(
+                            margin=dict(l=0, r=0, t=10, b=10),
+                            height=80,
+                            width=160,
+                            paper_bgcolor="rgba(0,0,0,0.0)",
+                            plot_bgcolor="rgba(0,0,0,0.0)",
+                        )
+                        fig_spark.update_xaxes(visible=False, showgrid=False, zeroline=False)
+                        fig_spark.update_yaxes(visible=False, showgrid=False, zeroline=False)
+                        st.plotly_chart(fig_spark, use_container_width=True)
                 except Exception:
-                    pass
+                    st.metric(label, "N/A", "N/A")
         st.markdown("</div>", unsafe_allow_html=True)
     def display_live_fx_quotes(self):
         st.markdown("### 💱 Live FX Quotes")
@@ -867,8 +1141,8 @@ class MarketOverviewDashboard:
         ]
         trend_metrics = []
         for label, qkey, ckey, ticker, tlabel in trend_keys:
-            quote = auto_cache(qkey, lambda t=ticker, l=tlabel: edm.get_index_quote(t, l), refresh=refresh_market_data)
-            chart_hist = auto_cache(ckey, lambda t=ticker, l=tlabel: edm.get_index_quote_history(t, l, lookback=20)['Close'].tolist() if edm.get_index_quote_history(t, l, lookback=20) is not None else [], refresh=refresh_market_data)
+            quote = auto_cache((qkey, ticker, tlabel), lambda t=ticker, l=tlabel: edm.get_index_quote(t, l), refresh=refresh_market_data)
+            chart_hist = auto_cache((ckey, ticker, tlabel), lambda t=ticker, l=tlabel: edm.get_index_quote_history(t, l, lookback=20)['Close'].tolist() if edm.get_index_quote_history(t, l, lookback=20) is not None else [], refresh=refresh_market_data)
             trend_metrics.append((label, quote, chart_hist))
 
         st.markdown("### 📈 Key Index & Commodity Trends")
@@ -942,23 +1216,62 @@ class MarketOverviewDashboard:
             ("DAX", "dax_quote", "dax_chart", "^GDAXI", "DAX"),
         ]
 
+
+
         # --- PATCH: Deduplicate by pre-fetching/caching all quotes and all chart histories in two dictionaries, then using those below ---
         quotes_cache = {}
+        today_econ_events = auto_cache(
+            ("today_econ_events", "united states", "germany", "japan", "united kingdom", "euro area", "high"),
+            lambda: edm.get_economic_events_api(
+                country_list=['united states', 'germany', 'japan', 'united kingdom', 'euro area'],
+                importance="high"
+            ),
+            refresh=refresh_market_data
+        )
+        if not today_econ_events.empty:
+            today = pd.Timestamp.now().normalize()
+            tomorrow = today + pd.Timedelta(days=1)
+            mask = (today_econ_events['date'].dt.date >= today.date()) & (today_econ_events['date'].dt.date <= tomorrow.date())
+            today_econ_events = today_econ_events[mask][['date', 'country', 'event', 'actual', 'forecast', 'previous']]
+        else:
+            today_econ_events = pd.DataFrame()
+        market_movers = get_market_movers(quotes_cache)
         history_cache = {}
         for label, qkey, ckey, ticker, tlabel in chart_keys:
             if "10Y" not in label:
-                quotes_cache[qkey] = auto_cache(qkey, lambda t=ticker, l=tlabel: edm.get_index_quote(t, l), refresh=refresh_market_data)
+                quotes_cache[qkey] = auto_cache((qkey, ticker, tlabel), lambda t=ticker, l=tlabel: edm.get_index_quote(t, l), refresh=refresh_market_data)
+                history_cache[ckey] = auto_cache(
+                    (ckey, ticker, tlabel),
+                    lambda t=ticker, l=tlabel: (
+                        edm.get_index_quote_history(t, l, lookback=20)['Close'].tolist()
+                        if edm.get_index_quote_history(t, l, lookback=20) is not None else []
+                    ),
+                    refresh=refresh_market_data
+                )
             else:
-                quotes_cache[qkey] = auto_cache(qkey, lambda l=label: edm.get_bond_yields().get(label, {}), refresh=refresh_market_data)
-            # Only fetch history ONCE per metric
-            history_cache[ckey] = auto_cache(
-                ckey,
-                lambda t=ticker, l=tlabel: (
-                    edm.get_index_quote_history(t, l, lookback=20)['Close'].tolist()
-                    if edm.get_index_quote_history(t, l, lookback=20) is not None else []
-                ),
-                refresh=refresh_market_data
-            )
+                quotes_cache[qkey] = auto_cache((qkey, label), lambda l=label: edm.get_bond_yields().get(label, {}), refresh=refresh_market_data)
+                history_cache[ckey] = auto_cache(
+                    (ckey, ticker),
+                    lambda t=ticker: edm.fred.get_series(t).dropna().tail(20).tolist(),
+                    refresh=refresh_market_data
+                )
+        today_econ_events = auto_cache(
+            ("today_econ_events", "united states", "germany", "japan", "united kingdom", "euro area", "high"),
+            lambda: edm.get_economic_events_api(
+                country_list=['united states', 'germany', 'japan', 'united kingdom', 'euro area'],
+                importance="high"
+            ),
+            refresh=refresh_market_data
+        )
+        if not today_econ_events.empty:
+            today = pd.Timestamp.now().normalize()
+            tomorrow = today + pd.Timedelta(days=1)
+            mask = (today_econ_events['date'].dt.date >= today.date()) & (
+                        today_econ_events['date'].dt.date <= tomorrow.date())
+            today_econ_events = today_econ_events[mask][['date', 'country', 'event', 'actual', 'forecast', 'previous']]
+        else:
+            today_econ_events = pd.DataFrame()
+        market_movers = get_market_movers(quotes_cache)
 
         cached_metrics = []
         for label, qkey, ckey, ticker, tlabel in chart_keys:
@@ -1009,16 +1322,66 @@ class MarketOverviewDashboard:
 
         render_snapshot_grouped(cached_metrics)
 
-        # --- PATCH: Macro Market Analysis section below snapshot ---
-        st.markdown("## Macro Market Analysis")
+        if isinstance(today_econ_events, pd.DataFrame) and not today_econ_events.empty:
+            st.markdown("#### 📅 Today's Key Economic Releases")
+            st.dataframe(today_econ_events, use_container_width=True, hide_index=True)
+        if market_movers:
+            st.markdown("#### 🔥 Biggest Market Moves Today")
+            for label, curr, chg, pct in market_movers:
+                display_name = DISPLAY_NAMES.get(label, label)
+                arrow = "▲" if chg > 0 else "▼"
+                st.markdown(f"**{display_name}:** {curr} ({arrow} {chg:+.2f}, {pct:+.2f}%)")
+
+        # --- PATCH: Enrich prompt context ---
+        # Prepare snapshot and news/catalyst context (use asset keys: dxy, vix, gold, oil, us10y, de10y)
+        asset_keys = {
+            'dxy': ['DXY', 'Dollar', 'USD'],
+            'vix': ['VIX', 'Volatility'],
+            'gold': ['Gold', 'XAU', 'Precious'],
+            'oil': ['Oil', 'WTI', 'Crude'],
+            'us10y': ['US 10Y', 'Treasury', 'Yield'],
+            'de10y': ['DE 10Y', 'Bund', 'German'],
+        }
+        snapshot = {
+            'dxy': cached_metrics[0][1], 'vix': cached_metrics[1][1],
+            'gold': cached_metrics[2][1], 'oil': cached_metrics[3][1],
+            'us10y': cached_metrics[4][1], 'de10y': cached_metrics[5][1],
+        }
+        # --- PATCH: Ensure 'gbpusd', 'eurusd', and 'uk10y' are always present in snapshot ---
+        snapshot['gbpusd'] = auto_cache(("gbpusd_quote", "GBPUSD=X", "GBPUSD"), lambda: edm.get_index_quote("GBPUSD=X", "GBPUSD"), refresh=refresh_market_data)
+        snapshot['eurusd'] = auto_cache(("eurusd_quote", "EURUSD=X", "EURUSD"), lambda: edm.get_index_quote("EURUSD=X", "EURUSD"), refresh=refresh_market_data)
+        uk_gilt = edm.get_bond_yields().get('GB 10Y', {})
+        snapshot['uk10y'] = uk_gilt
+        # ---
+        # --- PATCH: Unique asset_news cache keys for each instrument ---
+        asset_news = {}
+        for k, keywords in asset_keys.items():
+            asset_news[k] = auto_cache(
+                ("asset_news", k, tuple(keywords)),
+                lambda kw=keywords: get_asset_news(kw),
+                refresh=refresh_market_data
+            )
+
+        # Also fetch news for gbpusd and eurusd for the macro sentiment prompt
+        gbp_kw = ['GBPUSD', 'Pound', 'Sterling', 'BOE', 'UK']
+        eur_kw = ['EURUSD', 'Euro', 'ECB', 'EUR']
+        asset_news['gbpusd'] = auto_cache(
+            ("asset_news", "gbpusd", tuple(gbp_kw)),
+            lambda: get_asset_news(gbp_kw), refresh=refresh_market_data)
+        asset_news['eurusd'] = auto_cache(
+            ("asset_news", "eurusd", tuple(eur_kw)),
+            lambda: get_asset_news(eur_kw), refresh=refresh_market_data)
+
+        # --- PATCH: Fetch and display macro analysis using richer prompt ---
+        # --- PATCH: Unique cache key for macro sentiment context (avoid collisions) ---
         macro_md = load_or_fetch_macro_sentiment(
-            {
-                'dxy': cached_metrics[0][1], 'vix': cached_metrics[1][1],
-                'gold': cached_metrics[2][1], 'oil': cached_metrics[3][1],
-                'us10y': cached_metrics[4][1], 'de10y': cached_metrics[5][1],
-            },
+            snapshot,
+            asset_news,
+            today_econ_events.to_dict() if isinstance(today_econ_events, pd.DataFrame) else {},
+            market_movers,
             refresh=refresh_market_data
         )
+
         st.markdown(macro_md, unsafe_allow_html=True)
 
     def display_next_week_events(self):
@@ -1133,5 +1496,4 @@ class MarketOverviewDashboard:
 
 if __name__ == "__main__":
     dashboard = MarketOverviewDashboard()
-    show_cache_files()
     dashboard.run()
