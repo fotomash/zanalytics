@@ -84,23 +84,23 @@ def setup_page():
         }
 
         .gold-header {
-            background: linear-gradient(90deg, #FFD700 0%, #FFA500 50%, #FF8C00 100%);
+            background: rgba(255, 165, 0, 0.3);
             padding: 2rem;
             border-radius: 20px;
             margin-bottom: 2rem;
             text-align: center;
-            box-shadow: 0 10px 40px rgba(255, 215, 0, 0.3);
+            /* box-shadow: 0 10px 40px rgba(255, 215, 0, 0.3); */
             color: #000;
             font-weight: bold;
         }
 
         .metric-gold {
-            background: linear-gradient(145deg, #2d1810, #3d2820);
+            background: rgba(45, 24, 16, 0.3);
             padding: 1.5rem;
             border-radius: 15px;
             border: 2px solid #FFD700;
             margin: 1rem 0;
-            box-shadow: 0 8px 25px rgba(255, 215, 0, 0.2);
+            box-shadow: 0 8px 25px rgba(255, 215, 0, 0.1);
             text-align: center;
         }
 
@@ -113,19 +113,21 @@ def setup_page():
         }
 
         .buy-signal {
-            background: linear-gradient(45deg, #00ff88, #00cc66);
+            background: rgba(0, 255, 136, 0.2);
             color: #000;
-            animation: glow-green 2s infinite;
+            /* animation: glow-green 2s infinite; */
+            /* box-shadow: 0 0 20px rgba(0, 255, 136, 0.3); */
         }
 
         .sell-signal {
-            background: linear-gradient(45deg, #ff4444, #cc0000);
+            background: rgba(255, 68, 68, 0.2);
             color: #fff;
-            animation: glow-red 2s infinite;
+            /* animation: glow-red 2s infinite; */
+            /* box-shadow: 0 0 20px rgba(255, 68, 68, 0.3); */
         }
 
         .neutral-signal {
-            background: linear-gradient(45deg, #ffaa00, #ff8800);
+            background: rgba(255, 170, 0, 0.2);
             color: #000;
         }
 

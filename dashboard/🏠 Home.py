@@ -106,7 +106,7 @@ class ZanalyticsDashboard:
         st.markdown("""
         <style>
         .main .block-container {
-            background-color: rgba(0,0,0,0.05) !important;
+            background-color: rgba(0,0,0,0.025) !important;
         }
         </style>
         """, unsafe_allow_html=True)
@@ -130,9 +130,10 @@ class ZanalyticsDashboard:
             <div style='
                 margin: 0 auto 1.1rem auto;
                 max-width: 900px;
+                width: 98%;
                 text-align: center;
                 padding: 0.2em 0 0.1em 0;
-                background: linear-gradient(to right, rgba(103,116,255,0.25), rgba(176,66,255,0.25));
+                background: linear-gradient(to right, rgba(103,116,255,0.15), rgba(176,66,255,0.15));
                 border-radius: 12px;
                 border: 2px solid rgba(251,213,1,0.4);
                 box-shadow: 0 2px 12px rgba(103,116,255,0.10);
@@ -170,7 +171,6 @@ class ZanalyticsDashboard:
                     line-height: 1.42;
                     display: block;
                 '>
-                    Built for active risk, scenario analysis & edge discovery.
                 </span>
             </div>
             """,
@@ -221,8 +221,8 @@ class ZanalyticsDashboard:
                             yaxis_title="Price Bin",
                             zaxis_title="Inferred Volume"
                         ),
-                        paper_bgcolor="rgba(0,0,0,0.05)",
-                        plot_bgcolor="rgba(0,0,0,0.05)",
+                        paper_bgcolor="rgba(0,0,0,0.02)",
+                        plot_bgcolor="rgba(0,0,0,0.02)",
                     )
                     st.plotly_chart(fig, use_container_width=True)
                 else:
@@ -231,6 +231,137 @@ class ZanalyticsDashboard:
                 st.warning(f"Error loading or plotting XAU tick file: {e}")
         else:
             st.info("XAUUSD tick data not found for 3D surface demo.")
+
+        # --- XAUUSD 15-Minute Candlestick Chart from Parquet (with FVG, Midas VWAP, Wyckoff Accumulation) ---
+        try:
+            parquet_dir = Path(st.secrets["PARQUET_DATA_DIR"])
+            parquet_file = next(parquet_dir.glob("**/XAUUSD*15min*.parquet"), None)  # recursive search
+            if parquet_file:
+                df = pd.read_parquet(parquet_file)
+                if "timestamp" not in df.columns:
+                    st.error("Could not locate a 'timestamp' column in the parquet file.")
+                else:
+                    df["timestamp"] = pd.to_datetime(df["timestamp"])
+                    df = df.sort_values(by="timestamp")
+                    df_recent = df.tail(300)  # analyze a slightly larger window for regimes
+
+                    fig_xau = go.Figure(data=[go.Candlestick(
+                        x=df_recent["timestamp"],
+                        open=df_recent["open"],
+                        high=df_recent["high"],
+                        low=df_recent["low"],
+                        close=df_recent["close"],
+                        increasing_line_color='lime',
+                        decreasing_line_color='red',
+                        name='XAUUSD 15min'
+                    )])
+
+                    # --- FVG zone overlays ---
+                    for i in range(2, len(df_recent)):
+                        prev = df_recent.iloc[i-2]
+                        curr = df_recent.iloc[i]
+                        # Bullish FVG: current low > previous high
+                        if curr["low"] > prev["high"]:
+                            fig_xau.add_vrect(
+                                x0=df_recent.iloc[i-1]["timestamp"], x1=curr["timestamp"],
+                                fillcolor="rgba(0,255,0,0.13)", opacity=0.26, line_width=0, layer="below"
+                            )
+                        # Bearish FVG: current high < previous low
+                        elif curr["high"] < prev["low"]:
+                            fig_xau.add_vrect(
+                                x0=df_recent.iloc[i-1]["timestamp"], x1=curr["timestamp"],
+                                fillcolor="rgba(255,0,0,0.13)", opacity=0.26, line_width=0, layer="below"
+                            )
+
+                    # --- Anchored VWAP (Midas style, from left edge) ---
+                    vwap_prices = (df_recent['high'] + df_recent['low'] + df_recent['close']) / 3
+                    cumulative_vol = df_recent['volume'].cumsum()
+                    vwap = (vwap_prices * df_recent['volume']).cumsum() / cumulative_vol
+                    fig_xau.add_trace(go.Scatter(x=df_recent["timestamp"], y=vwap, mode='lines', name='Midas VWAP',
+                                                 line=dict(color='gold', width=2, dash='dot')))
+
+                    import numpy as np
+
+                    # --- Enhanced Wyckoff regime detection and annotation ---
+                    phases = []
+                    window = 42
+                    close = df_recent['close'].values
+
+                    for i in range(len(close) - window):
+                        win = close[i:i+window]
+                        atr = (df_recent['high'].iloc[i:i+window] - df_recent['low'].iloc[i:i+window]).mean()
+                        minmax_range = win.max() - win.min()
+                        slope = (win[-1] - win[0]) / window
+
+                        if minmax_range < 1.2 * atr and abs(slope) < 0.08 * atr:
+                            phases.append(('accumulation', df_recent.iloc[i]["timestamp"], df_recent.iloc[i+window]["timestamp"]))
+                        elif slope > 0.10 * atr:
+                            phases.append(('markup', df_recent.iloc[i]["timestamp"], df_recent.iloc[i+window]["timestamp"]))
+                        elif minmax_range < 1.2 * atr and abs(slope) < 0.08 * atr and i > 0:
+                            phases.append(('distribution', df_recent.iloc[i]["timestamp"], df_recent.iloc[i+window]["timestamp"]))
+                        elif slope < -0.10 * atr:
+                            phases.append(('markdown', df_recent.iloc[i]["timestamp"], df_recent.iloc[i+window]["timestamp"]))
+
+                    # Add colored overlays and annotation text
+                    phase_colors = {
+                        'accumulation': 'rgba(0, 90, 255, 0.08)',
+                        'markup': 'rgba(0, 200, 70, 0.08)',
+                        'distribution': 'rgba(255, 160, 0, 0.08)',
+                        'markdown': 'rgba(220, 40, 40, 0.08)'
+                    }
+
+                    for phase, start, end in phases:
+                        fig_xau.add_vrect(
+                            x0=start, x1=end,
+                            fillcolor=phase_colors[phase], opacity=0.13, line_width=0, layer="below"
+                        )
+                        fig_xau.add_annotation(
+                            x=start,
+                            y=df_recent['high'].max(),
+                            text=phase.title(),
+                            showarrow=False,
+                            font=dict(size=13, color=phase_colors[phase].replace("0.08", "0.8")),
+                            bgcolor="rgba(0,0,0,0.4)",
+                            yshift=16,
+                            opacity=0.9
+                        )
+
+                    # --- Add phase annotation to the chart title ---
+                    current_phase = None
+                    if phases:
+                        # Pick regime whose end is latest (or overlaps last timestamp)
+                        last_ts = df_recent["timestamp"].max()
+                        for phase, start, end in reversed(phases):
+                            if end >= last_ts:
+                                current_phase = phase
+                                break
+                        if not current_phase:
+                            # fallback: just use the last detected
+                            current_phase = phases[-1][0]
+
+                    phase_label = f"Wyckoff: <b style='color:orange;'>{current_phase.upper()}</b>" if current_phase else ""
+                    chart_title = f"XAUUSD – 15-Minute Candlestick Chart with FVG, Midas VWAP & {phase_label}"
+
+                    fig_xau.update_layout(
+                        title={
+                            'text': chart_title,
+                            'y':0.93,
+                            'x':0.5,
+                            'xanchor': 'center',
+                            'yanchor': 'top'
+                        },
+                        template=st.session_state.get('chart_theme', 'plotly_dark'),
+                        height=460,
+                        paper_bgcolor="rgba(0,0,0,0.02)",
+                        plot_bgcolor="rgba(0,0,0,0.02)",
+                        xaxis_rangeslider_visible=False,
+                        margin=dict(l=20, r=20, t=40, b=20)
+                    )
+                    st.plotly_chart(fig_xau, use_container_width=True)
+            else:
+                st.warning("No XAUUSD 15min parquet file found in PARQUET_DATA_DIR.")
+        except Exception as e:
+            st.error(f"Failed to load XAUUSD 15min candlestick chart: {e}")
 
         self.create_dxy_chart()
         st.markdown(
@@ -263,8 +394,8 @@ class ZanalyticsDashboard:
                 margin=dict(l=20, r=20, t=40, b=20),
                 template=st.session_state.get('chart_theme', 'plotly_dark'),
                 height=440,
-                paper_bgcolor="rgba(0,0,0,0.05)",
-                plot_bgcolor="rgba(0,0,0,0.05)",
+                paper_bgcolor="rgba(0,0,0,0.02)",
+                plot_bgcolor="rgba(0,0,0,0.02)",
             )
             # Only show the Plotly chart title for the DXY 3D chart (remove st.markdown title)
             st.plotly_chart(fig3d, use_container_width=True)
@@ -400,30 +531,34 @@ class ZanalyticsDashboard:
                 st.markdown(f"{pair}: {tf_list}")
 
     def create_dxy_chart(self):
-        st.markdown("#### 💵 U.S. Dollar Index (DXY) - Weekly")
+        st.markdown("#### 💵 U.S. Dollar Index (DXY) – 15‑Minute Candlestick")
         dxy_data = self.economic_manager.get_dxy_data()
         if dxy_data is not None and not dxy_data.empty:
-            fig = go.Figure(data=[go.Candlestick(
-                x=dxy_data.index,
-                open=dxy_data['Open'],
-                high=dxy_data['High'],
-                low=dxy_data['Low'],
-                close=dxy_data['Close'],
-                increasing_line_color='#26de81',
-                decreasing_line_color='#fc5c65'
+            # Plot the most-recent 200 M15 bars (~3 days)
+            candles = dxy_data.reset_index().tail(200)
+
+            fig_candles = go.Figure(data=[go.Candlestick(
+                x=candles.index,
+                open=candles['Open'],
+                high=candles['High'],
+                low=candles['Low'],
+                close=candles['Close'],
+                increasing_line_color='lime',
+                decreasing_line_color='red',
+                name='DXY M15'
             )])
-            fig.update_layout(
-                title="DXY Performance (Last 6 Months)",
+
+            fig_candles.update_layout(
+                title="DXY – 15-Minute Candlestick Chart (latest 200 bars)",
                 template=st.session_state.get('chart_theme', 'plotly_dark'),
-                height=500,
-                showlegend=False,
-                yaxis_title="DXY Value",
-                xaxis_title="Date",
+                height=460,
+                paper_bgcolor="rgba(0,0,0,0.02)",
+                plot_bgcolor="rgba(0,0,0,0.02)",
                 xaxis_rangeslider_visible=False,
-                paper_bgcolor="rgba(0,0,0,0.05)",
-                plot_bgcolor="rgba(0,0,0,0.05)",
+                margin=dict(l=20, r=20, t=40, b=20)
             )
-            st.plotly_chart(fig, use_container_width=True)
+
+            st.plotly_chart(fig_candles, use_container_width=True)
         else:
             st.info("Could not load DXY chart data.")
 

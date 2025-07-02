@@ -622,6 +622,33 @@ def main():
         initial_sidebar_state="expanded"
     )
 
+    def set_background(image_path):
+        try:
+            if not Path(image_path).exists():
+                st.warning("⚠️ Background image not found.")
+                return
+            import base64
+            with open(image_path, "rb") as image_file:
+                encoded = base64.b64encode(image_file.read()).decode()
+            st.markdown(
+                f"""
+                <style>
+                .stApp {{
+                    background-image: url("data:image/png;base64,{encoded}");
+                    background-size: cover;
+                    background-attachment: fixed;
+                    background-repeat: no-repeat;
+                    background-position: center;
+                }}
+                </style>
+                """,
+                unsafe_allow_html=True,
+            )
+        except Exception as e:
+            st.warning(f"Error loading background image: {e}")
+
+    set_background("./theme/transparent_grid.png")
+
     # Main header
     st.title("📈 NCOS v11 Trading Analysis Dashboard")
     st.markdown("**Comprehensive Market Analysis with Multiple Data Sources**")

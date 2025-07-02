@@ -26,7 +26,8 @@ cd /Users/tom/Documents/_trade/_exports/_tick
   --max_candles 150 \
   --json_dir /Users/tom/Documents/GitHub/zanalytics/dashboard/data \
   --csv_dir /Users/tom/Documents/GitHub/zanalytics/dashboard/data \
-    --file GBPUSD_M1_bars.csv 
+    --file GBPUSD_M1_bars.csv \
+    --no-summary-report
 
 
 
@@ -36,8 +37,8 @@ cd /Users/tom/Documents/_trade/_exports/_tick
   --no_compression \
   --output_dir /Users/tom/Documents/GitHub/zanalytics/dashboard/data/EURUSD \
   --max_candles 150 \
-  --file EURUSD_M1_bars.csv
-
+  --file EURUSD_M1_bars.csv \
+  --no-summary-report
 
     /Users/tom/Documents/GitHub/venv2/bin/python \
   /Users/tom/Documents/_trade/_exports/_tick/ncOS_ultimate_microstructure_analyzer_DEFAULTS.py \
@@ -45,7 +46,9 @@ cd /Users/tom/Documents/_trade/_exports/_tick
   --no_compression \
   --output_dir /Users/tom/Documents/GitHub/zanalytics/dashboard/data/XAUUSD \
   --max_candles 150 \
-  --file XAUUSD_M1_bars.csv 
+  --file XAUUSD_M1_bars.csv \
+  --no-summary-report
+
 
 
       /Users/tom/Documents/GitHub/venv2/bin/python \

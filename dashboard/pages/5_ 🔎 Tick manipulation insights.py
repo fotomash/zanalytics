@@ -1,25 +1,63 @@
 import streamlit as st
-
-# --- PATCH: Add full-page background image via Streamlit markdown ---
-st.markdown(
-    """
-    <style>
-    .stApp {
-        background-image: url("https://images.unsplash.com/photo-1612831455542-b812f6e33a7f?auto=format&fit=crop&w=2850&q=80");
-        background-size: cover;
-        background-position: center;
-        background-repeat: no-repeat;
-        background-attachment: fixed;
-    }
-    </style>
-    """,
-    unsafe_allow_html=True
-)
-
+# Move set_page_config for "Tick Insights Dashboard" to top
 st.set_page_config(
-    page_title="Quantum Microstructure Analyzer",
-    layout="wide"
+    page_title="Tick Insights Dashboard",
+    page_icon="🔎",
+    layout="wide",
+    initial_sidebar_state="expanded"
 )
+
+# --- PATCH: Add full-page background image via local asset ---
+from PIL import Image
+import base64
+
+@st.cache_data
+def get_base64_of_bin_file(bin_file_path):
+    with open(bin_file_path, "rb") as f:
+        data = f.read()
+    return base64.b64encode(data).decode()
+
+def set_background(image_file_path):
+    bin_str = get_base64_of_bin_file(image_file_path)
+    st.markdown(
+        f"""
+        <style>
+        [data-testid="stAppViewContainer"] {{
+            background-image: url("data:image/png;base64,{bin_str}");
+            background-size: cover;
+            background-position: center;
+            background-repeat: no-repeat;
+            background-attachment: fixed;
+        }}
+        </style>
+        """,
+        unsafe_allow_html=True
+    )
+# Set fixed full-page background image using local asset
+try:
+    set_background("./theme/image_af247b.jpg")
+except Exception:
+    st.warning("Background image file not found or could not be loaded.")
+
+# Ensure background and CSS are set before any data imports
+st.markdown("""
+<style>
+.main .block-container {
+    max-width: 998px !important;
+    padding-left: 1.5vw;
+    padding-right: 1.5vw;
+}
+</style>
+""", unsafe_allow_html=True)
+
+st.markdown("""
+<style>
+section[data-testid="stSidebar"] {
+    background-color: rgba(0,0,0,0.8) !important;
+    box-shadow: none !important;
+}
+</style>
+""", unsafe_allow_html=True)
 import pandas as pd
 import numpy as np
 from typing import Dict, List, Tuple, Optional
