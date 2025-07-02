@@ -58,6 +58,14 @@ section[data-testid="stSidebar"] {
 }
 </style>
 """, unsafe_allow_html=True)
+st.markdown("""
+<style>
+[data-testid="stAppViewContainer"] {
+    background-color: #000 !important;
+    background-image: none !important;
+}
+</style>
+""", unsafe_allow_html=True)
 import pandas as pd
 import numpy as np
 from typing import Dict, List, Tuple, Optional

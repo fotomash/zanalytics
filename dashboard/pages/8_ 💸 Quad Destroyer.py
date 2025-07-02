@@ -25,7 +25,7 @@ import json
 from pathlib import Path
 import math
 # st.set_page_config(
-#     page_title="🏛️ ZANFLOW v12 - Institutional Trading Dashboard",
+#     page_title="🏛️ Dashboard",
 #     page_icon="🏛️",
 #     layout="wide",
 #     initial_sidebar_state="expanded"
@@ -852,7 +852,6 @@ def create_institutional_master_chart(df: pd.DataFrame, symbol: str, timeframe: 
         shared_xaxes=True,
         vertical_spacing=0.01,
         subplot_titles=(
-            f'{symbol} {timeframe} - ZANFLOW v12 Institutional Analysis',
             'Volume Profile & Session Analysis',
             'Smart Money Concepts (SMC)',
             'Wyckoff Phase Analysis',
@@ -1143,11 +1142,7 @@ def create_institutional_master_chart(df: pd.DataFrame, symbol: str, timeframe: 
 
     # Update layout with institutional styling
     fig.update_layout(
-        title=dict(
-            text=f'🏛️ ZANFLOW v12 - {symbol} {timeframe} Institutional Analysis',
-            font=dict(size=28, color='#FFD700', family='Inter'),
-            x=0.5
-        ),
+
         template='plotly_dark',
         height=1200,
         showlegend=True,

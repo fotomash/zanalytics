@@ -1,57 +1,3 @@
-def show_cache_files():
-    import os
-    st.sidebar.markdown("### 🗂️ Cache Folder Files")
-    cache_dir = ".cache"
-    if not os.path.exists(cache_dir):
-        st.sidebar.info("No cache folder found yet.")
-        return
-    files = os.listdir(cache_dir)
-    if not files:
-        st.sidebar.info("Cache folder is empty.")
-    else:
-        st.sidebar.write("\n".join(sorted(files)))
-
-import os
-import pickle
-
-# --- PATCH: Ensure .cache directory exists ---
-def ensure_cache_dir():
-    os.makedirs(".cache", exist_ok=True)
-ensure_cache_dir()
-
-# --- PATCH: auto_cache and macro sentiment cache use .cache/ ---
-def auto_cache(key, fetch_fn, refresh=False):
-    ensure_cache_dir()
-    cache_file = os.path.join(".cache", f"{key}.pkl")
-    if not refresh and os.path.exists(cache_file):
-        with open(cache_file, "rb") as f:
-            return pickle.load(f)
-    result = fetch_fn()
-    with open(cache_file, "wb") as f:
-        pickle.dump(result, f)
-    return result
-
-def load_or_fetch_macro_sentiment(snapshot, refresh=False):
-    ensure_cache_dir()
-    cache_file = os.path.join(".cache", "macro_sentiment_cache.txt")
-    if not refresh and os.path.exists(cache_file):
-        with open(cache_file, "r") as f:
-            return f.read()
-    result = fetch_openai_macro_sentiment(
-        dxy_price=snapshot['dxy']['current'],
-        vix_price=snapshot['vix']['current'],
-        gold_price=edm.get_index_quote("GC=F", "Gold")['current'],
-        oil_price=edm.get_index_quote("CL=F", "Oil")['current'],
-        us10y=edm.get_bond_yields()["US 10Y"]["current"],
-        de10y=edm.get_bond_yields()["DE 10Y"]["current"],
-    )
-    with open(cache_file, "w") as f:
-        f.write(result)
-    return result
-import pandas as pd
-from datetime import datetime
-from typing import Dict, Any, Optional
-from fredapi import Fred
 
 import streamlit as st
 from openai import OpenAI
@@ -60,29 +6,16 @@ st.set_page_config(page_title="Zanalyttics Dashboard", page_icon="🚀", layout=
 
 client = OpenAI(api_key=st.secrets["opanai_API"])
 
-def fetch_openai_macro_sentiment(dxy_price, vix_price, gold_price, oil_price, us10y, de10y):
-    prompt = f"""
-    Perform a real-time intermarket sentiment analysis based on:
-
-    - DXY: {dxy_price}
-    - VIX: {vix_price}
-    - GOLD (XAUUSD): {gold_price}
-    - OIL (WTI Crude): {oil_price}
-    - US 10Y Yield: {us10y}
-    - German 10Y Bund: {de10y}
-
-    Analyze current behavior vs historical reactions to macro events (CPI, FOMC, NFP).
-    Cover volatility risks, correlations, and cross-asset rotations.
-
-    Format output in markdown with clear sections like:
-    - 📊 VIX Insight
-    - 🪙 Gold Macro Context
-    - 🛢️ Oil Macro Context
-    - ⚠️ Key Takeaways for Traders
-    """
+def fetch_openai_macro_sentiment():
+    prompt = (
+        "Generate a comprehensive intermarket sentiment analysis focused on: "
+        "VIX, DXY, US10Y, and German Bonds. Format in markdown. "
+        "Include current interpretation, behavior, cross-market interaction, and trader guidance. "
+        "Conclude with a summary of key risks or macro pressure points."
+    )
     try:
         response = client.chat.completions.create(
-            model="o3-mini",
+            model="gpt-3.5-turbo",
             messages=[{"role": "user", "content": prompt}]
         )
         return response.choices[0].message.content
@@ -93,251 +26,24 @@ def get_high_impact_news():
     keywords = ["FOMC", "CPI", "NFP", "unemployment", "GDP", "central bank", "rate hike", "inflation"]
     try:
         import requests
-        st.write("DEBUG: get_high_impact_news - about to fetch news from Finnhub")
         response = requests.get("https://finnhub.io/api/v1/news?category=general&token=" + st.secrets["finnhub_API"])
         articles = response.json()
-        st.write("DEBUG: Raw articles fetched from Finnhub:", articles)
         filtered = [a for a in articles if any(k.lower() in a["headline"].lower() for k in keywords)]
-        st.write("DEBUG: Filtered high-impact news:", filtered)
         return filtered
     except:
         return []
-class EconomicDataManager:
-    def get_short_volume_data(self, ticker="AAPL", limit=7):
-        import requests
-        import pandas as pd
 
-        api_key = st.secrets.get("polygon_api_key") or "DyEadGzDCLwCJomppjGgDFXXUCW94ONO"
-        url = "https://api.polygon.io/stocks/v1/short-volume"
-        params = {
-            "ticker": ticker,
-            "limit": limit,
-            "sort": "date.desc",
-            "apiKey": api_key
-        }
+st.markdown("### 🧨 High-Impact Economic Releases")
+news = get_high_impact_news()
+if news:
+    for n in news[:5]:
+        st.markdown(f"- **[{n['headline']}]({n['url']})**  
+📅 <small>{n['datetime']}</small>", unsafe_allow_html=True)
+else:
+    st.info("No FOMC/CPI-related headlines detected.")
 
-        try:
-            r = requests.get(url, params=params, timeout=10)
-            r.raise_for_status()
-            data = r.json().get("results", [])
-            df = pd.DataFrame(data)
-            df["date"] = pd.to_datetime(df["date"])
-            return df[["date", "short_volume_ratio", "short_volume", "total_volume"]]
-        except Exception as e:
-            st.error(f"Failed to fetch short volume: {e}")
-            return pd.DataFrame()
-    def get_finnhub_headlines(
-        self,
-        symbols=("XAU", "EURUSD", "GBPUSD", "BTC"),
-        max_articles=12,
-        category="forex",
-    ):
-        """
-        Fetch headlines from Finnhub and keep only those that mention any of the
-        symbols tuple (case-insensitive).
-        """
-        import requests, time, pandas as pd, datetime as dt
-
-        API_KEY = st.secrets.get("finnhub_api_key") or "d07lgo1r01qrslhp3q3g"
-        url = "https://finnhub.io/api/v1/news"
-        params = {"category": category, "token": API_KEY}
-        try:
-            r = requests.get(url, params=params, timeout=10)
-            r.raise_for_status()
-            raw = r.json()
-            filtered = [
-                art for art in raw
-                if any(sym.lower() in (art.get("headline", "") + art.get("summary", "")).lower() for sym in symbols)
-            ][:max_articles]
-            if not filtered:
-                return pd.DataFrame()
-            df = pd.DataFrame(filtered)
-            df["datetime"] = df["datetime"].apply(
-                lambda x: dt.datetime.utcfromtimestamp(x).strftime("%Y-%m-%d %H:%M")
-            )
-            df = df[["datetime", "source", "headline", "url"]]
-            return df
-        except Exception as e:
-            st.error(f"Finnhub news fetch failed: {e}")
-            return pd.DataFrame()
-    def get_newsapi_headlines(self, country="gb", category="business", page_size=10):
-        """
-        Fetches top news headlines from NewsAPI for a given country and category.
-        """
-        import requests
-        API_KEY = st.secrets.get("newsapi_key") or "713b3bd82121482aaa0ecdc9af77b6da"
-        url = f"https://newsapi.org/v2/top-headlines"
-        params = {
-            "apiKey": API_KEY,
-            "country": country,
-            "category": category,
-            "pageSize": page_size
-        }
-        try:
-            r = requests.get(url, params=params, timeout=10)
-            r.raise_for_status()
-            articles = r.json().get("articles", [])
-            return articles
-        except Exception as e:
-            st.error(f"Failed to fetch news: {e}")
-            return []
-    def get_economic_events_api(self, country_list=None, importance="high"):
-        """
-        Fetches upcoming economic events from Trading Economics API.
-        Args:
-            country_list: List of country names (e.g., ['united states', 'germany', 'united kingdom', 'euro area']) or None for all.
-            importance: "high", "medium", "low", or None for all events.
-        Returns:
-            pd.DataFrame of events (date, country, event, actual, forecast, previous, importance).
-        """
-        import requests
-        import pandas as pd
-
-        API_KEY = st.secrets.get("trading_economics_api_key") or "1750867cdfc34c6:288nxdz64y932qq"
-        base_url = "https://api.tradingeconomics.com/calendar"
-        params = {"c": API_KEY}
-        if country_list:
-            params["countries"] = ",".join(country_list)
-        importance_map = {"high": 3, "medium": 2, "low": 1}
-        if importance in importance_map:
-            params["importance"] = importance_map[importance]
-
-        try:
-            r = requests.get(base_url, params=params, timeout=15)
-            r.raise_for_status()
-            events = r.json()
-            if not events:
-                return pd.DataFrame()
-            df = pd.DataFrame(events)
-            df['date'] = pd.to_datetime(df['date'])
-            df = df[['date', 'country', 'event', 'actual', 'forecast', 'previous', 'importance', 'unit', 'reference']]
-            return df
-        except Exception as e:
-            st.error(f"Failed to fetch economic calendar: {e}")
-            return pd.DataFrame()
-    def get_index_quote_history(self, ticker: str, label: str, lookback=14):
-        try:
-            t = yf.Ticker(ticker)
-            hist = t.history(period=f"{lookback}d")
-            if not hist.empty:
-                hist = hist[['Close']]
-                hist = hist.rename(columns={"Close": "Close"})
-                hist["Date"] = hist.index
-                return hist
-        except Exception:
-            return None
-    """ Manages fetching live economic data using yfinance and web scraping. """
-
-    def _safe_secret(self, key, default=""):
-        return st.secrets.get(key) if key in st.secrets else default
-
-    def __init__(self, api_key: Optional[str] = None):
-        """
-        Initializes the data manager.
-        The api_key is kept for potential future use but is not required for yfinance.
-        """
-        self.api_key = api_key
-        fred_key = st.secrets.get("fred_api_key") or "6a980b8c2421503564570ecf4d765173"
-        self.fred = Fred(api_key=fred_key)
-
-    def get_svix_quote(self) -> Dict[str, Any]:
-        """ Fetches the latest quote for SVIX using yfinance. """
-        try:
-            ticker = yf.Ticker("SVIX")
-            hist = ticker.history(period="2d")
-            if len(hist) >= 2:
-                current_price, prev_price = hist['Close'].iloc[-1], hist['Close'].iloc[-2]
-                return {'name': 'SVIX', 'current': current_price, 'change': current_price - prev_price}
-            return {'name': 'SVIX', 'error': 'No data'}
-        except Exception as e:
-            return {'name': 'SVIX', 'error': str(e)}
-
-    def get_bond_yields(self) -> Dict[str, Dict[str, Any]]:
-        """Fetch latest 10‑year bond yields from FRED."""
-        tickers = {
-            "US 10Y": "DGS10",
-            "DE 10Y": "IRLTLT01DEM156N",
-            "GB 10Y": "IRLTLT01GBM156N",
-            "JP 10Y": "IRLTLT01JPM156N",
-        }
-        yield_data = {}
-        for name, code in tickers.items():
-            try:
-                series = self.fred.get_series(code)
-                if series is not None and not series.empty:
-                    current = float(series.dropna().iloc[-1])
-                    prev = float(series.dropna().iloc[-2]) if len(series.dropna()) >= 2 else current
-                    yield_data[name] = {
-                        'current': round(current, 3),
-                        'change': round(current - prev, 3)
-                    }
-                else:
-                    yield_data[name] = {'error': 'No data'}
-            except Exception:
-                yield_data[name] = {'error': 'Fetch failed'}
-        return yield_data
-
-    def get_index_quote(self, ticker: str, label: str) -> Dict[str, Any]:
-        """Fetch last and delta for an index using yfinance."""
-        try:
-            t = yf.Ticker(ticker)
-            hist = t.history(period="3d")
-            if len(hist) >= 2:
-                last, prev = hist['Close'].iloc[-1], hist['Close'].iloc[-2]
-                return {'name': label, 'current': round(last, 2), 'change': round(last - prev, 2)}
-            elif len(hist) == 1:
-                last = hist['Close'].iloc[-1]
-                return {'name': label, 'current': round(last, 2), 'change': 0}
-            else:
-                return {'name': label, 'error': 'No data'}
-        except Exception as e:
-            return {'name': label, 'error': str(e)}
-
-    # Removed get_economic_events (obsolete scraping method)
-
-    def get_polygon_news(self, ticker="C:EURUSD", limit=10):
-        """Fetch recent news articles for a specific asset via Polygon.io."""
-        import requests
-        api_key = st.secrets.get("polygon_api_key") or "DyEadGzDCLwCJomppjGgDFXXUCW94ONO"
-        url = f"https://api.polygon.io/v2/reference/news?ticker={ticker}&limit={limit}&apiKey={api_key}"
-        try:
-            r = requests.get(url, timeout=10)
-            r.raise_for_status()
-            return r.json().get("results", [])
-        except Exception as e:
-            st.warning(f"Polygon news fetch failed for {ticker}: {e}")
-            return []
-
-    def get_polygon_fx_snapshot(self, pairs=("C:EURUSD", "C:GBPUSD", "C:USDJPY")):
-        """
-        Fetch real‑time FX bid/ask/last via Polygon snapshot endpoint.
-        Returns a dict keyed by pair.
-        """
-        import requests, pandas as pd, datetime as dt
-        api_key = st.secrets.get("polygon_api_key") or "DyEadGzDCLwCJomppjGgDFXXUCW94ONO"
-        results = {}
-        for p in pairs:
-            url = f"https://api.polygon.io/v2/snapshot/locale/global/markets/forex/tickers/{p}?apiKey={api_key}"
-            try:
-                r = requests.get(url, timeout=6)
-                r.raise_for_status()
-                data = r.json().get("ticker", {})
-                if data:
-                    last = data.get("close", {}).get("price")
-                    change = data.get("day", {}).get("change")
-                    pct = data.get("day", {}).get("percent_change")
-                    results[p.replace('C:','')] = {
-                        "last": round(last, 5) if last else None,
-                        "Δ": f"{change:+.5f}" if change else None,
-                        "%": f"{pct:+.2f}%" if pct else None,
-                        "time": dt.datetime.utcfromtimestamp(data.get("updated")).strftime("%H:%M:%S") if data.get("updated") else ""
-                    }
-            except Exception as e:
-                results[p] = {"error": str(e)}
-        return pd.DataFrame.from_dict(results, orient="index")
-
-
-edm = EconomicDataManager()
+if st.button("📈 Fetch Full Intermarket Sentiment"):
+    st.markdown(fetch_openai_macro_sentiment())
 
 
 # --- Original Dashboard Below ---
@@ -383,6 +89,29 @@ def get_image_as_base64(path):
 
 
 # --- Economic Data Manager ---
+
+
+def display_macro_microcharts(self):
+    import altair as alt
+    st.markdown("### 📉 Macro Asset Microcharts")
+    assets = [
+        ("DX-Y.NYB", "DXY"),
+        ("^VIX", "VIX"),
+        ("^TNX", "US10Y"),
+        ("BUND.DE", "Bunds")
+    ]
+    cols = st.columns(2)
+    for i, (ticker, label) in enumerate(assets):
+        hist = self.economic_manager.get_index_quote_history(ticker, label, lookback=14)
+        if hist is not None and not hist.empty:
+            if "Date" not in hist.columns:
+                hist = hist.reset_index()
+            chart = alt.Chart(hist).mark_line().encode(
+                x=alt.X("Date:T", axis=None),
+                y=alt.Y("Close:Q", scale=alt.Scale(zero=False), axis=None)
+            ).properties(height=80, width=160, title=label)
+            cols[i % 2].altair_chart(chart, use_container_width=False)
+
 class EconomicDataManager:
     def get_short_volume_data(self, ticker="AAPL", limit=7):
         import requests
@@ -757,7 +486,8 @@ class MarketOverviewDashboard:
             st.session_state.chart_theme = 'plotly_dark'
 
     def run(self):
-
+        st.set_page_config(page_title="Zanalyttics Dashboard", page_icon="🚀", layout="wide",
+                           initial_sidebar_state="expanded")
 
         img_base64 = get_image_as_base64("image_af247b.jpg")
         if img_base64:
@@ -811,74 +541,56 @@ class MarketOverviewDashboard:
 
         market_data = self._load_market_data(data_sources)
 
-        # --- PATCH: Modernize Key Index & Commodity Trends with snapshot mini-cards ---
-        # Trend metrics cache, 3 per row, consistent mini-card style
-        refresh_market_data = st.session_state.get("refresh_market_data", False)
-        def render_snapshot_grouped(metrics):
-            st.markdown(
-                '''
-                <div style='background-color: rgba(0,0,0,0.25); padding: 1.1rem; border-radius: 12px; box-shadow: 0 2px 10px rgba(0,0,0,0.12); margin-bottom:1.4rem;'>
-                ''', unsafe_allow_html=True
-            )
-            for i in range(0, len(metrics), 3):
-                row = metrics[i:i+3]
-                cols = st.columns(len(row))
-                for col, (label, quote, yvals) in zip(cols, row):
-                    value = quote.get("current", "N/A")
-                    delta = quote.get("change", 0)
-                    color = "#26de81" if delta and float(delta) > 0 else "#fc5c65" if delta and float(delta) < 0 else "#e7eaf0"
-                    with col:
-                        st.markdown(f"<div style='text-align:center;color:#e7eaf0;font-size:1.05em;'>{label}</div>", unsafe_allow_html=True)
-                        st.markdown(f"<div style='text-align:center;font-size:2.4em;font-weight:bold;color:white'>{value}</div>", unsafe_allow_html=True)
-                        if delta not in ("N/A", None):
-                            arrow = "▲" if float(delta) > 0 else "▼"
-                            st.markdown(f"<div style='text-align:center;font-size:1.1em;color:{color};padding-bottom:0.2em;'>{arrow} {delta}</div>", unsafe_allow_html=True)
-                        # Sparkline (cached)
-                        if yvals:
-                            import plotly.graph_objects as go
-                            fig_spark = go.Figure()
-                            fig_spark.add_trace(go.Scatter(
-                                x=list(range(len(yvals))),
-                                y=yvals,
-                                mode="lines",
-                                line=dict(color="#FFD600", width=2),
-                                showlegend=False,
-                                hoverinfo="skip",
-                            ))
-                            fig_spark.update_layout(
-                                margin=dict(l=0, r=0, t=10, b=10),
-                                height=70,
-                                width=150,
-                                paper_bgcolor="rgba(0,0,0,0.0)",
-                                plot_bgcolor="rgba(0,0,0,0.0)",
-                            )
-                            fig_spark.update_xaxes(visible=False, showgrid=False, zeroline=False)
-                            fig_spark.update_yaxes(visible=False, showgrid=False, zeroline=False)
-                            st.plotly_chart(fig_spark, use_container_width=True)
-            st.markdown("</div>", unsafe_allow_html=True)
+        # Removed heatmap and correlation matrix display and separators as requested
 
-        trend_keys = [
-            ("NASDAQ", "nasdaq_quote", "nasdaq_chart", "^IXIC", "NASDAQ"),
-            ("US30", "us30_quote", "us30_chart", "^DJI", "US30"),
-            ("DAX", "dax_quote", "dax_chart", "^GDAXI", "DAX"),
-            ("Gold", "gold_quote", "gold_chart", "GC=F", "Gold"),
-            ("DXY", "dxy_quote", "dxy_chart", "DX-Y.NYB", "DXY"),
-            ("EURUSD", "eurusd_quote", "eurusd_chart", "EURUSD=X", "EURUSD"),
-        ]
-        trend_metrics = []
-        for label, qkey, ckey, ticker, tlabel in trend_keys:
-            quote = auto_cache(qkey, lambda t=ticker, l=tlabel: edm.get_index_quote(t, l), refresh=refresh_market_data)
-            chart_hist = auto_cache(ckey, lambda t=ticker, l=tlabel: edm.get_index_quote_history(t, l, lookback=20)['Close'].tolist() if edm.get_index_quote_history(t, l, lookback=20) is not None else [], refresh=refresh_market_data)
-            trend_metrics.append((label, quote, chart_hist))
-
-        st.markdown("### 📈 Key Index & Commodity Trends")
-        render_snapshot_grouped(trend_metrics)
-
+        # self.display_finnhub_news()
+        # self.display_polygon_news()
+        # self.display_live_fx_quotes()
+        self.display_selected_index_trends()
         self.display_next_week_events()
         self.display_news_headlines()
         st.markdown("⚠️ FX quotes and news feeds are temporarily unavailable due to API restrictions. Please check your API keys and access rights.")
 
-    # display_selected_index_trends removed (replaced by modern snapshot cards)
+    def display_selected_index_trends(self):
+        import altair as alt
+
+        st.markdown("### 📈 Key Index & Commodity Trends")
+
+        assets = [
+            ("^IXIC", "NASDAQ"),
+            ("^DJI", "US30"),
+            ("^GDAXI", "DAX"),
+            ("GC=F", "Gold"),
+            ("DX-Y.NYB", "DXY"),
+            ("EURUSD=X", "EURUSD")
+        ]
+
+        def arrow(val):
+            if val == "N/A" or val == 0:
+                return "→"
+            return "↑" if val > 0 else "↓"
+
+        for ticker, label in assets:
+            # Get chart data
+            hist = self.economic_manager.get_index_quote_history(ticker, label, lookback=14)
+            # Get current value and delta
+            quote = self.economic_manager.get_index_quote(ticker, label)
+            if hist is not None and not hist.empty:
+                if quote.get("error"):
+                    display_title = f"#### {label} (unavailable)"
+                else:
+                    val = quote.get("current", "N/A")
+                    delta = quote.get("change", "N/A")
+                    arr = arrow(delta)
+                    display_title = f"#### {label} {val} {arr}"
+                st.markdown(display_title)
+                chart = alt.Chart(hist).mark_line().encode(
+                    x=alt.X("Date:T", title="Date"),
+                    y=alt.Y("Close:Q", title=f"{label} Price", scale=alt.Scale(zero=False))
+                ).properties(height=180)
+                st.altair_chart(chart, use_container_width=True)
+            else:
+                st.caption(f"No data available for {label}.")
 
     def display_news_headlines(self):
         st.markdown("### 🗞️ UK Business News")
@@ -922,106 +634,130 @@ class MarketOverviewDashboard:
                             st.caption("No data")
 
     def display_macro_sentiment(self):
-        import plotly.graph_objects as go
-        import re
-        import os, pickle
-        # --- PATCH: Unified Refresh Button at the top ---
-        refresh_market_data = st.button("🔄 Refresh Data", key="refresh_market_data")
+        import altair as alt
 
-        # --- PATCH: Cache all metrics ONCE at the top; group snapshot charts in rows of 3 ---
-        # Chart keys: label, quote_key, chart_key, ticker, label
-        chart_keys = [
-            ("DXY", "dxy_quote", "dxy_chart", "DX-Y.NYB", "DXY"),
-            ("VIX", "vix_quote", "vix_chart", "^VIX", "VIX"),
-            ("Gold", "gold_quote", "gold_chart", "GC=F", "Gold"),
-            ("Oil", "oil_quote", "oil_chart", "CL=F", "Oil"),
-            ("US 10Y", "us10y_quote", "us10y_chart", "DGS10", "US 10Y"),
-            ("DE 10Y", "de10y_quote", "de10y_chart", "IRLTLT01DEM156N", "DE 10Y"),
-            ("NASDAQ", "nasdaq_quote", "nasdaq_chart", "^IXIC", "NASDAQ"),
-            ("S&P", "spx_quote", "spx_chart", "^GSPC", "S&P 500"),
-            ("DAX", "dax_quote", "dax_chart", "^GDAXI", "DAX"),
-        ]
+        st.markdown("<h3 style='margin-bottom:0.7rem'>🌍 Market Snapshot</h3>", unsafe_allow_html=True)
+        
+        # Fetch data
+        dxy_hist = self.economic_manager.get_index_quote_history("DX-Y.NYB", "DXY", lookback=14)
+        vix_hist = self.economic_manager.get_index_quote_history("^VIX", "VIX", lookback=14)
+        dxy = self.economic_manager.get_index_quote("DX-Y.NYB", "DXY")
+        vix = self.economic_manager.get_index_quote("^VIX", "VIX")
+        bonds = self.economic_manager.get_bond_yields()
 
-        # --- PATCH: Deduplicate by pre-fetching/caching all quotes and all chart histories in two dictionaries, then using those below ---
-        quotes_cache = {}
-        history_cache = {}
-        for label, qkey, ckey, ticker, tlabel in chart_keys:
-            if "10Y" not in label:
-                quotes_cache[qkey] = auto_cache(qkey, lambda t=ticker, l=tlabel: edm.get_index_quote(t, l), refresh=refresh_market_data)
+        def arrow(val):
+            if val == "N/A" or val == 0:
+                return "→"
+            return "⬆️" if val > 0 else "⬇️"
+
+        def color(val):
+            if val == "N/A" or val == 0:
+                return "inherit"
+            return "#26de81" if val > 0 else "#fc5c65"
+
+        # Build table data with colored arrows
+        snapshot = []
+        for market, data in [("DXY", dxy), ("VIX", vix)]:
+            if data.get('error'):
+                snapshot.append({
+                    "Market": market,
+                    "Value": "N/A",
+                    "Δ": data.get('error')
+                })
             else:
-                quotes_cache[qkey] = auto_cache(qkey, lambda l=label: edm.get_bond_yields().get(label, {}), refresh=refresh_market_data)
-            # Only fetch history ONCE per metric
-            history_cache[ckey] = auto_cache(
-                ckey,
-                lambda t=ticker, l=tlabel: (
-                    edm.get_index_quote_history(t, l, lookback=20)['Close'].tolist()
-                    if edm.get_index_quote_history(t, l, lookback=20) is not None else []
-                ),
-                refresh=refresh_market_data
-            )
+                delta = data["change"]
+                snap = {
+                    "Market": market,
+                    "Value": data["current"],  # Ensure numeric for Arrow compatibility
+                    "Δ": f"<span style='color:{color(delta)}'>{delta:+.2f} {arrow(delta)}</span>"
+                }
+                snapshot.append(snap)
+        for name, data in bonds.items():
+            if data.get('error'):
+                snapshot.append({
+                    "Market": name,
+                    "Value": "N/A",
+                    "Δ": data.get('error')
+                })
+            else:
+                snapshot.append({
+                    "Market": name,
+                    "Value": round(data['current'], 3),  # Numeric value, not string with %
+                    "Δ": f"{data['change']:+.3f}"
+                })
+        # df = pd.DataFrame(snapshot)
 
-        cached_metrics = []
-        for label, qkey, ckey, ticker, tlabel in chart_keys:
-            cached_metrics.append((label, quotes_cache[qkey], history_cache[ckey]))
+        # Custom HTML table rendering to show styled arrows
+        styled_rows = ""
+        for row in snapshot:
+            market = row["Market"]
+            value = row["Value"]
+            delta = row["Δ"]
+            styled_rows += f"<tr><td>{market}</td><td>{value}</td><td>{delta}</td></tr>"
 
-        # --- PATCH: Render snapshot metrics grouped in rows of 3 at the top ---
-        def render_snapshot_grouped(metrics):
-            st.markdown(
-                '''
-                <div style='background-color: rgba(0,0,0,0.25); padding: 1.1rem; border-radius: 12px; box-shadow: 0 2px 10px rgba(0,0,0,0.12); margin-bottom:1.4rem;'>
-                ''', unsafe_allow_html=True
-            )
-            for i in range(0, len(metrics), 3):
-                row = metrics[i:i+3]
-                cols = st.columns(len(row))
-                for col, (label, quote, yvals) in zip(cols, row):
-                    value = quote.get("current", "N/A")
-                    delta = quote.get("change", 0)
-                    color = "#26de81" if delta and float(delta) > 0 else "#fc5c65" if delta and float(delta) < 0 else "#e7eaf0"
-                    with col:
-                        st.markdown(f"<div style='text-align:center;color:#e7eaf0;font-size:1.05em;'>{label}</div>", unsafe_allow_html=True)
-                        st.markdown(f"<div style='text-align:center;font-size:2.4em;font-weight:bold;color:white'>{value}</div>", unsafe_allow_html=True)
-                        if delta not in ("N/A", None):
-                            arrow = "▲" if float(delta) > 0 else "▼"
-                            st.markdown(f"<div style='text-align:center;font-size:1.1em;color:{color};padding-bottom:0.2em;'>{arrow} {delta}</div>", unsafe_allow_html=True)
-                        # Sparkline (cached)
-                        if yvals:
-                            fig_spark = go.Figure()
-                            fig_spark.add_trace(go.Scatter(
-                                x=list(range(len(yvals))),
-                                y=yvals,
-                                mode="lines",
-                                line=dict(color="#FFD600", width=2),
-                                showlegend=False,
-                                hoverinfo="skip",
-                            ))
-                            fig_spark.update_layout(
-                                margin=dict(l=0, r=0, t=10, b=10),
-                                height=70,
-                                width=150,
-                                paper_bgcolor="rgba(0,0,0,0.0)",
-                                plot_bgcolor="rgba(0,0,0,0.0)",
-                            )
-                            fig_spark.update_xaxes(visible=False, showgrid=False, zeroline=False)
-                            fig_spark.update_yaxes(visible=False, showgrid=False, zeroline=False)
-                            st.plotly_chart(fig_spark, use_container_width=True)
-            st.markdown("</div>", unsafe_allow_html=True)
+        html_table = f"""
+<style>
+.market-table {{
+    border-collapse: collapse;
+    width: 100%;
+}}
+.market-table th, .market-table td {{
+    border: 1px solid #3a3f4b;
+    padding: 8px 12px;
+    text-align: left;
+    font-size: 0.95rem;
+}}
+.market-table th {{
+    background-color: #1f2c3b;
+    color: #ffffff;
+}}
+.market-table td {{
+    background-color: #1a222d;
+    color: #e7eaf0;
+}}
+</style>
+<table class="market-table">
+<thead>
+<tr><th>Market</th><th>Value</th><th>Δ</th></tr>
+</thead>
+<tbody>
+{styled_rows}
+</tbody>
+</table>
+"""
+        st.markdown(html_table, unsafe_allow_html=True)
 
-        render_snapshot_grouped(cached_metrics)
+        # Add sparklines below
+        st.markdown("---")
+        col1, col2 = st.columns(2)
+        with col1:
+            st.markdown("##### DXY Trend (14d)")
+            if dxy_hist is not None:
+                if "Date" not in dxy_hist.columns:
+                    dxy_hist = dxy_hist.reset_index()
+                chart_dxy = alt.Chart(dxy_hist).mark_line(color="#2d8cff").encode(
+                    x=alt.X("Date:T", axis=alt.Axis(labels=False, ticks=False, title=None)),
+                    y=alt.Y("Close:Q", scale=alt.Scale(zero=False), axis=alt.Axis(labels=False, ticks=False, title=None))
+                ).properties(width=170, height=52)
+                st.altair_chart(chart_dxy, use_container_width=True)
+            else:
+                st.write("No DXY data")
+        with col2:
+            st.markdown("##### VIX Trend (14d)")
+            if vix_hist is not None:
+                if "Date" not in vix_hist.columns:
+                    vix_hist = vix_hist.reset_index()
+                chart_vix = alt.Chart(vix_hist).mark_line(color="#fc5c65").encode(
+                    x=alt.X("Date:T", axis=alt.Axis(labels=False, ticks=False, title=None)),
+                    y=alt.Y("Close:Q", scale=alt.Scale(zero=False), axis=alt.Axis(labels=False, ticks=False, title=None))
+                ).properties(width=170, height=52)
+                st.altair_chart(chart_vix, use_container_width=True)
+            else:
+                st.write("No VIX data")
 
-        # --- PATCH: Macro Market Analysis section below snapshot ---
-        st.markdown("## Macro Market Analysis")
-        macro_md = load_or_fetch_macro_sentiment(
-            {
-                'dxy': cached_metrics[0][1], 'vix': cached_metrics[1][1],
-                'gold': cached_metrics[2][1], 'oil': cached_metrics[3][1],
-                'us10y': cached_metrics[4][1], 'de10y': cached_metrics[5][1],
-            },
-            refresh=refresh_market_data
-        )
-        st.markdown(macro_md, unsafe_allow_html=True)
+    self.display_macro_microcharts()
 
-    def display_next_week_events(self):
+def display_next_week_events(self):
         """Displays next week's key economic events."""
         st.markdown("### 🗓️ Next Week's High-Impact Events")
         today = datetime.today()
@@ -1133,5 +869,4 @@ class MarketOverviewDashboard:
 
 if __name__ == "__main__":
     dashboard = MarketOverviewDashboard()
-    show_cache_files()
     dashboard.run()

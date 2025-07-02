@@ -108,20 +108,20 @@ def setup_page_config():
         
         /* Professional header styling */
         .header-style {
-            background: linear-gradient(90deg, #667eea 0%, #764ba2 100%);
+            background: rgba(10, 10, 10, 0.8);
             padding: 1rem;
             border-radius: 10px;
             margin-bottom: 2rem;
             text-align: center;
             box-shadow: 0 4px 15px rgba(102, 126, 234, 0.4);
         }
-        
+        x
         /* Metric cards styling */
         .metric-card {
-            background: rgba(255, 255, 255, 0.1);
+            background: rgba(10, 10, 10, 0.2);
             padding: 1rem;
             border-radius: 8px;
-            border-left: 4px solid #667eea;
+            border-left: 4px solid rgba(255, 255, 255, 0.1);
             margin-bottom: 1rem;
             backdrop-filter: blur(10px);
         }

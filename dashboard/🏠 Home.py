@@ -5,6 +5,14 @@ Zanalytics Dashboard
 A focused dashboard providing at-a-glance market intelligence and an overview of available data.
 """
 import streamlit as st
+
+# Set Streamlit page config as the very first Streamlit command
+st.set_page_config(
+    page_title="Zanalytics Dashboard",
+    page_icon="🚀",
+    layout="wide",
+    initial_sidebar_state="expanded"
+)
 import pandas as pd
 import numpy as np
 import plotly.graph_objects as go
@@ -19,6 +27,20 @@ from typing import Dict, Optional
 import base64
 import yfinance as yf
 from fredapi import Fred
+# --- PATCH: Caching Utilities ---
+import pickle
+def ensure_cache_dir():
+    os.makedirs(".cache", exist_ok=True)
+def auto_cache(key, fetch_fn, refresh=False):
+    ensure_cache_dir()
+    cache_file = os.path.join(".cache", f"{key}.pkl")
+    if not refresh and os.path.exists(cache_file):
+        with open(cache_file, "rb") as f:
+            return pickle.load(f)
+    result = fetch_fn()
+    with open(cache_file, "wb") as f:
+        pickle.dump(result, f)
+    return result
 
 # Suppress warnings for a cleaner output
 # Suppress warnings for a cleaner output
@@ -75,8 +97,13 @@ class ZanalyticsDashboard:
             st.session_state.chart_theme = 'plotly_dark'
 
     def run(self):
-        st.set_page_config(page_title="Zanalytics Dashboard", page_icon="🚀", layout="wide",
-                           initial_sidebar_state="expanded")
+        # PATCH: Add refresh button and cache file sidebar
+        if "refresh_home_data" not in st.session_state:
+            st.session_state["refresh_home_data"] = False
+        refresh_home_data = st.button("🔄 Refresh All Chart/Data Cache")
+        if refresh_home_data:
+            st.session_state["refresh_home_data"] = True
+
         st.markdown("""
         <style>
         section[data-testid="stSidebar"] {
@@ -111,6 +138,20 @@ class ZanalyticsDashboard:
         </style>
         """, unsafe_allow_html=True)
 
+        # PATCH: Show .cache folder files in the sidebar
+        def show_cache_files():
+            st.sidebar.markdown("### 🗂️ Cache Folder Files")
+            cache_dir = ".cache"
+            if not os.path.exists(cache_dir):
+                st.sidebar.info("No cache folder found yet.")
+                return
+            files = os.listdir(cache_dir)
+            if not files:
+                st.sidebar.info("Cache folder is empty.")
+            else:
+                st.sidebar.write("\n".join(sorted(files)))
+        show_cache_files()
+
         if not self.data_dir.exists():
             st.error(f"Data directory not found at: `{self.data_dir}`")
             st.info(
@@ -122,6 +163,9 @@ class ZanalyticsDashboard:
             data_sources = self.scan_all_data_sources()
         # Moved st.success to display_home_page
         self.display_home_page(data_sources)
+        # PATCH: Reset refresh flag at end of run
+        if "refresh_home_data" in st.session_state and st.session_state["refresh_home_data"]:
+            st.session_state["refresh_home_data"] = False
 
     def display_home_page(self, data_sources):
         # --- Quant-Desk Welcome Block (Updated Design) ---
@@ -129,8 +173,8 @@ class ZanalyticsDashboard:
             """
             <div style='
                 margin: 0 auto 1.1rem auto;
-                max-width: 900px;
-                width: 98%;
+                max-width: 100%;
+                width: 100%;
                 text-align: center;
                 padding: 0.2em 0 0.1em 0;
                 background: linear-gradient(to right, rgba(103,116,255,0.15), rgba(176,66,255,0.15));
@@ -139,38 +183,26 @@ class ZanalyticsDashboard:
                 box-shadow: 0 2px 12px rgba(103,116,255,0.10);
             '>
                 <span style='
-                    font-size: 1.65rem;
-                    font-weight: 700;
+                    font-family: "Segoe UI", "Montserrat", "Inter", "Arial", sans-serif;
+                    font-size: 2.1rem;
+                    font-weight: 800;
                     color: #fff;
-                    letter-spacing: -0.02em;
+                    letter-spacing: 0.02em;
                     display: block;
-                    margin-bottom: 0.15em;
+                    margin-bottom: 0.13em;
+                    text-transform: uppercase;
                 '>
-                    Zanalytics Quant Market Desk
+                    ZANALYTICS
                 </span>
                 <span style='
-                    font-size: 1.09rem;
+                    font-family: "Segoe UI", "Montserrat", "Inter", "Arial", sans-serif;
+                    font-size: 1.12rem;
                     color: #eee;
                     font-weight: 600;
                     display: block;
-                    margin-bottom: 0.2em;
+                    margin-bottom: 0.19em;
                 '>
-                    AI-Powered Global Market Intelligence
-                </span>
-                <span style='
-                    font-size: 1.01rem;
-                    color: #dbeafe;
-                    display: block;
-                    margin-bottom: 0.25em;
-                '>
-                    Microstructure • Liquidity Flows • Macro Trends
-                </span>
-                <span style='
-                    font-size: 0.97rem;
-                    color: #bfc8da;
-                    line-height: 1.42;
-                    display: block;
-                '>
+                    AI / ML Powered Global Market Intelligence
                 </span>
             </div>
             """,
@@ -310,21 +342,31 @@ class ZanalyticsDashboard:
                         'markdown': 'rgba(220, 40, 40, 0.08)'
                     }
 
+                    # Draw shaded vrects for phases, and annotate once per phase (inside each band)
+                    last_phase = None
                     for phase, start, end in phases:
                         fig_xau.add_vrect(
                             x0=start, x1=end,
                             fillcolor=phase_colors[phase], opacity=0.13, line_width=0, layer="below"
                         )
-                        fig_xau.add_annotation(
-                            x=start,
-                            y=df_recent['high'].max(),
-                            text=phase.title(),
-                            showarrow=False,
-                            font=dict(size=13, color=phase_colors[phase].replace("0.08", "0.8")),
-                            bgcolor="rgba(0,0,0,0.4)",
-                            yshift=16,
-                            opacity=0.9
-                        )
+                        # Annotate inside the band for the first occurrence of each phase
+                        if phase != last_phase:
+                            win = df_recent[(df_recent["timestamp"] >= start) & (df_recent["timestamp"] <= end)]
+                            if not win.empty:
+                                y_mid = (win['high'].max() + win['low'].min()) / 2
+                            else:
+                                y_mid = df_recent['close'].iloc[-1]
+                            fig_xau.add_annotation(
+                                x=start,
+                                y=y_mid,
+                                text=phase.title(),
+                                showarrow=False,
+                                font=dict(size=13, color=phase_colors[phase].replace("0.08", "0.8")),
+                                bgcolor="rgba(0,0,0,0.4)",
+                                yshift=0,
+                                opacity=0.9
+                            )
+                            last_phase = phase
 
                     # --- Add phase annotation to the chart title ---
                     current_phase = None
@@ -352,16 +394,150 @@ class ZanalyticsDashboard:
                         },
                         template=st.session_state.get('chart_theme', 'plotly_dark'),
                         height=460,
+                        autosize=True,
                         paper_bgcolor="rgba(0,0,0,0.02)",
                         plot_bgcolor="rgba(0,0,0,0.02)",
                         xaxis_rangeslider_visible=False,
                         margin=dict(l=20, r=20, t=40, b=20)
                     )
+                    # Remove the legend from the top-right
+                    fig_xau.update_layout(showlegend=False)
+                    # Plot the chart directly at top-level so it stretches full width
                     st.plotly_chart(fig_xau, use_container_width=True)
             else:
                 st.warning("No XAUUSD 15min parquet file found in PARQUET_DATA_DIR.")
         except Exception as e:
             st.error(f"Failed to load XAUUSD 15min candlestick chart: {e}")
+
+        # --- EURUSD and GBPUSD 15-Minute Candlestick Charts (with FVG, Midas VWAP, Wyckoff) ---
+        for fx_pair in ["EURUSD", "GBPUSD"]:
+            try:
+                parquet_dir = Path(st.secrets["PARQUET_DATA_DIR"])
+                parquet_file = next(parquet_dir.glob(f"**/{fx_pair}*15min*.parquet"), None)
+                if parquet_file:
+                    df = pd.read_parquet(parquet_file)
+                    required_cols = {"timestamp", "open", "high", "low", "close", "volume"}
+                    if not required_cols.issubset(df.columns):
+                        st.info(f"{fx_pair} 15min parquet file missing required columns: {required_cols - set(df.columns)}")
+                        continue
+                    df["timestamp"] = pd.to_datetime(df["timestamp"])
+                    df = df.sort_values(by="timestamp")
+                    df_recent = df.tail(300)
+
+                    fig_fx = go.Figure(data=[go.Candlestick(
+                        x=df_recent["timestamp"],
+                        open=df_recent["open"],
+                        high=df_recent["high"],
+                        low=df_recent["low"],
+                        close=df_recent["close"],
+                        increasing_line_color='lime',
+                        decreasing_line_color='red',
+                        name=f'{fx_pair} 15min'
+                    )])
+
+                    # FVG overlays
+                    for i in range(2, len(df_recent)):
+                        prev = df_recent.iloc[i-2]
+                        curr = df_recent.iloc[i]
+                        if curr["low"] > prev["high"]:
+                            fig_fx.add_vrect(
+                                x0=df_recent.iloc[i-1]["timestamp"], x1=curr["timestamp"],
+                                fillcolor="rgba(0,255,0,0.13)", opacity=0.26, line_width=0, layer="below"
+                            )
+                        elif curr["high"] < prev["low"]:
+                            fig_fx.add_vrect(
+                                x0=df_recent.iloc[i-1]["timestamp"], x1=curr["timestamp"],
+                                fillcolor="rgba(255,0,0,0.13)", opacity=0.26, line_width=0, layer="below"
+                            )
+
+                    # Anchored VWAP (Midas style)
+                    vwap_prices = (df_recent['high'] + df_recent['low'] + df_recent['close']) / 3
+                    cumulative_vol = df_recent['volume'].cumsum()
+                    vwap = (vwap_prices * df_recent['volume']).cumsum() / cumulative_vol
+                    fig_fx.add_trace(go.Scatter(x=df_recent["timestamp"], y=vwap, mode='lines', name='Midas VWAP',
+                                                line=dict(color='gold', width=2, dash='dot')))
+
+                    # Wyckoff regime detection
+                    phases = []
+                    window = 42
+                    close = df_recent['close'].values
+                    for i in range(len(close) - window):
+                        win = close[i:i+window]
+                        atr = (df_recent['high'].iloc[i:i+window] - df_recent['low'].iloc[i:i+window]).mean()
+                        minmax_range = win.max() - win.min()
+                        slope = (win[-1] - win[0]) / window
+                        if minmax_range < 1.2 * atr and abs(slope) < 0.08 * atr:
+                            phases.append(('accumulation', df_recent.iloc[i]["timestamp"], df_recent.iloc[i+window]["timestamp"]))
+                        elif slope > 0.10 * atr:
+                            phases.append(('markup', df_recent.iloc[i]["timestamp"], df_recent.iloc[i+window]["timestamp"]))
+                        elif minmax_range < 1.2 * atr and abs(slope) < 0.08 * atr and i > 0:
+                            phases.append(('distribution', df_recent.iloc[i]["timestamp"], df_recent.iloc[i+window]["timestamp"]))
+                        elif slope < -0.10 * atr:
+                            phases.append(('markdown', df_recent.iloc[i]["timestamp"], df_recent.iloc[i+window]["timestamp"]))
+                    phase_colors = {
+                        'accumulation': 'rgba(0, 90, 255, 0.08)',
+                        'markup': 'rgba(0, 200, 70, 0.08)',
+                        'distribution': 'rgba(255, 160, 0, 0.08)',
+                        'markdown': 'rgba(220, 40, 40, 0.08)'
+                    }
+                    last_phase = None
+                    for phase, start, end in phases:
+                        fig_fx.add_vrect(
+                            x0=start, x1=end,
+                            fillcolor=phase_colors[phase], opacity=0.13, line_width=0, layer="below"
+                        )
+                        if phase != last_phase:
+                            win = df_recent[(df_recent["timestamp"] >= start) & (df_recent["timestamp"] <= end)]
+                            if not win.empty:
+                                y_mid = (win['high'].max() + win['low'].min()) / 2
+                            else:
+                                y_mid = df_recent['close'].iloc[-1]
+                            fig_fx.add_annotation(
+                                x=start,
+                                y=y_mid,
+                                text=phase.title(),
+                                showarrow=False,
+                                font=dict(size=13, color=phase_colors[phase].replace("0.08", "0.8")),
+                                bgcolor="rgba(0,0,0,0.4)",
+                                yshift=0,
+                                opacity=0.9
+                            )
+                            last_phase = phase
+                    # Chart title with phase
+                    current_phase = None
+                    if phases:
+                        last_ts = df_recent["timestamp"].max()
+                        for phase, start, end in reversed(phases):
+                            if end >= last_ts:
+                                current_phase = phase
+                                break
+                        if not current_phase:
+                            current_phase = phases[-1][0]
+                    phase_label = f"Wyckoff: <b style='color:orange;'>{current_phase.upper()}</b>" if current_phase else ""
+                    chart_title = f"{fx_pair} – 15-Minute Candlestick Chart with FVG, Midas VWAP & {phase_label}"
+                    fig_fx.update_layout(
+                        title={
+                            'text': chart_title,
+                            'y':0.93,
+                            'x':0.5,
+                            'xanchor': 'center',
+                            'yanchor': 'top'
+                        },
+                        template=st.session_state.get('chart_theme', 'plotly_dark'),
+                        height=370,
+                        autosize=True,
+                        paper_bgcolor="rgba(0,0,0,0.02)",
+                        plot_bgcolor="rgba(0,0,0,0.02)",
+                        xaxis_rangeslider_visible=False,
+                        margin=dict(l=20, r=20, t=40, b=20),
+                        showlegend=False
+                    )
+                    fig_fx.update_layout(showlegend=False)
+                    st.plotly_chart(fig_fx, use_container_width=True)
+                else:
+                    st.info(f"No {fx_pair} 15min parquet file found in PARQUET_DATA_DIR.")
+            except Exception as e:
+                st.warning(f"Failed to load {fx_pair} 15min candlestick chart: {e}")
 
         self.create_dxy_chart()
         st.markdown(
@@ -371,34 +547,53 @@ class ZanalyticsDashboard:
             unsafe_allow_html=True,
         )
 
-        # --- DXY 3D Surface Chart ---
-        dxy_data = self.economic_manager.get_dxy_data()
-        if dxy_data is not None and not dxy_data.empty:
-            time_bins = np.arange(len(dxy_data))
-            z_vals = np.abs(dxy_data['Close'].diff().fillna(0).values)
-            fig3d = go.Figure(data=[go.Scatter3d(
-                x=time_bins,
-                y=dxy_data['Close'],
-                z=z_vals,
-                mode='lines+markers',
-                marker=dict(size=4, color=z_vals, colorscale='Viridis', opacity=0.8),
-                line=dict(color='royalblue', width=2)
-            )])
-            fig3d.update_layout(
-                title="DXY - 3D Price and Volatility Chart",
-                scene=dict(
-                    xaxis_title="Time",
-                    yaxis_title="DXY Price",
-                    zaxis_title="|Price Δ|"
-                ),
-                margin=dict(l=20, r=20, t=40, b=20),
-                template=st.session_state.get('chart_theme', 'plotly_dark'),
-                height=440,
-                paper_bgcolor="rgba(0,0,0,0.02)",
-                plot_bgcolor="rgba(0,0,0,0.02)",
-            )
-            # Only show the Plotly chart title for the DXY 3D chart (remove st.markdown title)
-            st.plotly_chart(fig3d, use_container_width=True)
+        # --- XAUUSD 3D Visualization of FVG & SMC (15min) ---
+        try:
+            parquet_dir = Path(st.secrets["PARQUET_DATA_DIR"])
+            parquet_file = next(parquet_dir.glob("**/XAUUSD*15min*.parquet"), None)
+            if parquet_file:
+                df_3d = pd.read_parquet(parquet_file)
+                if "timestamp" in df_3d.columns and "close" in df_3d.columns:
+                    df_3d = df_3d.sort_values("timestamp")
+                    df_3d["timestamp"] = pd.to_datetime(df_3d["timestamp"])
+                    df_3d_recent = df_3d.tail(200)
+                    x_vals = df_3d_recent["timestamp"]
+                    y_vals = df_3d_recent["close"]
+                    z_vals = np.abs(df_3d_recent["close"].diff().fillna(0))
+                    fig_xau_3d = go.Figure(data=[go.Scatter3d(
+                        x=x_vals,
+                        y=y_vals,
+                        z=z_vals,
+                        mode='markers',
+                        marker=dict(
+                            size=6,
+                            color=z_vals,
+                            colorscale='Plasma',
+                            opacity=0.85,
+                            colorbar=dict(title="Volatility"),
+                        ),
+                        name="FVG & SMC"
+                    )])
+                    fig_xau_3d.update_layout(
+                        title="XAUUSD - 3D Visualization of FVG & SMC (15min)",
+                        scene=dict(
+                            xaxis_title="Timestamp",
+                            yaxis_title="Close Price",
+                            zaxis_title="Volatility (|ΔClose|)"
+                        ),
+                        margin=dict(l=20, r=20, t=40, b=20),
+                        template=st.session_state.get('chart_theme', 'plotly_dark'),
+                        height=440,
+                        paper_bgcolor="rgba(0,0,0,0.02)",
+                        plot_bgcolor="rgba(0,0,0,0.02)",
+                    )
+                    st.plotly_chart(fig_xau_3d, use_container_width=True)
+                else:
+                    st.info("XAUUSD 15min parquet missing 'timestamp' or 'close' column for 3D FVG/SMC chart.")
+            else:
+                st.info("No XAUUSD 15min parquet file found for 3D FVG/SMC visualization.")
+        except Exception as e:
+            st.warning(f"Error loading 3D XAUUSD FVG/SMC chart: {e}")
 
         st.markdown("<hr style='margin-top:1.5rem'>", unsafe_allow_html=True)
 
@@ -435,12 +630,51 @@ class ZanalyticsDashboard:
 '>
 """, unsafe_allow_html=True)
         cols = st.columns(len(latest_yields))
+        # --- For sparkline charts ---
+        yield_tickers = {
+            "US": "DGS10",
+            "Germany": "IRLTLT01DEM156N",
+            "Japan": "IRLTLT01JPM156N",
+            "UK": "IRLTLT01GBM156N",
+        }
         for i, (country, val) in enumerate(latest_yields.items()):
             prev_val = previous_yields.get(country)
             delta = None
             if prev_val is not None and val != "N/A":
                 delta = round(val - prev_val, 3)
             cols[i].metric(country, f"{val}%" if val != 'N/A' else val, delta)
+
+            # --- Insert mini-chart (sparkline) below metric for each country ---
+            try:
+                ticker = yield_tickers.get(country)
+                if ticker is not None:
+                    # Fetch last 50 yield values from FRED
+                    series = self.fred.get_series(ticker).dropna()
+                    if len(series) >= 2:
+                        yvals = series.iloc[-50:].values
+                        xvals = list(range(len(yvals)))
+                        # Make sparkline plot
+                        fig_spark = go.Figure()
+                        fig_spark.add_trace(go.Scatter(
+                            x=xvals,
+                            y=yvals,
+                            mode="lines",
+                            line=dict(color="#FFD600", width=2),
+                            showlegend=False,
+                            hoverinfo="skip",
+                        ))
+                        fig_spark.update_layout(
+                            margin=dict(l=0, r=0, t=10, b=10),
+                            height=80,
+                            width=160,
+                            paper_bgcolor="rgba(0,0,0,0.0)",
+                            plot_bgcolor="rgba(0,0,0,0.0)",
+                        )
+                        fig_spark.update_xaxes(visible=False, showgrid=False, zeroline=False)
+                        fig_spark.update_yaxes(visible=False, showgrid=False, zeroline=False)
+                        cols[i].plotly_chart(fig_spark, use_container_width=False)
+            except Exception:
+                pass
         st.markdown("</div>", unsafe_allow_html=True)
 
         # Move the "About Zanalytics Trading Frameworks" expander here, after yields table, before datasets and footer
@@ -505,8 +739,13 @@ class ZanalyticsDashboard:
         }
         latest_yields, previous_yields = {}, {}
         for country, code in tickers.items():
+            # PATCH: cache each FRED yield series
+            series = auto_cache(
+                f"home_{country}_10y_yield_series",
+                lambda c=code: self.fred.get_series(c).dropna(),
+                refresh=st.session_state.get("refresh_home_data", False)
+            )
             try:
-                series = self.fred.get_series(code).dropna()
                 latest = float(series.iloc[-1])
                 prev = float(series.iloc[-2]) if len(series) > 1 else None
                 latest_yields[country] = round(latest, 3)
@@ -532,11 +771,10 @@ class ZanalyticsDashboard:
 
     def create_dxy_chart(self):
         st.markdown("#### 💵 U.S. Dollar Index (DXY) – 15‑Minute Candlestick")
-        dxy_data = self.economic_manager.get_dxy_data()
+        # PATCH: Use cache
+        dxy_data = auto_cache("home_dxy_15m", lambda: self.economic_manager.get_dxy_data(), refresh=st.session_state.get("refresh_home_data", False))
         if dxy_data is not None and not dxy_data.empty:
-            # Plot the most-recent 200 M15 bars (~3 days)
             candles = dxy_data.reset_index().tail(200)
-
             fig_candles = go.Figure(data=[go.Candlestick(
                 x=candles.index,
                 open=candles['Open'],
@@ -547,7 +785,6 @@ class ZanalyticsDashboard:
                 decreasing_line_color='red',
                 name='DXY M15'
             )])
-
             fig_candles.update_layout(
                 title="DXY – 15-Minute Candlestick Chart (latest 200 bars)",
                 template=st.session_state.get('chart_theme', 'plotly_dark'),
@@ -557,7 +794,6 @@ class ZanalyticsDashboard:
                 xaxis_rangeslider_visible=False,
                 margin=dict(l=20, r=20, t=40, b=20)
             )
-
             st.plotly_chart(fig_candles, use_container_width=True)
         else:
             st.info("Could not load DXY chart data.")
