@@ -1663,6 +1663,7 @@ These documents expand on engineered-liquidity traps, Wyckoff sweeps, and the VP
                 fig_sp.add_trace(go.Bar(
                     x=counts.index,
                     y=counts.values,
+
                     name='Spoofing Events',
                     marker=dict(color='#17becf')
                 ))

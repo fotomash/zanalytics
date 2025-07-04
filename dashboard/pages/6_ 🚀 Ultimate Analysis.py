@@ -319,8 +319,15 @@ class UltimateZANFLOWDashboard:
                     title="Market Performance Heatmap (%)"
                 )
 
+                # Apply black theme styling
                 fig.update_layout(
-                    template=st.session_state.get('chart_theme', 'plotly_dark'),
+                    paper_bgcolor="black",
+                    plot_bgcolor="black",
+                    font=dict(color="white"),
+                    xaxis=dict(gridcolor="gray", zeroline=False, showline=False, color="white"),
+                    yaxis=dict(gridcolor="gray", zeroline=False, showline=False, color="white"),
+                    margin=dict(l=0, r=0, t=30, b=30),
+                    legend=dict(font=dict(color="white")),
                     height=400
                 )
 
@@ -411,8 +418,15 @@ class UltimateZANFLOWDashboard:
                         title="Price Correlation Matrix"
                     )
 
+                    # Apply black theme styling
                     fig.update_layout(
-                        template=st.session_state.get('chart_theme', 'plotly_dark'),
+                        paper_bgcolor="black",
+                        plot_bgcolor="black",
+                        font=dict(color="white"),
+                        xaxis=dict(gridcolor="gray", zeroline=False, showline=False, color="white"),
+                        yaxis=dict(gridcolor="gray", zeroline=False, showline=False, color="white"),
+                        margin=dict(l=0, r=0, t=30, b=30),
+                        legend=dict(font=dict(color="white")),
                         height=500
                     )
 
@@ -537,7 +551,7 @@ class UltimateZANFLOWDashboard:
             shared_xaxes=True
         )
 
-        # Main candlestick chart
+        # --- Pimped up Candlestick chart with shadows and depth ---
         fig.add_trace(
             go.Candlestick(
                 x=df.index,
@@ -546,43 +560,48 @@ class UltimateZANFLOWDashboard:
                 low=df['low'],
                 close=df['close'],
                 name="Price",
-                increasing_line_color='lime',
-                decreasing_line_color='red'
+                increasing_line_color='limegreen',
+                decreasing_line_color='crimson',
+                # Shadow/depth effect: thicker contrasting marker lines
+                increasing_line_width=2.5,
+                decreasing_line_width=2.5,
+                # Add marker line contrast for depth
+                # Marker line is not directly supported for candlestick, so we use thicker lines and color
             ), row=1, col=1
         )
 
-        # Moving averages with labels
+        # Moving averages with labels (slightly wider for pop)
         ma_colors = {'ema_8': '#ff6b6b', 'ema_21': '#4ecdc4', 'ema_55': '#45b7d1', 'sma_200': '#96ceb4'}
         for ma, color in ma_colors.items():
             if ma in df.columns:
                 fig.add_trace(go.Scatter(
                     x=df.index, y=df[ma],
                     mode='lines', name=ma.upper(),
-                    line=dict(color=color, width=2)
+                    line=dict(color=color, width=2.7)
                 ), row=1, col=1)
 
-        # Bollinger Bands
+        # Bollinger Bands (make upper/lower more visible)
         if all(col in df.columns for col in ['BB_Upper_20', 'BB_Lower_20']):
             fig.add_trace(go.Scatter(
                 x=df.index, y=df['BB_Upper_20'],
                 mode='lines', name='BB Upper',
-                line=dict(color='gray', width=1, dash='dash'),
+                line=dict(color='rgba(200,200,200,0.7)', width=1.4, dash='dash'),
                 showlegend=False
             ), row=1, col=1)
 
             fig.add_trace(go.Scatter(
                 x=df.index, y=df['BB_Lower_20'],
                 mode='lines', name='BB Lower',
-                line=dict(color='gray', width=1, dash='dash'),
-                fill='tonexty', fillcolor='rgba(128,128,128,0.1)',
+                line=dict(color='rgba(200,200,200,0.7)', width=1.4, dash='dash'),
+                fill='tonexty', fillcolor='rgba(128,128,128,0.10)',
                 showlegend=False
             ), row=1, col=1)
 
-        # SMC Analysis overlays
+        # SMC Analysis overlays (pimped up in add_smc_overlays)
         if st.session_state.get('show_smc', True):
             self.add_smc_overlays(fig, df, row=1)
 
-        # Wyckoff Analysis overlays
+        # Wyckoff Analysis overlays (pimped up in add_wyckoff_overlays)
         if st.session_state.get('show_wyckoff', True):
             self.add_wyckoff_overlays(fig, df, row=1)
 
@@ -595,7 +614,9 @@ class UltimateZANFLOWDashboard:
                 x=df.index, y=df['volume'],
                 name='Volume',
                 marker_color=colors,
-                opacity=0.7
+                opacity=0.7,
+                marker_line_width=1.2,
+                marker_line_color='rgba(0,0,0,0.2)'
             ), row=2, col=1)
 
             # Volume moving average
@@ -603,7 +624,7 @@ class UltimateZANFLOWDashboard:
                 fig.add_trace(go.Scatter(
                     x=df.index, y=df['volume_sma_20'],
                     mode='lines', name='Vol MA20',
-                    line=dict(color='orange', width=2)
+                    line=dict(color='orange', width=2.2)
                 ), row=2, col=1)
 
         # Momentum indicators
@@ -611,7 +632,7 @@ class UltimateZANFLOWDashboard:
             fig.add_trace(go.Scatter(
                 x=df.index, y=df['rsi_14'],
                 mode='lines', name='RSI 14',
-                line=dict(color='purple', width=2)
+                line=dict(color='purple', width=2.2)
             ), row=3, col=1)
 
             # RSI levels
@@ -623,31 +644,38 @@ class UltimateZANFLOWDashboard:
             fig.add_trace(go.Scatter(
                 x=df.index, y=df['MACD_12_26_9'],
                 mode='lines', name='MACD',
-                line=dict(color='blue', width=2)
+                line=dict(color='blue', width=2.2)
             ), row=4, col=1)
 
             fig.add_trace(go.Scatter(
                 x=df.index, y=df['MACDs_12_26_9'],
                 mode='lines', name='Signal',
-                line=dict(color='red', width=2)
+                line=dict(color='red', width=2.2)
             ), row=4, col=1)
 
-        # Update layout
+        # --- Enhanced background: dark illuminated gradient effect ---
+        # Plotly doesn't support real gradients directly, but we can simulate with a dark "off-black" and panel effect.
+        # We'll use a dark blue-black as the plot_bgcolor and paper_bgcolor, and use a subtle background image for gradient if desired.
+        # Here, we use a slightly blue-tinted black for a "glow" feel.
         fig.update_layout(
-            title="",  # Remove in-chart title
-            template=st.session_state.get('chart_theme', 'plotly_dark'),
-            paper_bgcolor='rgba(0,0,0,0.02)',
-            plot_bgcolor='rgba(0,0,0,0.02)',
+            title="",
+            paper_bgcolor="rgba(0,0,0,1)",
+            plot_bgcolor="rgba(10,15,35,1)",  # dark blue-black
+            font=dict(color="white"),
+            # Dimensional gridlines
+            xaxis=dict(gridcolor="rgba(255,255,255,0.10)", zeroline=False, showline=False, color="white"),
+            yaxis=dict(gridcolor="rgba(255,255,255,0.10)", zeroline=False, showline=False, color="white"),
+            margin=dict(l=0, r=0, t=30, b=30),
+            legend=dict(font=dict(color="white")),
             showlegend=False,
             xaxis_rangeslider_visible=False,
-            height=500,
-            margin=dict(l=20, r=20, t=40, b=20)
+            height=500
         )
 
         st.plotly_chart(fig, use_container_width=True)
 
     def add_smc_overlays(self, fig, df, row=1):
-        """Add Smart Money Concepts overlays"""
+        """Add Smart Money Concepts overlays - pimped up with glow and size"""
         # Fair Value Gaps
         if 'bullish_fvg' in df.columns:
             fvg_bullish = df[df['bullish_fvg'] == True]
@@ -655,7 +683,13 @@ class UltimateZANFLOWDashboard:
                 fig.add_trace(go.Scatter(
                     x=fvg_bullish.index, y=fvg_bullish['low'],
                     mode='markers', name='Bullish FVG',
-                    marker=dict(symbol='triangle-up', color='lime', size=12),
+                    marker=dict(
+                        symbol='triangle-up',
+                        color='lime',
+                        size=14,  # +2 from previous
+                        opacity=0.9,
+                        line=dict(width=2, color='rgba(0,255,0,0.7)')  # subtle glow
+                    ),
                     showlegend=True
                 ), row=row, col=1)
 
@@ -665,7 +699,13 @@ class UltimateZANFLOWDashboard:
                 fig.add_trace(go.Scatter(
                     x=fvg_bearish.index, y=fvg_bearish['high'],
                     mode='markers', name='Bearish FVG',
-                    marker=dict(symbol='triangle-down', color='red', size=12),
+                    marker=dict(
+                        symbol='triangle-down',
+                        color='red',
+                        size=14,
+                        opacity=0.9,
+                        line=dict(width=2, color='rgba(255,0,0,0.7)')
+                    ),
                     showlegend=True
                 ), row=row, col=1)
 
@@ -676,7 +716,13 @@ class UltimateZANFLOWDashboard:
                 fig.add_trace(go.Scatter(
                     x=ob_bullish.index, y=ob_bullish['low'],
                     mode='markers', name='Bullish OB',
-                    marker=dict(symbol='square', color='lightgreen', size=10),
+                    marker=dict(
+                        symbol='square',
+                        color='lightgreen',
+                        size=12,
+                        opacity=0.9,
+                        line=dict(width=2, color='rgba(0,255,100,0.7)')
+                    ),
                     showlegend=True
                 ), row=row, col=1)
 
@@ -686,7 +732,13 @@ class UltimateZANFLOWDashboard:
                 fig.add_trace(go.Scatter(
                     x=ob_bearish.index, y=ob_bearish['high'],
                     mode='markers', name='Bearish OB',
-                    marker=dict(symbol='square', color='lightcoral', size=10),
+                    marker=dict(
+                        symbol='square',
+                        color='lightcoral',
+                        size=12,
+                        opacity=0.9,
+                        line=dict(width=2, color='rgba(255,50,50,0.7)')
+                    ),
                     showlegend=True
                 ), row=row, col=1)
 
@@ -697,20 +749,30 @@ class UltimateZANFLOWDashboard:
                 fig.add_trace(go.Scatter(
                     x=structure_breaks.index, y=structure_breaks['close'],
                     mode='markers', name='Structure Break',
-                    marker=dict(symbol='x', color='yellow', size=15),
+                    marker=dict(
+                        symbol='x',
+                        color='yellow',
+                        size=17,
+                        opacity=0.9,
+                        line=dict(width=2, color='rgba(255,255,0,0.7)')
+                    ),
                     showlegend=True
                 ), row=row, col=1)
 
     def add_wyckoff_overlays(self, fig, df, row=1):
-        """Add Wyckoff analysis overlays"""
-        # Wyckoff phases
+        """Add Wyckoff analysis overlays, pimped up with larger, glowing markers"""
         phase_colors = {
             1: 'blue',    # Accumulation
-            2: 'red',     # Distribution  
+            2: 'red',     # Distribution
             3: 'green',   # Markup
             4: 'orange'   # Markdown
         }
-
+        phase_line_colors = {
+            1: 'rgba(100,180,255,0.7)',
+            2: 'rgba(255,100,100,0.7)',
+            3: 'rgba(100,255,100,0.7)',
+            4: 'rgba(255,200,100,0.7)'
+        }
         if 'wyckoff_phase' in df.columns:
             for phase, color in phase_colors.items():
                 phase_data = df[df['wyckoff_phase'] == phase]
@@ -719,7 +781,12 @@ class UltimateZANFLOWDashboard:
                     fig.add_trace(go.Scatter(
                         x=phase_data.index, y=phase_data['close'],
                         mode='markers', name=f'Wyckoff {phase_names[phase]}',
-                        marker=dict(color=color, size=8, opacity=0.7),
+                        marker=dict(
+                            color=color,
+                            size=10,  # +2 from previous
+                            opacity=0.9,
+                            line=dict(width=2, color=phase_line_colors[phase])
+                        ),
                         showlegend=True
                     ), row=row, col=1)
 
@@ -750,11 +817,29 @@ class UltimateZANFLOWDashboard:
 
             with col1:
                 st.markdown("### 📊 Price Change Distribution")
-                fig = px.histogram(
-                    price_changes,
-                    nbins=50,
-                    title="Price Change Distribution",
-                    template=st.session_state.get('chart_theme', 'plotly_dark')
+                hist_data = np.histogram(price_changes, bins=50)
+                fig = go.Figure()
+                fig.add_trace(go.Bar(
+                    x=0.5 * (hist_data[1][1:] + hist_data[1][:-1]),  # bin centers
+                    y=hist_data[0],
+                    marker=dict(
+                        color='lightskyblue',
+                        line=dict(width=1, color='white'),
+                        opacity=0.9
+                    ),
+                    width=(hist_data[1][1] - hist_data[1][0]),
+                    name="Price Changes"
+                ))
+                fig.update_layout(
+                    title="Price Change Distribution (3D Style)",
+                    paper_bgcolor="black",
+                    plot_bgcolor="black",
+                    font=dict(color="white"),
+                    xaxis=dict(gridcolor="gray", zeroline=False, showline=False, color="white", title="Return"),
+                    yaxis=dict(gridcolor="gray", zeroline=False, showline=False, color="white", title="Count"),
+                    margin=dict(l=0, r=0, t=30, b=30),
+                    legend=dict(font=dict(color="white")),
+                    height=400
                 )
                 st.plotly_chart(fig, use_container_width=True)
 
@@ -773,7 +858,13 @@ class UltimateZANFLOWDashboard:
                 ))
                 fig.update_layout(
                     title="20-Period Rolling Volatility",
-                    template=st.session_state.get('chart_theme', 'plotly_dark')
+                    paper_bgcolor="black",
+                    plot_bgcolor="black",
+                    font=dict(color="white"),
+                    xaxis=dict(gridcolor="gray", zeroline=False, showline=False, color="white"),
+                    yaxis=dict(gridcolor="gray", zeroline=False, showline=False, color="white"),
+                    margin=dict(l=0, r=0, t=30, b=30),
+                    legend=dict(font=dict(color="white"))
                 )
                 st.plotly_chart(fig, use_container_width=True)
 
@@ -803,7 +894,7 @@ class UltimateZANFLOWDashboard:
             if bullish_fvgs + bull_obs > bearish_fvgs + bear_obs:
                 bias = "🟢 BULLISH"
             elif bearish_fvgs + bear_obs > bullish_fvgs + bull_obs:
-                bias = "🔴 BEARISH" 
+                bias = "🔴 BEARISH"
             else:
                 bias = "🟡 NEUTRAL"
             st.metric("SMC Bias", bias)
@@ -1160,7 +1251,13 @@ Price: {row['close']:.4f} | Body: {body_size:.2f}%
                 title="Volume Profile",
                 xaxis_title="Volume",
                 yaxis_title="Price",
-                template=st.session_state.get('chart_theme', 'plotly_dark'),
+                paper_bgcolor="black",
+                plot_bgcolor="black",
+                font=dict(color="white"),
+                xaxis=dict(gridcolor="gray", zeroline=False, showline=False, color="white"),
+                yaxis=dict(gridcolor="gray", zeroline=False, showline=False, color="white"),
+                margin=dict(l=0, r=0, t=30, b=30),
+                legend=dict(font=dict(color="white")),
                 height=400
             )
 

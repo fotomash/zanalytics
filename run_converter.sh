@@ -1,11 +1,12 @@
 
 cp -R /Volumes/_bars/* /Users/tom/Documents/_trade/_exports/_tick/_bars
 cp -R /Volumes/_processed/* /Users/tom/Documents/_trade/_exports/_tick/midas_analysis
-cp -R /Volumes/_ticks/* /Users/tom/Documents/_trade/_exports/_tick/
+cp -R /Volumes/_ticks/* /Users/tom/Documents/_trade/_exports/_tick/_raw
 cp -R /Volumes/out/* /Users/tom/Documents/_trade/_exports/_tick/parquet
+cp -R /Volumes/_tick_csv/* /Users/tom/Documents/_trade/_exports/_tick/_raw
 
 '''
-      finnhub_api_key = "d1fiar1r01qig3h21l20d1fiar1r01qig3h21l2g"
+    finnhub_api_key = "d1fiar1r01qig3h21l20d1fiar1r01qig3h21l2g"
     newsapi_key = "713b3bd82121482aaa0ecdc9af77b6da"
     trading_economics_api_key = "1750867cdfc34c6:288nxdz64y932qq"
     fred_api_key = "6a980b8c2421503564570ecf4d765173"
@@ -41,8 +42,7 @@ cd /Users/tom/Documents/_trade/_exports/_tick
   --output /Users/tom/Documents/GitHub/zanalytics/dashboard/data --no-dashboard
 
 /Users/tom/Documents/GitHub/venv2/bin/python \
-  /Users/tom/Documents/_trade/_exports/_tick/ncOS_ultimate_microstructure_analyzeqwer
-  qwer_DEFAULTS.py \
+  /Users/tom/Documents/_trade/_exports/_tick/ncOS_ultimate_microstructure_analyzer.py \
   --directory ./ \
   --no_compression \
   --output_dir /Users/tom/Documents/GitHub/zanalytics/dashboard/data \

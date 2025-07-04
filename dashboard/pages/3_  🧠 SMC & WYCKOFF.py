@@ -292,20 +292,8 @@ class QRTQuantumAnalyzer(QuantumMicrostructureAnalyzer):
         return patterns
 
     def create_qrt_dashboard(self, df: pd.DataFrame, selected_file: str):
-        """Create QRT-level professional dashboard"""
+        """Create QRT-level professional dashboard with upgraded black/3D visual style"""
         import base64
-
-        def get_image_as_base64(path):
-            """Reads an image file and returns its base64 encoded string."""
-            try:
-                with open(path, "rb") as image_file:
-                    return base64.b64encode(image_file.read()).decode()
-            except FileNotFoundError:
-                st.warning(
-                    f"Background image not found at '{path}'. Please ensure it's in the same directory as the script.")
-                return None
-
-        # --- QRT Dashboard Streamlit Implementation ---
         import streamlit as st
         import plotly.graph_objects as go
         from plotly.subplots import make_subplots
@@ -320,34 +308,82 @@ class QRTQuantumAnalyzer(QuantumMicrostructureAnalyzer):
             f"<h2>QRT Trading Signal: <span style='color:#FFD700'>{signals.get('signal', 'N/A').upper()}</span></h2>",
             unsafe_allow_html=True
         )
-        # Metrics row
+        # Metrics row, wrapped in markdown for dark background effect
         col1, col2, col3, col4 = st.columns(4)
         with col1:
+            st.markdown(
+                "<div style='background: #181818; border-radius:7px; padding:8px 4px; margin-bottom:8px'>",
+                unsafe_allow_html=True)
             st.metric("Last Price", f"${df['price_mid'].iloc[-1]:.5f}")
+            st.markdown("</div>", unsafe_allow_html=True)
         with col2:
+            st.markdown(
+                "<div style='background: #181818; border-radius:7px; padding:8px 4px; margin-bottom:8px'>",
+                unsafe_allow_html=True)
             st.metric("Cumulative Delta", f"{df['cumulative_delta'].iloc[-1]:,.0f}")
+            st.markdown("</div>", unsafe_allow_html=True)
         with col3:
+            st.markdown(
+                "<div style='background: #181818; border-radius:7px; padding:8px 4px; margin-bottom:8px'>",
+                unsafe_allow_html=True)
             st.metric("Absorption Ratio", f"{df['absorption_ratio'].iloc[-1]:.2f}")
+            st.markdown("</div>", unsafe_allow_html=True)
         with col4:
+            st.markdown(
+                "<div style='background: #181818; border-radius:7px; padding:8px 4px; margin-bottom:8px'>",
+                unsafe_allow_html=True)
             st.metric("Exhaustion Score", f"{df['exhaustion_score'].iloc[-1]:.2f}")
+            st.markdown("</div>", unsafe_allow_html=True)
+
         # Chart
-        fig = make_subplots(rows=2, cols=1, shared_xaxes=True, vertical_spacing=0.03,
-                            row_heights=[0.7, 0.3])
+        fig = make_subplots(rows=2, cols=1, shared_xaxes=True, vertical_spacing=0.03, row_heights=[0.7, 0.3])
         fig.add_trace(go.Candlestick(
-            x=df['timestamp'], open=df['open'], high=df['high'],
-            low=df['low'], close=df['close'], name="Price"), row=1, col=1)
+            x=df['timestamp'],
+            open=df['open'],
+            high=df['high'],
+            low=df['low'],
+            close=df['close'],
+            name="Price",
+            increasing_line_color='limegreen',
+            decreasing_line_color='crimson',
+            line_width=1.5
+        ), row=1, col=1)
+        # Cumulative Delta (as line)
         fig.add_trace(go.Scatter(
-            x=df['timestamp'], y=df['cumulative_delta'], name="Cumulative Delta", line=dict(color='orange')), row=2,
-            col=1)
+            x=df['timestamp'],
+            y=df['cumulative_delta'],
+            name="Cumulative Delta",
+            line=dict(color='orange', width=2.2),
+            opacity=0.8,
+        ), row=2, col=1)
         # Volume bar chart with robust auto-detection of usable volume column
         volume_candidates = [col for col in df.columns if 'vol' in col.lower() or 'volume' in col.lower()]
         volume_col = next((col for col in volume_candidates if col in df.columns and df[col].sum() > 0), None)
         if volume_col:
             fig.add_trace(go.Bar(
-                x=df['timestamp'], y=df[volume_col], name=f"Volume ({volume_col})", marker_color='rgba(50,150,255,0.2)'), row=2, col=1)
+                x=df['timestamp'],
+                y=df[volume_col],
+                name=f"Volume ({volume_col})",
+                marker_color='rgba(50,150,255,0.7)',
+                marker_line_width=0.5,
+                opacity=0.8,
+            ), row=2, col=1)
         else:
             st.warning("⚠️ No usable volume column found in data.")
-        fig.update_layout(height=600, showlegend=False)
+        # Layout: Black/3D style
+        fig.update_layout(
+            height=600,
+            showlegend=False,
+            paper_bgcolor="black",
+            plot_bgcolor="black",
+            font=dict(color="white"),
+            xaxis=dict(gridcolor="gray", zeroline=False, showline=False, color="white"),
+            yaxis=dict(gridcolor="gray", zeroline=False, showline=False, color="white"),
+            xaxis2=dict(gridcolor="gray", zeroline=False, showline=False, color="white"),
+            yaxis2=dict(gridcolor="gray", zeroline=False, showline=False, color="white"),
+            margin=dict(l=0, r=0, t=30, b=30),
+            legend=dict(font=dict(color="white"))
+        )
         st.plotly_chart(fig, use_container_width=True)
         # Wyckoff Patterns
         with st.expander("🔬 Wyckoff Pattern Detection"):
@@ -662,21 +698,41 @@ if st.session_state.df_to_use is not None:
         with col1:
             current_price = tf_data['close'].iloc[-1]
             price_change = ((current_price - tf_data['close'].iloc[-2]) / tf_data['close'].iloc[-2]) * 100
+            st.markdown(
+                "<div style='background: #181818; border-radius:7px; padding:8px 4px; margin-bottom:8px'>",
+                unsafe_allow_html=True)
             st.metric("Current Price", f"${current_price:.5f}", f"{price_change:+.2f}%")
+            st.markdown("</div>", unsafe_allow_html=True)
         with col2:
             volume_col = 'volume' if 'volume' in tf_data.columns else 'tick_volume' if 'tick_volume' in tf_data.columns else None
+            st.markdown(
+                "<div style='background: #181818; border-radius:7px; padding:8px 4px; margin-bottom:8px'>",
+                unsafe_allow_html=True)
             if volume_col:
                 st.metric("24h Volume", f"{tf_data[volume_col].tail(24).sum():,.0f}")
             else:
                 st.metric("24h Volume", "N/A")
+            st.markdown("</div>", unsafe_allow_html=True)
         with col3:
+            st.markdown(
+                "<div style='background: #181818; border-radius:7px; padding:8px 4px; margin-bottom:8px'>",
+                unsafe_allow_html=True)
             st.metric("Volatility", f"{tf_data['close'].pct_change().std() * 100:.2f}%")
+            st.markdown("</div>", unsafe_allow_html=True)
         with col4:
             high_24h = tf_data['high'].tail(24).max()
+            st.markdown(
+                "<div style='background: #181818; border-radius:7px; padding:8px 4px; margin-bottom:8px'>",
+                unsafe_allow_html=True)
             st.metric("24h High", f"${high_24h:.5f}")
+            st.markdown("</div>", unsafe_allow_html=True)
         with col5:
             low_24h = tf_data['low'].tail(24).min()
+            st.markdown(
+                "<div style='background: #181818; border-radius:7px; padding:8px 4px; margin-bottom:8px'>",
+                unsafe_allow_html=True)
             st.metric("24h Low", f"${low_24h:.5f}")
+            st.markdown("</div>", unsafe_allow_html=True)
 
         chart_builder = ChartBuilder()
         fig = chart_builder.create_main_chart(
@@ -686,6 +742,17 @@ if st.session_state.df_to_use is not None:
             show_volume=show_volume,
             analysis_results=st.session_state.analysis_results
         )
+        # --- PATCH: Apply black/3D style to chart_builder chart if not already set ---
+        if hasattr(fig, "update_layout"):
+            fig.update_layout(
+                paper_bgcolor="black",
+                plot_bgcolor="black",
+                font=dict(color="white"),
+                xaxis=dict(gridcolor="gray", zeroline=False, showline=False, color="white"),
+                yaxis=dict(gridcolor="gray", zeroline=False, showline=False, color="white"),
+                margin=dict(l=0, r=0, t=30, b=30),
+                legend=dict(font=dict(color="white"))
+            )
         st.plotly_chart(fig, use_container_width=True)
 
         if st.session_state.analysis_results:
