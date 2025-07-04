@@ -1,4 +1,3 @@
-
 """
 confluence_engine.py
 Phase 3: Ultra-Fine Confluence Indicator Extraction for Entry Logic
@@ -55,6 +54,30 @@ def compute_confluence_indicators(df_ltf: pd.DataFrame, df_htf: pd.DataFrame = N
             result["entry_grade"] = "medium"
         else:
             result["entry_grade"] = "low"
+
+        # Additional RSI-based tagging if 'rsi' exists
+        if "rsi" in df_ltf.columns:
+            rsi_value = df_ltf["rsi"].iloc[-1]
+            result["rsi"] = round(rsi_value, 2)
+            if rsi_value > 70:
+                result["entry_grade"] = "low"  # Overbought, reduce grade
+            elif rsi_value < 30 and result["entry_grade"] != "high":
+                result["entry_grade"] = "medium"  # Oversold, increase grade if not already high
+
+        # HTF trend alignment if df_htf provided
+        if df_htf is not None and "close" in df_htf.columns and len(df_htf) >= 4:
+            htf_close = df_htf["close"].tail(10).values
+            if len(htf_close) >= 4:
+                htf_slope = htf_close[-1] - htf_close[-4]
+                result["htf_slope"] = round(htf_slope, 4)
+                # Conflict detection
+                if (result["dss_slope"] > 0 and htf_slope < 0) or (result["dss_slope"] < 0 and htf_slope > 0):
+                    # Misaligned trends, downgrade entry grade
+                    result["entry_grade"] = "low"
+            else:
+                result["htf_slope"] = 0.0
+        else:
+            result["htf_slope"] = 0.0
 
     except Exception as e:
         print(f"[confluence_engine] Error computing indicators: {e}")

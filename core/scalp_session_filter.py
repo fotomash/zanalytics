@@ -52,3 +52,66 @@ def is_within_session_time(current_utc: datetime, config: dict) -> dict:
         "utc_time": current_time.strftime("%H:%M"),
         "reason": reason or "Outside allowed session windows"
     }
+
+# --------------------------------------------------------------------------- #
+# Extended utilities for session-based filtering                              #
+# --------------------------------------------------------------------------- #
+def evaluate_session_conditions(
+    current_utc: datetime,
+    config: dict,
+    market_conditions: dict | None = None
+) -> dict:
+    """
+    Combines the basic session‐time filter with optional market condition checks
+    such as minimum volatility or volume.
+
+    Parameters
+    ----------
+    current_utc : datetime
+        Current UTC timestamp (typically `datetime.utcnow()` in calling code).
+    config : dict
+        Configuration dictionary that must include the same keys used by
+        `is_within_session_time`, plus optional:
+            - min_volatility (float) : minimum acceptable volatility metric
+            - min_volume (float)     : minimum acceptable volume metric
+    market_conditions : dict | None
+        Dictionary that can hold real‑time market metrics, e.g.:
+            {"volatility": 0.9, "volume": 1250}
+
+    Returns
+    -------
+    dict
+        The original session check dict, possibly updated with additional
+        failure reasons if market conditions are not met.
+    """
+    session_info = is_within_session_time(current_utc, config)
+
+    # Early exit if time filter already failed
+    if not session_info["session_ok"]:
+        return session_info
+
+    # Enrich checks with volatility / volume if provided
+    if market_conditions:
+        if "min_volatility" in config:
+            if market_conditions.get("volatility", 0) < config["min_volatility"]:
+                session_info["session_ok"] = False
+                session_info["reason"] += " | Volatility below threshold"
+
+        if "min_volume" in config:
+            if market_conditions.get("volume", 0) < config["min_volume"]:
+                session_info["session_ok"] = False
+                session_info["reason"] += " | Volume below threshold"
+
+    return session_info
+
+
+def pretty_print_session_report(session_info: dict) -> None:
+    """
+    Utility logger for quick console debugging of session checks.
+    """
+    print(
+        f"[SESSION] OK={session_info['session_ok']} | "
+        f"UTC={session_info['utc_time']} | "
+        f"Session={session_info['session_name'] or '-'} | "
+        f"Reason={session_info['reason']}"
+    )

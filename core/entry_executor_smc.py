@@ -2,10 +2,10 @@ import pandas as pd
 import numpy as np
 from typing import Dict, Tuple, Optional, List
 from datetime import datetime
-from confirmation_engine_smc import detect_structure_break, ConfirmationConstants
+from core.confirmation_engine_smc import detect_structure_break, ConfirmationConstants
 import logging
 from typing import Optional, Dict, Any
-from telegram_alert_engine import send_simple_summary_alert
+from core.telegram_alert_engine import send_simple_summary_alert
 
 # Default SL buffer in pips if profile does not override
 DEFAULT_SL_BUFFER_PIPS = 1.0
@@ -66,7 +66,7 @@ def scan_confluences(
     return report
 
 # --- Microstructure filter import ---
-from scalp_filters import validate_scalp_signal
+from core.scalp_filters import validate_scalp_signal
 
 
 def find_mitigation_candle(ltf_data: pd.DataFrame, poi_range: List[float], poi_type: str) -> Optional[pd.Series]:

@@ -100,15 +100,30 @@ class ZanalyticsDashboard:
         # PATCH: Add refresh button and cache file sidebar
         if "refresh_home_data" not in st.session_state:
             st.session_state["refresh_home_data"] = False
-        refresh_home_data = st.button("🔄 Refresh All Chart/Data Cache")
+        # Move the refresh button to the sidebar
+        refresh_home_data = st.sidebar.button("🔄 Refresh Cache", key="refresh_home")
         if refresh_home_data:
             st.session_state["refresh_home_data"] = True
+        # Visual cache indicator in sidebar
+        cache_file = os.path.join(".cache", "home_data_sources.pkl")
+        if os.path.exists(cache_file):
+            st.sidebar.success("✅ Cache present")
+        else:
+            st.sidebar.warning("⚠️ No cache")
 
         st.markdown("""
         <style>
         section[data-testid="stSidebar"] {
             background-color: rgba(0,0,0,0.8) !important;
             box-shadow: none !important;
+        }
+        button[kind="secondary"] {
+            background-color: #242424 !important;
+            color: #fff !important;
+            border: 1px solid rgba(250,250,250,0.12) !important;
+            font-weight: 600 !important;
+            padding: 0.5em 1em !important;
+            border-radius: 8px !important;
         }
         </style>
         """, unsafe_allow_html=True)
@@ -147,7 +162,11 @@ class ZanalyticsDashboard:
             return
 
         with st.spinner("🛰️ Scanning all data sources..."):
-            data_sources = self.scan_all_data_sources()
+            data_sources = auto_cache(
+                "home_data_sources",
+                lambda: self.scan_all_data_sources(),
+                refresh=st.session_state.get("refresh_home_data", False)
+            )
         # Moved st.success to display_home_page
         self.display_home_page(data_sources)
         # PATCH: Reset refresh flag at end of run
@@ -254,15 +273,23 @@ class ZanalyticsDashboard:
         # --- XAUUSD 15-Minute Candlestick Chart from Parquet (with FVG, Midas VWAP, Wyckoff Accumulation) ---
         try:
             parquet_dir = Path(st.secrets["PARQUET_DATA_DIR"])
-            parquet_file = next(parquet_dir.glob("**/XAUUSD*15min*.parquet"), None)  # recursive search
+            parquet_file = next(parquet_dir.glob("**/XAUUSD*15min*.parquet"), None)
             if parquet_file:
-                df = pd.read_parquet(parquet_file)
+                df = auto_cache(
+                    "home_chart_xauusd_15min",
+                    lambda: pd.read_parquet(parquet_file).sort_values("timestamp").tail(200),
+                    refresh=st.session_state.get("refresh_home_data", False)
+                )
+                # === PATCH: Only show latest data, not file path ===
+                latest_ts = df["timestamp"].max() if "timestamp" in df.columns else "N/A"
+                st.info(f"Latest XAUUSD data: {latest_ts}")
+                # (Your existing processing/plotting here)
                 if "timestamp" not in df.columns:
                     st.error("Could not locate a 'timestamp' column in the parquet file.")
                 else:
                     df["timestamp"] = pd.to_datetime(df["timestamp"])
                     df = df.sort_values(by="timestamp")
-                    df_recent = df.tail(300)  # analyze a slightly larger window for regimes
+                    df_recent = df.tail(200)
 
                     fig_xau = go.Figure(data=[go.Candlestick(
                         x=df_recent["timestamp"],
@@ -402,14 +429,18 @@ class ZanalyticsDashboard:
                 parquet_dir = Path(st.secrets["PARQUET_DATA_DIR"])
                 parquet_file = next(parquet_dir.glob(f"**/{fx_pair}*15min*.parquet"), None)
                 if parquet_file:
-                    df = pd.read_parquet(parquet_file)
+                    df = auto_cache(
+                        f"home_chart_{fx_pair.lower()}_15min",
+                        lambda p=parquet_file: pd.read_parquet(p).sort_values("timestamp").tail(200),
+                        refresh=st.session_state.get("refresh_home_data", False)
+                    )
                     required_cols = {"timestamp", "open", "high", "low", "close", "volume"}
                     if not required_cols.issubset(df.columns):
                         st.info(f"{fx_pair} 15min parquet file missing required columns: {required_cols - set(df.columns)}")
                         continue
                     df["timestamp"] = pd.to_datetime(df["timestamp"])
                     df = df.sort_values(by="timestamp")
-                    df_recent = df.tail(300)
+                    df_recent = df.tail(200)
 
                     fig_fx = go.Figure(data=[go.Candlestick(
                         x=df_recent["timestamp"],
@@ -525,6 +556,142 @@ class ZanalyticsDashboard:
                     st.info(f"No {fx_pair} 15min parquet file found in PARQUET_DATA_DIR.")
             except Exception as e:
                 st.warning(f"Failed to load {fx_pair} 15min candlestick chart: {e}")
+
+        # Insert EURGBP 15-min chart block after GBPUSD
+        try:
+            fx_pair = "EURGBP"
+            parquet_dir = Path(st.secrets["PARQUET_DATA_DIR"])
+            parquet_file = next(parquet_dir.glob(f"**/{fx_pair}*15min*.parquet"), None)
+            if parquet_file:
+                # Only load the last 200 rows for charting using .tail(200)
+                df = auto_cache(
+                    "home_chart_eurgbp_15min",
+                    lambda p=parquet_file: pd.read_parquet(p).sort_values("timestamp").tail(200),
+                    refresh=st.session_state.get("refresh_home_data", False)
+                )
+                required_cols = {"timestamp", "open", "high", "low", "close", "volume"}
+                if not required_cols.issubset(df.columns):
+                    st.info(f"{fx_pair} 15min parquet file missing required columns: {required_cols - set(df.columns)}")
+                else:
+                    df["timestamp"] = pd.to_datetime(df["timestamp"])
+                    df = df.sort_values(by="timestamp")
+                    # Confirm that only the last 200 rows are used for plotting
+                    df_recent = df.tail(200)
+
+                    fig_fx = go.Figure(data=[go.Candlestick(
+                        x=df_recent["timestamp"],
+                        open=df_recent["open"],
+                        high=df_recent["high"],
+                        low=df_recent["low"],
+                        close=df_recent["close"],
+                        increasing_line_color='lime',
+                        decreasing_line_color='red',
+                        name=f'{fx_pair} 15min'
+                    )])
+
+                    # FVG overlays
+                    for i in range(2, len(df_recent)):
+                        prev = df_recent.iloc[i-2]
+                        curr = df_recent.iloc[i]
+                        if curr["low"] > prev["high"]:
+                            fig_fx.add_vrect(
+                                x0=df_recent.iloc[i-1]["timestamp"], x1=curr["timestamp"],
+                                fillcolor="rgba(0,255,0,0.13)", opacity=0.26, line_width=0, layer="below"
+                            )
+                        elif curr["high"] < prev["low"]:
+                            fig_fx.add_vrect(
+                                x0=df_recent.iloc[i-1]["timestamp"], x1=curr["timestamp"],
+                                fillcolor="rgba(255,0,0,0.13)", opacity=0.26, line_width=0, layer="below"
+                            )
+
+                    # Anchored VWAP (Midas style)
+                    vwap_prices = (df_recent['high'] + df_recent['low'] + df_recent['close']) / 3
+                    cumulative_vol = df_recent['volume'].cumsum()
+                    vwap = (vwap_prices * df_recent['volume']).cumsum() / cumulative_vol
+                    fig_fx.add_trace(go.Scatter(x=df_recent["timestamp"], y=vwap, mode='lines', name='Midas VWAP',
+                                                line=dict(color='gold', width=2, dash='dot')))
+
+                    # Wyckoff regime detection
+                    phases = []
+                    window = 42
+                    close = df_recent['close'].values
+                    for i in range(len(close) - window):
+                        win = close[i:i+window]
+                        atr = (df_recent['high'].iloc[i:i+window] - df_recent['low'].iloc[i:i+window]).mean()
+                        minmax_range = win.max() - win.min()
+                        slope = (win[-1] - win[0]) / window
+                        if minmax_range < 1.2 * atr and abs(slope) < 0.08 * atr:
+                            phases.append(('accumulation', df_recent.iloc[i]["timestamp"], df_recent.iloc[i+window]["timestamp"]))
+                        elif slope > 0.10 * atr:
+                            phases.append(('markup', df_recent.iloc[i]["timestamp"], df_recent.iloc[i+window]["timestamp"]))
+                        elif minmax_range < 1.2 * atr and abs(slope) < 0.08 * atr and i > 0:
+                            phases.append(('distribution', df_recent.iloc[i]["timestamp"], df_recent.iloc[i+window]["timestamp"]))
+                        elif slope < -0.10 * atr:
+                            phases.append(('markdown', df_recent.iloc[i]["timestamp"], df_recent.iloc[i+window]["timestamp"]))
+                    phase_colors = {
+                        'accumulation': 'rgba(0, 90, 255, 0.08)',
+                        'markup': 'rgba(0, 200, 70, 0.08)',
+                        'distribution': 'rgba(255, 160, 0, 0.08)',
+                        'markdown': 'rgba(220, 40, 40, 0.08)'
+                    }
+                    last_phase = None
+                    for phase, start, end in phases:
+                        fig_fx.add_vrect(
+                            x0=start, x1=end,
+                            fillcolor=phase_colors[phase], opacity=0.13, line_width=0, layer="below"
+                        )
+                        if phase != last_phase:
+                            win = df_recent[(df_recent["timestamp"] >= start) & (df_recent["timestamp"] <= end)]
+                            if not win.empty:
+                                y_mid = (win['high'].max() + win['low'].min()) / 2
+                            else:
+                                y_mid = df_recent['close'].iloc[-1]
+                            fig_fx.add_annotation(
+                                x=start,
+                                y=y_mid,
+                                text=phase.title(),
+                                showarrow=False,
+                                font=dict(size=13, color=phase_colors[phase].replace("0.08", "0.8")),
+                                bgcolor="rgba(0,0,0,0.4)",
+                                yshift=0,
+                                opacity=0.9
+                            )
+                            last_phase = phase
+                    # Chart title with phase
+                    current_phase = None
+                    if phases:
+                        last_ts = df_recent["timestamp"].max()
+                        for phase, start, end in reversed(phases):
+                            if end >= last_ts:
+                                current_phase = phase
+                                break
+                        if not current_phase:
+                            current_phase = phases[-1][0]
+                    phase_label = f"Wyckoff: <b style='color:orange;'>{current_phase.upper()}</b>" if current_phase else ""
+                    chart_title = f"{fx_pair} – 15-Minute Candlestick Chart with FVG, Midas VWAP & {phase_label}"
+                    fig_fx.update_layout(
+                        title={
+                            'text': chart_title,
+                            'y':0.93,
+                            'x':0.5,
+                            'xanchor': 'center',
+                            'yanchor': 'top'
+                        },
+                        template=st.session_state.get('chart_theme', 'plotly_dark'),
+                        height=370,
+                        autosize=True,
+                        paper_bgcolor="rgba(0,0,0,0.02)",
+                        plot_bgcolor="rgba(0,0,0,0.02)",
+                        xaxis_rangeslider_visible=False,
+                        margin=dict(l=20, r=20, t=40, b=20),
+                        showlegend=False
+                    )
+                    fig_fx.update_layout(showlegend=False)
+                    st.plotly_chart(fig_fx, use_container_width=True)
+            else:
+                st.info(f"No {fx_pair} 15min parquet file found in PARQUET_DATA_DIR.")
+        except Exception as e:
+            st.warning(f"Failed to load EURGBP 15min candlestick chart: {e}")
 
         self.create_dxy_chart()
         st.markdown(

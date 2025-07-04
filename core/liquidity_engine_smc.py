@@ -16,12 +16,12 @@ import inspect     # To get function name for logging
 # Ensure session_flow.py exists and contains a tag_session function
 # If not available, comment out the import and the 'session' assignment below.
 try:
-    from session_flow import tag_session
+    from core.session_flow import tag_session
     SESSION_TAGGING_ENABLED = True
     # print("INFO (liquidity_engine_smc): session_flow.tag_session imported successfully.") # Less verbose startup
 except ImportError:
     SESSION_TAGGING_ENABLED = False
-    print("WARNING (liquidity_engine_smc): Could not import tag_session from session_flow. Session tagging disabled.")
+    print("WARNING (liquidity_engine_smc): Could not import tag_session from core.session_flow. Session tagging disabled.")
     def tag_session(timestamp):
         """Dummy function if session_flow is not available."""
         return None
@@ -45,7 +45,6 @@ def detect_inducement_from_structure(intermediate_df, df_timeframe_str, structur
                                         Needs 'Low', 'High', 'Close', 'Open' columns.
         df_timeframe_str (str): String representation of the intermediate_df timeframe (e.g., 'H1', '15min').
         structure_data (dict): Output dictionary from analyze_market_structure().
-                               Expected keys: 'htf_bias', 'erl_targets', 'structure_points'.
         sweep_window (int): Max candles after the ERL point's timestamp to search
                             for a sweep candle.
 
@@ -212,8 +211,23 @@ def detect_inducement_from_structure(intermediate_df, df_timeframe_str, structur
     return inducement
 
 # --- Example Usage Block ---
+
 if __name__ == '__main__':
     print("\n--- Testing Liquidity Engine SMC with Detailed Logging ---")
+
+    # Example for loading data from either CSV or Parquet file
+    # (Uncomment and set the file_path to test with your own data)
+    #
+    # file_path = "your_data_file.csv"  # or "your_data_file.parquet"
+    # # Support both CSV and Parquet formats for input data
+    # if file_path.endswith(".csv"):
+    #     df = pd.read_csv(file_path)
+    # elif file_path.endswith(".parquet"):
+    #     df = pd.read_parquet(file_path)
+    # else:
+    #     raise ValueError("Unsupported file type. Please provide a CSV or Parquet file.")
+    #
+    # print(df.head())
 
     # Create Sample DataFrames and Structure Data for testing
     # (Using the same dummy data generation as before)

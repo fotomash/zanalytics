@@ -47,6 +47,37 @@ def tag_smc_zones(df: pd.DataFrame, tf: str = "1min", **kwargs) -> pd.DataFrame:
     print(f"[INFO][SMC] Placeholder tags added for TF={tf}")
     return df
 
+
+# --- Swing Detection Function ---
+def detect_swings(df: pd.DataFrame, left: int = 2, right: int = 2) -> pd.DataFrame:
+    """
+    Annotates swing highs and swing lows using look-back/look-forward windowing.
+
+    Parameters:
+        df: OHLCV dataframe
+        left: number of bars to the left
+        right: number of bars to the right
+
+    Returns:
+        DataFrame with new columns:
+            - 'swing_high': True/False/None
+            - 'swing_low' : True/False/None
+    """
+    df = df.copy()
+    df["swing_high"] = False
+    df["swing_low"] = False
+
+    for i in range(left, len(df) - right):
+        high = df["High"].iloc[i]
+        low = df["Low"].iloc[i]
+
+        if all(df["High"].iloc[i - left:i] < high) and all(df["High"].iloc[i + 1:i + 1 + right] < high):
+            df.at[df.index[i], "swing_high"] = True
+        if all(df["Low"].iloc[i - left:i] > low) and all(df["Low"].iloc[i + 1:i + 1 + right] > low):
+            df.at[df.index[i], "swing_low"] = True
+
+    return df
+
 # --- Example Usage ---
 if __name__ == '__main__':
     print("--- Testing SMC Enrichment Engine (Placeholder) ---")

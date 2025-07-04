@@ -16,6 +16,7 @@ from fredapi import Fred
 from openai import OpenAI
 import requests
 import warnings
+import time
 warnings.filterwarnings('ignore')
 
 # Utility to embed images as base64 for CSS backgrounds
@@ -204,9 +205,27 @@ def ensure_cache_dir():
 
 ensure_cache_dir()
 
+# Cache TTL for price fetches
+CACHE_TTL_SEC = 300  # 5‑minute disk cache for price fetches
+
 @st.cache_data
 def get_validated_prices(symbol_map):
-    """Fetch prices with professional-grade validation"""
+    """
+    Fetch prices with professional-grade validation, using a 5-minute disk cache.
+    Returns: (prices, errors, last_updated: datetime)
+    """
+    import hashlib
+    import json
+    cache_key = hashlib.md5(json.dumps(symbol_map, sort_keys=True).encode()).hexdigest()
+    cache_file = f".cache/prices/{cache_key}.pkl"
+
+    # Try to load from disk cache if fresh
+    if os.path.exists(cache_file) and (time.time() - os.path.getmtime(cache_file) < CACHE_TTL_SEC):
+        with open(cache_file, "rb") as f:
+            prices, errors = pickle.load(f)
+        last_updated = datetime.fromtimestamp(os.path.getmtime(cache_file))
+        return prices, errors, last_updated
+
     prices = {}
     errors = []
 
@@ -266,7 +285,11 @@ def get_validated_prices(symbol_map):
 
         progress_bar.empty()
 
-    return prices, errors
+    # Save to disk cache
+    with open(cache_file, "wb") as f:
+        pickle.dump((prices, errors), f)
+    last_updated = datetime.now()
+    return prices, errors, last_updated
 
 
 
@@ -361,7 +384,7 @@ def get_comprehensive_news(assets_focus=None):
 
     return all_news
 
-# Professional macro sentiment analysis
+@st.cache_data(ttl=86400)  # Cache for 1 day
 def generate_professional_macro_analysis(snapshot, news_data, econ_events):
     """Generate Bloomberg-style macro analysis"""
 
@@ -562,6 +585,129 @@ def calculate_technical_indicators(ticker, period="1mo"):
     except Exception as e:
         return None
 
+def compute_rsi(values, period=14):
+    """Simple RSI computation"""
+    deltas = np.diff(values)
+    seed = deltas[:period+1]
+    up = seed[seed >= 0].sum()/period
+    down = -seed[seed < 0].sum()/period
+    rs = up/down if down != 0 else 0
+    rsi = np.zeros_like(values)
+    rsi[:period] = 100.
+    for i in range(period, len(values)):
+        delta = deltas[i-1]
+        if delta > 0:
+            upval = delta
+            downval = 0.
+        else:
+            upval = 0.
+            downval = -delta
+        up = (up*(period-1) + upval)/period
+        down = (down*(period-1) + downval)/period
+        rs = up/down if down != 0 else 0
+        rsi[i] = 100. - 100./(1. + rs)
+    return rsi
+
+def render_market_card_pro(asset_key, prices, peer_moves, news_dict, rsi_dict=None, vol_dict=None, is_top_mover=False):
+    import plotly.graph_objects as go
+    label = ENHANCED_DISPLAY_NAMES.get(asset_key, asset_key)
+    data = prices.get(asset_key, {})
+    try:
+        hist = yf.Ticker(PROFESSIONAL_SYMBOL_MAP[asset_key]).history(period="1mo")['Close']
+        values = hist.dropna().values[-20:] if len(hist) >= 20 else hist.dropna().values
+        asset_high = hist.dropna().max()
+        asset_low = hist.dropna().min()
+    except Exception:
+        values = []
+        asset_high = asset_low = None
+
+    value = data.get("current", "N/A")
+    delta = data.get("change", 0)
+    pct = data.get("pct_change", 0)
+
+    # Volatility
+    vol = None
+    if len(values) > 1:
+        vol = np.std(np.diff(values)) * np.sqrt(252) / np.mean(values) * 100
+        vol = f"{vol:.1f}"
+
+    # RSI
+    rsi = None
+    if len(values) >= 15:
+        rsi = compute_rsi(values)[-1]
+        rsi = int(rsi)
+    signal = "Neutral"
+    sig_color = "#bdbdbd"
+    if rsi:
+        if rsi > 70:
+            signal, sig_color = "Overbought", "#e57373"
+        elif rsi < 30:
+            signal, sig_color = "Oversold", "#64b5f6"
+        else:
+            signal = "Neutral"
+
+    # PATCH: Hide Range if N/A
+    if asset_low is not None and asset_high is not None and not (np.isnan(asset_low) or np.isnan(asset_high)):
+        range_str = f"Range: {asset_low:.2f}–{asset_high:.2f}"
+    else:
+        range_str = ""
+
+    # PATCH: Improved Mini-News Relevance
+    mini_news = ""
+    # Search for relevant news: prefer rates/macro, then fx
+    for cat in ['rates', 'macro', 'fx']:
+        for article in news_dict.get(cat, []):
+            if ENHANCED_DISPLAY_NAMES.get(asset_key, asset_key).split()[0].lower() in article.get("headline", "").lower():
+                mini_news = article.get("headline", "")
+                break
+        if mini_news:
+            break
+    # fallback to top general news if nothing found
+    if not mini_news:
+        mini_news = news_dict.get(asset_key, [""])[0]
+
+    mover_badge = '<span style="background:#ff9800;color:#fff;font-size:0.88em;padding:1px 7px;border-radius:7px;margin-right:6px;">🔥 Top Mover</span>' if is_top_mover else ""
+
+    fig = go.Figure()
+    if len(values) > 1:
+        fig.add_trace(go.Scatter(
+            y=values, mode="lines", line=dict(color="gold", width=2), showlegend=False
+        ))
+    fig.update_layout(
+        height=52,
+        margin=dict(l=0, r=0, t=0, b=0),
+        paper_bgcolor="rgba(0,0,0,0)",
+        plot_bgcolor="rgba(0,0,0,0)",
+        xaxis=dict(visible=False),
+        yaxis=dict(visible=False),
+    )
+
+    # Format value
+    value_str = f"{value:.2f}" if isinstance(value, (float, int)) else str(value)
+    delta_str = f"{delta:+.2f}"
+    delta_color = "green" if delta >= 0 else "red"
+
+    # PATCH: Only show range span if range_str is not empty
+    range_html = f'<span style="font-size:0.98em;color:#bdbdbd;">{range_str}</span>' if range_str else ""
+
+    st.markdown(
+        f"""
+        <div style="text-align:center;margin-bottom:10px;padding:10px 0 0 0;">
+            <div style="font-size:1.3em;font-weight:800;color:#ffe082;">{label} {mover_badge}</div>
+            <div style="font-size:2.5em;font-weight:700;color:#fff;">{value_str}</div>
+            <div style="font-size:1.1em;font-weight:500;color:{delta_color};margin-bottom:2px;">
+                {delta_str} ({pct:+.2f}%)
+            </div>
+            {f'<div style="margin:2px 0 3px 0;font-size:0.98em;">{range_html}<span style="background:{sig_color};color:#181818;padding:2px 8px 2px 8px;border-radius:8px;">{signal}</span>{" | 1w Vol: " + str(vol) + "%" if vol else ""}{" | RSI: " + str(rsi) if rsi else ""}</div>' if (range_html or sig_color or vol or rsi) else ""}
+            <div style="margin-top:3px;min-height:1.5em;font-size:0.99em;color:#90caf9;">
+                {mini_news}
+            </div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+    st.plotly_chart(fig, use_container_width=True, config={"displayModeBar": False})
+
 # Main dashboard
 def main():
     # Ensure session state keys are initialized
@@ -641,8 +787,70 @@ def main():
             border: none;
             border-top: 1.1px solid #434356;
         }
+        /* --- PATCH: Market Card Pro Grid Styling --- */
+        .pro-micro-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 24px 30px;
+            margin-bottom: 32px;
+        }
+        @media (max-width: 1100px) {
+            .pro-micro-grid { grid-template-columns: 1fr 1fr; }
+        }
+        @media (max-width: 750px) {
+            .pro-micro-grid { grid-template-columns: 1fr; }
+        }
+        .pro-micro-cell {
+            background: rgba(28, 28, 32, 0.91);
+            border-radius: 14px;
+            border: 1.4px solid rgba(255,255,255,0.09);
+            box-shadow: 0 2px 14px 0 rgba(0,0,0,0.23);
+            padding: 16px 10px 12px 10px;
+            min-width: 0;
+        }
     </style>
     """, unsafe_allow_html=True)
+
+    # --- PATCH: 3x3 Market Grid (DXY, VIX, Gold, Oil, US 10Y, DE 10Y, NASDAQ, S&P, DAX) ---
+    # This block is inserted right before the large heading “ANALYSIS”.
+    # Asset order: [DXY, VIX, Gold], [Oil, US 10Y, DE 10Y], [NASDAQ, S&P, DAX]
+    grid_assets = [
+        ["dxy_quote", "vix_quote", "gold_quote"],
+        ["oil_quote", "us10y_quote", "de10y_quote"],
+        ["nasdaq_quote", "spx_quote", "dax_quote"]
+    ]
+    flat_assets = [item for sublist in grid_assets for item in sublist]
+    chart_assets = flat_assets
+    # Fetch prices for these assets
+    prices_grid, price_errors_grid, last_update_grid = get_validated_prices({k: PROFESSIONAL_SYMBOL_MAP[k] for k in flat_assets})
+    last_update_ts = last_update_grid
+    # Prepare news headlines per asset for context line
+    all_news_grid = get_comprehensive_news()
+    news_dict_grid = {}
+    for asset in flat_assets:
+        news_dict_grid[asset] = []
+        for cat in all_news_grid:
+            for article in all_news_grid[cat]:
+                headline = article.get("headline", "")
+                if ENHANCED_DISPLAY_NAMES.get(asset, asset).split()[0].lower() in headline.lower():
+                    news_dict_grid[asset].append(headline)
+        if not news_dict_grid[asset]:
+            news_dict_grid[asset] = [all_news_grid['fx'][0]['headline']] if 'fx' in all_news_grid and all_news_grid['fx'] else [""]
+    # Find top % mover in this grid
+    pct_moves_grid = [(asset, abs(prices_grid.get(asset, {}).get("pct_change", 0))) for asset in flat_assets]
+    top_mover_grid = max(pct_moves_grid, key=lambda x: x[1])[0] if pct_moves_grid else None
+    # Render the grid using HTML/CSS for exact 3x3 layout (as in MyMicroSentiment)
+    st.markdown("<div class='pro-micro-grid'>", unsafe_allow_html=True)
+    for row in grid_assets:
+        for asset in row:
+            st.markdown("<div class='pro-micro-cell'>", unsafe_allow_html=True)
+            render_market_card_pro(
+                asset, prices_grid, None, news_dict_grid,
+                rsi_dict=None, vol_dict=None,
+                is_top_mover=(asset == top_mover_grid)
+            )
+            st.markdown("</div>", unsafe_allow_html=True)
+    st.markdown("</div>", unsafe_allow_html=True)
 
     # --- Events & Macro Drivers summary block ---
     st.markdown("""
@@ -717,168 +925,6 @@ def main():
     if refresh_button:
         st.cache_data.clear()
 
-    # --- Nine mini-panels in a 3x3 grid ---
-    chart_assets = [
-        "dxy_quote", "vix_quote", "gold_quote",
-        "oil_quote", "us10y_quote", "de10y_quote",
-        "nasdaq_quote", "spx_quote", "dax_quote"
-    ]
-
-    # Get prices (always fetch after refresh, else from cache)
-    prices, price_errors = get_validated_prices({k: PROFESSIONAL_SYMBOL_MAP[k] for k in chart_assets})
-
-    # --- ENHANCED PRO GRID PATCH ---
-    # Enhanced pro version of grid with sparkline, volatility, RSI, news, mover badge, etc.
-    def compute_rsi(values, period=14):
-        """Simple RSI computation"""
-        deltas = np.diff(values)
-        seed = deltas[:period+1]
-        up = seed[seed >= 0].sum()/period
-        down = -seed[seed < 0].sum()/period
-        rs = up/down if down != 0 else 0
-        rsi = np.zeros_like(values)
-        rsi[:period] = 100.
-        for i in range(period, len(values)):
-            delta = deltas[i-1]
-            if delta > 0:
-                upval = delta
-                downval = 0.
-            else:
-                upval = 0.
-                downval = -delta
-            up = (up*(period-1) + upval)/period
-            down = (down*(period-1) + downval)/period
-            rs = up/down if down != 0 else 0
-            rsi[i] = 100. - 100./(1. + rs)
-        return rsi
-
-    def render_market_card_pro(asset_key, prices, peer_moves, news_dict, rsi_dict=None, vol_dict=None, is_top_mover=False):
-        import plotly.graph_objects as go
-        label = ENHANCED_DISPLAY_NAMES.get(asset_key, asset_key)
-        data = prices.get(asset_key, {})
-        try:
-            hist = yf.Ticker(PROFESSIONAL_SYMBOL_MAP[asset_key]).history(period="1mo")['Close']
-            values = hist.dropna().values[-20:] if len(hist) >= 20 else hist.dropna().values
-            asset_high = hist.dropna().max()
-            asset_low = hist.dropna().min()
-        except Exception:
-            values = []
-            asset_high = asset_low = None
-
-        value = data.get("current", "N/A")
-        delta = data.get("change", 0)
-        pct = data.get("pct_change", 0)
-
-        # Volatility
-        vol = None
-        if len(values) > 1:
-            vol = np.std(np.diff(values)) * np.sqrt(252) / np.mean(values) * 100
-            vol = f"{vol:.1f}"
-
-        # RSI
-        rsi = None
-        if len(values) >= 15:
-            rsi = compute_rsi(values)[-1]
-            rsi = int(rsi)
-        signal = "Neutral"
-        sig_color = "#bdbdbd"
-        if rsi:
-            if rsi > 70:
-                signal, sig_color = "Overbought", "#e57373"
-            elif rsi < 30:
-                signal, sig_color = "Oversold", "#64b5f6"
-            else:
-                signal = "Neutral"
-
-        # PATCH: Hide Range if N/A
-        if asset_low is not None and asset_high is not None and not (np.isnan(asset_low) or np.isnan(asset_high)):
-            range_str = f"Range: {asset_low:.2f}–{asset_high:.2f}"
-        else:
-            range_str = ""
-
-        # PATCH: Improved Mini-News Relevance
-        mini_news = ""
-        # Search for relevant news: prefer rates/macro, then fx
-        for cat in ['rates', 'macro', 'fx']:
-            for article in all_news.get(cat, []):
-                if ENHANCED_DISPLAY_NAMES.get(asset_key, asset_key).split()[0].lower() in article.get("headline", "").lower():
-                    mini_news = article.get("headline", "")
-                    break
-            if mini_news:
-                break
-        # fallback to top general news if nothing found
-        if not mini_news:
-            mini_news = news_dict.get(asset_key, [""])[0]
-
-        mover_badge = '<span style="background:#ff9800;color:#fff;font-size:0.88em;padding:1px 7px;border-radius:7px;margin-right:6px;">🔥 Top Mover</span>' if is_top_mover else ""
-
-        fig = go.Figure()
-        if len(values) > 1:
-            fig.add_trace(go.Scatter(
-                y=values, mode="lines", line=dict(color="gold", width=2), showlegend=False
-            ))
-        fig.update_layout(
-            height=52,
-            margin=dict(l=0, r=0, t=0, b=0),
-            paper_bgcolor="rgba(0,0,0,0)",
-            plot_bgcolor="rgba(0,0,0,0)",
-            xaxis=dict(visible=False),
-            yaxis=dict(visible=False),
-        )
-
-        # Format value
-        value_str = f"{value:.2f}" if isinstance(value, (float, int)) else str(value)
-        delta_str = f"{delta:+.2f}"
-        delta_color = "green" if delta >= 0 else "red"
-
-        # PATCH: Only show range span if range_str is not empty
-        range_html = f'<span style="font-size:0.98em;color:#bdbdbd;">{range_str}</span>' if range_str else ""
-
-        st.markdown(
-            f"""
-            <div style="text-align:center;margin-bottom:10px;padding:10px 0 0 0;">
-                <div style="font-size:1.3em;font-weight:800;color:#ffe082;">{label} {mover_badge}</div>
-                <div style="font-size:2.5em;font-weight:700;color:#fff;">{value_str}</div>
-                <div style="font-size:1.1em;font-weight:500;color:{delta_color};margin-bottom:2px;">
-                    {delta_str} ({pct:+.2f}%)
-                </div>
-                {f'<div style="margin:2px 0 3px 0;font-size:0.98em;">{range_html}<span style="background:{sig_color};color:#181818;padding:2px 8px 2px 8px;border-radius:8px;">{signal}</span>{" | 1w Vol: " + str(vol) + "%" if vol else ""}{" | RSI: " + str(rsi) if rsi else ""}</div>' if (range_html or sig_color or vol or rsi) else ""}
-                <div style="margin-top:3px;min-height:1.5em;font-size:0.99em;color:#90caf9;">
-                    {mini_news}
-                </div>
-            </div>
-            """,
-            unsafe_allow_html=True,
-        )
-        st.plotly_chart(fig, use_container_width=True, config={"displayModeBar": False})
-
-    # Prepare news headlines per asset for context line
-    news_dict = {}
-    for asset in chart_assets:
-        news_dict[asset] = []
-        for cat in all_news:
-            for article in all_news[cat]:
-                headline = article.get("headline", "")
-                if ENHANCED_DISPLAY_NAMES.get(asset, asset).split()[0].lower() in headline.lower():
-                    news_dict[asset].append(headline)
-        # fallback: top general news
-        if not news_dict[asset]:
-            news_dict[asset] = [all_news['fx'][0]['headline']] if 'fx' in all_news and all_news['fx'] else [""]
-
-    # Find top % mover
-    all_pct_moves = [(asset, abs(prices.get(asset, {}).get("pct_change", 0))) for asset in chart_assets]
-    top_mover = max(all_pct_moves, key=lambda x: x[1])[0] if all_pct_moves else None
-
-    # Enhanced 3x3 grid
-    grid_cols = st.columns(3)
-    for i, asset in enumerate(chart_assets):
-        with grid_cols[i % 3]:
-            render_market_card_pro(
-                asset, prices, None, news_dict,
-                rsi_dict=None, vol_dict=None,
-                is_top_mover=(asset == top_mover)
-            )
-
     # --- ANALYSIS section below the grid ---
     st.markdown(
         "<div style='text-align:center; font-size:2em; font-weight:bold; color:#fff; margin-top:30px; margin-bottom:20px;'>ANALYSIS</div>",
@@ -886,7 +932,16 @@ def main():
     )
     # Macro analysis using professional function, inside market-card
     # Only pass the snapshot of the nine assets
+    prices = prices_grid
     filtered_prices = {k: prices[k] for k in chart_assets if k in prices}
+
+    # Add refresh button for macro analysis
+    if st.button("🔁 Refresh Analysis", key="refresh_analysis", use_container_width=True):
+        st.cache_data.clear()
+
+    import hashlib
+    import json
+    prices_key = hashlib.md5(json.dumps(filtered_prices, sort_keys=True, default=str).encode()).hexdigest()
     # Dummy news and econ_events for analysis function (empty as per instructions)
     with st.spinner("🧠 Generating Macro Intelligence..."):
         analysis = generate_professional_macro_analysis(filtered_prices, {}, pd.DataFrame())
@@ -895,8 +950,10 @@ def main():
     st.markdown('</div>', unsafe_allow_html=True)
 
     # --- Enhanced Macro Insight Block ---
+    # Show the true last update timestamp for prices
+    last_update_str = last_update_ts.strftime('%Y-%m-%d %H:%M UTC') if last_update_ts else datetime.now().strftime('%Y-%m-%d %H:%M UTC')
     st.markdown(
-        """
+        f"""
         <div style='margin-top: 20px; margin-bottom: 10px; padding: 16px 18px 8px 18px; background: rgba(20,20,25,0.80); border-radius: 10px; color: #f1f1f1;'>
         <b>🗓️ Upcoming Economic Releases</b><br>
         <span style='font-size:1.04em'>
@@ -928,6 +985,8 @@ def main():
         • EUR/USD: 1.0850, 1.0920 (range)<br>
         • US 10Y: 4.33% (yield breakout)<br>
         </span>
+        <hr style='margin:10px 0 10px 0; border-top: 1px solid #555;'>
+        <span style='font-size:0.98em; color:#bdbdbd;'>Last Update: {last_update_str}</span>
         </div>
         """,
         unsafe_allow_html=True

@@ -16,6 +16,7 @@ import warnings
 from typing import Dict, List, Optional, Tuple
 import math
 
+PARQUET_DATA_DIR = st.secrets["PARQUET_DATA_DIR"]
 warnings.filterwarnings('ignore')
 
 # ============================================================================
@@ -165,7 +166,7 @@ def setup_page():
 @st.cache_data
 def load_all_timeframes(selected_pair):
     """Load all timeframe data for selected pair"""
-    data_dir = f"/Users/tom/Documents/_trade/_exports/_tick/out/parquet/{selected_pair}"
+    data_dir = f"{PARQUET_DATA_DIR}{selected_pair}"
     timeframes = {
         '1min': f'{selected_pair}_1min.parquet',
         '5min': f'{selected_pair}_5min.parquet',
