@@ -24,7 +24,7 @@ except ImportError:
 # --- Import Marker Enrichment Engine --- ### MODIFICATION START ###
 try:
     # Using the user-provided scaffold name
-    from marker_enrichment_engine import add_all_indicators
+    from .marker_enrichment_engine import add_all_indicators
     ENRICHMENT_ENGINE_LOADED = True
     print("[INFO][IngestionEngine] Successfully imported 'add_all_indicators' from marker_enrichment_engine.")
 except ImportError:
