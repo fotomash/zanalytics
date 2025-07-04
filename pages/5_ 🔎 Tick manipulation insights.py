@@ -1,4 +1,5 @@
 import streamlit as st
+import toml
 # Move set_page_config for "Tick Insights Dashboard" to top
 st.set_page_config(
     page_title="Tick Insights Dashboard",
@@ -71,8 +72,46 @@ import numpy as np
 from typing import Dict, List, Tuple, Optional
 # ... other imports
 
+# --- Ensure project root and /core directory are on PYTHONPATH ---
+import sys, os
+_ROOT_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+_CORE_DIR = os.path.join(_ROOT_DIR, "core")
+for _p in (_ROOT_DIR, _CORE_DIR):
+    if _p not in sys.path:
+        sys.path.append(_p)
+
 # ---- Tick Vectorizer Integration ----
 from utils.tick_vectorizer import TickVectorizer, VectorizedDashboard
+
+# --- Robust optional imports: gracefully degrade if modules are missing ---
+try:
+    from core.micro_wyckoff_phase_engine import detect_micro_wyckoff_phase as detect_wyckoff_phases
+except (ImportError, ModuleNotFoundError):
+    def detect_wyckoff_phases(df):
+        """Stub fallback when `micro_wyckoff_phase_engine` is unavailable."""
+        return []
+
+try:
+    from core.impulse_correction_detector import detect_impulse_patterns
+except (ImportError, ModuleNotFoundError):
+    def detect_impulse_patterns(df):
+        """Stub fallback when `impulse_correction_detector` is unavailable."""
+        return []
+
+# ---- Core microstructure modules ----
+
+# TODO: remove or replace when microstructure_filter is available – # apply_microstructure_filter(
+# from core.scalp_filters import detect_scalp_conditions
+# --- Optional import for SMC enrichment logic ---
+try:
+    from core.smc_enrichment_engine import enrich_with_smc_logic
+except (ImportError, ModuleNotFoundError, AttributeError):
+    def enrich_with_smc_logic(df):
+        """
+        Fallback stub: safely returns the input dataframe unchanged when the
+        real `enrich_with_smc_logic` implementation is unavailable.
+        """
+        return df
 
 
 class QRTDeskAnalytics:
@@ -306,8 +345,65 @@ class QRTDeskAnalytics:
                     'volume': zone_df['inferred_volume'].sum()
                 })
         return {'killzone_events': killzone_events, 'count': len(killzone_events)}
-# quantum_microstructure_analyzer.py
 import streamlit as st
+
+# --- Intelligence Report (LLM, pro UX) --------------------------------------
+import time
+
+def generate_intelligence_report(df: pd.DataFrame, client) -> str:
+    """
+    Get chart-by-chart insights using the zanalytics_midas model.
+    """
+    prompt = f"""
+    You are a financial microstructure analyst specializing in engineered liquidity
+    and order-flow interpretation.
+
+    Analyse the following tick snapshot and write concise, data-driven commentary
+    for each of these dashboard sections:
+    • 📈 Price vs Inferred Volume  
+    • ↔️ Spread Behaviour  
+    • 🔥 VPIN (Flow Toxicity)  
+    • 📊 Wyckoff Phase Inference  
+    • 🧠 Regime Transition Signals  
+    • 📍 Scalp Entry Conditions  
+
+    Tick Snapshot (first 25 rows):
+    {df.head(25).to_json(orient="records", date_format="iso")}
+    """
+    response = client.chat.completions.create(
+        model="zanalytics_midas",
+        messages=[{"role": "user", "content": prompt}],
+        temperature=0.4
+    )
+    return response.choices[0].message.content.strip()
+
+# --- Button-triggered Intelligence Report (with cache/progress/last updated) ---
+import datetime
+
+report_placeholder = st.empty()
+status_placeholder = st.empty()
+
+if 'intelligence_report' not in st.session_state:
+    st.session_state['intelligence_report'] = None
+    st.session_state['intelligence_report_time'] = None
+
+if st.button("🧠 Generate Tick Intelligence Report", key="generate_tick_report"):
+    with st.spinner("Generating intelligence report..."):
+        try:
+            commentary = generate_intelligence_report(df, client)
+            st.session_state['intelligence_report'] = commentary
+            st.session_state['intelligence_report_time'] = datetime.datetime.now()
+        except Exception as e:
+            st.session_state['intelligence_report'] = "Intelligence report currently unavailable."
+            st.session_state['intelligence_report_time'] = datetime.datetime.now()
+
+# Always display last report and updated time (if any)
+if st.session_state['intelligence_report']:
+    report_placeholder.markdown(st.session_state['intelligence_report'])
+    if st.session_state['intelligence_report_time']:
+        status_placeholder.caption(f"Last updated: {st.session_state['intelligence_report_time'].strftime('%Y-%m-%d %H:%M:%S')}")
+else:
+    report_placeholder.info("No intelligence report generated yet. Click the button above to run your tick intelligence analysis.")
 import pandas as pd
 import numpy as np
 import plotly.graph_objects as go
@@ -1825,12 +1921,30 @@ These documents expand on engineered-liquidity traps, Wyckoff sweeps, and the VP
 if __name__ == "__main__":
     st.sidebar.title("🧬 Quantum Configuration")
 
+    # --- Resolve data folder from Streamlit secrets first, then fallback to .streamlit/secrets.toml ---
     try:
+        # Primary: Streamlit-cloud style secrets
         tick_files_directory = st.secrets["raw_data_directory"]
         st.sidebar.success(f"Data Source:\n{tick_files_directory}")
-    except KeyError:
-        st.sidebar.error("`raw_data_directory` not found in secrets.toml")
-        st.stop()
+    except Exception:
+        # Local fallback: .streamlit/secrets.toml at project root
+        script_dir = os.path.dirname(__file__)
+        project_root = os.path.abspath(os.path.join(script_dir, os.pardir))
+        secrets_path = os.path.join(project_root, ".streamlit", "secrets.toml")
+
+        if os.path.exists(secrets_path):
+            import toml  # local import only if needed
+
+            secrets = toml.load(secrets_path)
+            tick_files_directory = secrets.get("raw_data_directory", "")
+            if tick_files_directory:
+                st.sidebar.success(f"Data Source:\n{tick_files_directory}")
+            else:
+                st.sidebar.error("`raw_data_directory` not found in .streamlit/secrets.toml")
+                st.stop()
+        else:
+            st.sidebar.error("No Streamlit secrets available and fallback .streamlit/secrets.toml not found.")
+            st.stop()
 
     # FIXED: Only show files with "ticks" in the name
     valid_files = [f for f in os.listdir(tick_files_directory)
@@ -1852,6 +1966,8 @@ if __name__ == "__main__":
     # Initialize analyzer
     script_dir = os.path.dirname(__file__)
     config_path = os.path.join(script_dir, 'quantum_microstructure_config.yaml')
+
+    # Load OpenAI API key from st.secrets (already imported above)
 
     analyzer = QuantumMicrostructureAnalyzer(config_path)
 
