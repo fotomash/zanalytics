@@ -18,6 +18,7 @@ import warnings
 import sqlite3
 from typing import Dict, List, Optional, Tuple, Any
 import re
+import base64
 warnings.filterwarnings('ignore')
 
 # --- Parquet scanning helper ---
@@ -74,35 +75,78 @@ class UltimateZANFLOWDashboard:
             initial_sidebar_state="expanded"
         )
 
-        # Custom CSS for better styling
-        st.markdown("""
-        <style>
-        .main-header {
-            background: linear-gradient(90deg, #1e3c72 0%, #2a5298 100%);
-            padding: 1rem;
-            border-radius: 10px;
-            color: white;
-            text-align: center;
-            margin-bottom: 2rem;
-        }
-        .metric-card {
-            background: #f0f2f6;
-            padding: 1rem;
-            border-radius: 8px;
-            border-left: 4px solid #1e3c72;
-        }
-        .wyckoff-phase {
-            padding: 0.5rem;
-            border-radius: 5px;
-            margin: 0.25rem 0;
-            font-weight: bold;
-        }
-        .accumulation { background-color: #e8f5e8; color: #2e7d2e; }
-        .distribution { background-color: #ffe8e8; color: #cc0000; }
-        .markup { background-color: #e8f8ff; color: #0066cc; }
-        .markdown { background-color: #fff3e0; color: #e65100; }
-        </style>
-        """, unsafe_allow_html=True)
+        # --- PATCH: HOME background and style ---
+        def get_image_as_base64(path):
+            try:
+                with open(path, "rb") as image_file:
+                    return base64.b64encode(image_file.read()).decode()
+            except Exception:
+                return None
+
+        img_base64 = get_image_as_base64("./pages/image_af247b.jpg")
+        if img_base64:
+            st.markdown(f"""
+            <style>
+            [data-testid="stAppViewContainer"] > .main {{
+                background-image: linear-gradient(rgba(0,0,0,0.8), rgba(0,0,0,0.8)), url(data:image/jpeg;base64,{img_base64});
+                background-size: cover;
+                background-position: center;
+                background-repeat: no-repeat;
+                background-attachment: fixed;
+            }}
+            .main .block-container {{
+                background-color: rgba(0,0,0,0.025) !important;
+            }}
+            #MainMenu {{visibility: hidden;}}
+            footer {{visibility: hidden;}}
+            </style>
+            """, unsafe_allow_html=True)
+
+        # Remove old .main-header CSS block (now commented out)
+        # st.markdown("""
+        # <style>
+        # .main-header {
+        #     background: linear-gradient(90deg, #1e3c72 0%, #2a5298 100%);
+        #     padding: 1rem;
+        #     border-radius: 10px;
+        #     color: white;
+        #     text-align: center;
+        #     margin-bottom: 2rem;
+        # }
+        # .metric-card {
+        #     background: #f0f2f6;
+        #     padding: 1rem;
+        #     border-radius: 8px;
+        #     border-left: 4px solid #1e3c72;
+        # }
+        # .wyckoff-phase {
+        #     padding: 0.5rem;
+        #     border-radius: 5px;
+        #     margin: 0.25rem 0;
+        #     font-weight: bold;
+        # }
+        # .accumulation { background-color: #e8f5e8; color: #2e7d2e; }
+        # .distribution { background-color: #ffe8e8; color: #cc0000; }
+        # .markup { background-color: #e8f8ff; color: #0066cc; }
+        # .markdown { background-color: #fff3e0; color: #e65100; }
+        # </style>
+        # """, unsafe_allow_html=True)
+
+        # Dashboard main title - match HOME
+        st.markdown(
+            """
+            <div style='text-align:center; margin-bottom:2rem;'>
+                <span style='font-size:2rem; font-weight:700; color:#fff; letter-spacing:0.03em;'>
+                    ZANFLOW Ultimate Dashboard
+                </span>
+                <br>
+                <span style='font-size:1.1rem; color:#eee; font-weight:500;'>
+                    Comprehensive SMC, Wyckoff & Microstructure Analytics
+                </span>
+            </div>
+            """,
+            unsafe_allow_html=True
+        )
 
         # Legacy loader kept for backward-compat, but no longer required
         try:
@@ -121,6 +165,7 @@ class UltimateZANFLOWDashboard:
         ):
             self.display_ultimate_analysis()
         else:
+            # Apply consistent background and style for HOME view
             self.display_market_overview()
 
     def create_sidebar_controls(self):
@@ -188,7 +233,7 @@ class UltimateZANFLOWDashboard:
         st.session_state['show_wyckoff'] = st.sidebar.checkbox("📈 Wyckoff Analysis", True)
         st.session_state['show_patterns'] = st.sidebar.checkbox("🎯 Pattern Recognition", True)
         st.session_state['show_volume'] = st.sidebar.checkbox("📊 Volume Analysis", True)
-        st.session_state['show_risk'] = st.sidebar.checkbox("⚠️ Risk Metrics", True)
+        # st.session_state['show_risk'] = st.sidebar.checkbox("⚠️ Risk Metrics", True)
 
         # Chart options
         st.sidebar.markdown("### 📈 Chart Settings")
@@ -202,27 +247,30 @@ class UltimateZANFLOWDashboard:
         col1, col2, col3, col4 = st.columns(4)
 
         with col1:
-            st.metric("Currency Pairs", len(self.pairs_data))
+            st.markdown("<div style='color:#ffeb3b; font-size:1.2rem;'>Currency Pairs</div>", unsafe_allow_html=True)
+            st.markdown(f"<div style='color:#fff; font-size:1.6rem; font-weight:bold;'>{len(self.pairs_data)}</div>", unsafe_allow_html=True)
 
         with col2:
             total_timeframes = sum(len(timeframes) for timeframes in self.pairs_data.values())
-            st.metric("Total Datasets", total_timeframes)
+            st.markdown("<div style='color:#ffeb3b; font-size:1.2rem;'>Total Datasets</div>", unsafe_allow_html=True)
+            st.markdown(f"<div style='color:#fff; font-size:1.6rem; font-weight:bold;'>{total_timeframes}</div>", unsafe_allow_html=True)
 
         with col3:
             total_data_points = sum(
                 len(df) for pair_data in self.pairs_data.values()
                 for df in pair_data.values()
             )
-            st.metric("Total Bars", f"{total_data_points:,}")
+            st.markdown("<div style='color:#ffeb3b; font-size:1.2rem;'>Total Bars</div>", unsafe_allow_html=True)
+            st.markdown(f"<div style='color:#fff; font-size:1.6rem; font-weight:bold;'>{total_data_points:,}</div>", unsafe_allow_html=True)
 
         with col4:
-            # Calculate average indicators per dataset
             avg_indicators = np.mean([
                 len([col for col in df.columns if col not in ['open', 'high', 'low', 'close', 'volume']])
                 for pair_data in self.pairs_data.values()
                 for df in pair_data.values()
             ]) if self.pairs_data else 0
-            st.metric("Avg Indicators", f"{int(avg_indicators)}")
+            st.markdown("<div style='color:#ffeb3b; font-size:1.2rem;'>Avg Indicators</div>", unsafe_allow_html=True)
+            st.markdown(f"<div style='color:#fff; font-size:1.6rem; font-weight:bold;'>{int(avg_indicators)}</div>", unsafe_allow_html=True)
 
         # Market heatmap
         st.markdown("### 🔥 Market Heatmap")
@@ -408,9 +456,9 @@ class UltimateZANFLOWDashboard:
         with col1:
             if st.session_state.get('show_volume', True):
                 self.create_advanced_volume_analysis(df_display)
-        with col2:
-            if st.session_state.get('show_risk', True):
-                self.create_risk_analysis(df_display)
+        # with col2:
+        #     if st.session_state.get('show_risk', True):
+        #         self.create_risk_analysis(df_display)
 
         # Latest TXT insights
         st.markdown("## 🧾 Latest Report Insights")
@@ -469,12 +517,19 @@ class UltimateZANFLOWDashboard:
 
     def create_ultimate_price_chart(self, df, pair, timeframe):
         """Create ultimate price chart with all overlays"""
+        # Gold header above the chart
+        st.markdown(
+            f"<div style='text-align:center; font-size:1.12em; color:#ffe082; font-weight:700; margin-bottom:0.2em;'>"
+            f"{pair} {timeframe} – Price Action & SMC Overlays"
+            f"</div>",
+            unsafe_allow_html=True
+        )
         fig = make_subplots(
             rows=4, cols=1,
             subplot_titles=[
                 f"{pair} {timeframe} - Price Action & Smart Money Analysis",
                 "Volume Profile",
-                "Momentum Oscillators", 
+                "Momentum Oscillators",
                 "Market Structure"
             ],
             vertical_spacing=0.05,
@@ -491,8 +546,8 @@ class UltimateZANFLOWDashboard:
                 low=df['low'],
                 close=df['close'],
                 name="Price",
-                increasing_line_color='#00ff88',
-                decreasing_line_color='#ff4444'
+                increasing_line_color='lime',
+                decreasing_line_color='red'
             ), row=1, col=1
         )
 
@@ -533,7 +588,7 @@ class UltimateZANFLOWDashboard:
 
         # Volume analysis
         if 'volume' in df.columns:
-            colors = ['green' if close >= open_val else 'red' 
+            colors = ['green' if close >= open_val else 'red'
                      for close, open_val in zip(df['close'], df['open'])]
 
             fig.add_trace(go.Bar(
@@ -579,11 +634,14 @@ class UltimateZANFLOWDashboard:
 
         # Update layout
         fig.update_layout(
-            title=f"{pair} {timeframe} Ultimate Analysis",
+            title="",  # Remove in-chart title
             template=st.session_state.get('chart_theme', 'plotly_dark'),
-            height=1000,
-            showlegend=True,
-            xaxis_rangeslider_visible=False
+            paper_bgcolor='rgba(0,0,0,0.02)',
+            plot_bgcolor='rgba(0,0,0,0.02)',
+            showlegend=False,
+            xaxis_rangeslider_visible=False,
+            height=500,
+            margin=dict(l=20, r=20, t=40, b=20)
         )
 
         st.plotly_chart(fig, use_container_width=True)
@@ -772,10 +830,10 @@ class UltimateZANFLOWDashboard:
                 bullish_fvgs = df[df['bullish_fvg'] == True]
                 if not bullish_fvgs.empty:
                     for idx, row in bullish_fvgs.tail(5).iterrows():
-                        st.markdown(f"""
-                        **{idx.strftime('%Y-%m-%d %H:%M')}**  
-                        Price: {row['close']:.4f} | Gap Size: {row.get('fvg_size', 0):.4f}
-                        """)
+                        label = idx.strftime('%Y-%m-%d %H:%M') if hasattr(idx, 'strftime') else str(idx)
+                        st.markdown(f"""**{label}**  
+Price: {row['close']:.4f} | Gap Size: {row.get('fvg_size', 0):.4f}
+""")
                 else:
                     st.info("No bullish FVGs detected in this period")
 
@@ -784,10 +842,10 @@ class UltimateZANFLOWDashboard:
                 bearish_fvgs = df[df['bearish_fvg'] == True]
                 if not bearish_fvgs.empty:
                     for idx, row in bearish_fvgs.tail(5).iterrows():
-                        st.markdown(f"""
-                        **{idx.strftime('%Y-%m-%d %H:%M')}**  
-                        Price: {row['close']:.4f} | Gap Size: {row.get('fvg_size', 0):.4f}
-                        """)
+                        label = idx.strftime('%Y-%m-%d %H:%M') if hasattr(idx, 'strftime') else str(idx)
+                        st.markdown(f"""**{label}**  
+Price: {row['close']:.4f} | Gap Size: {row.get('fvg_size', 0):.4f}
+""")
                 else:
                     st.info("No bearish FVGs detected in this period")
 
@@ -802,10 +860,10 @@ class UltimateZANFLOWDashboard:
                 if not bullish_obs.empty:
                     for idx, row in bullish_obs.tail(5).iterrows():
                         body_size = abs(row['close'] - row['open']) / row['open'] * 100
-                        st.markdown(f"""
-                        **{idx.strftime('%Y-%m-%d %H:%M')}**  
-                        Price: {row['close']:.4f} | Body: {body_size:.2f}%
-                        """)
+                        label = idx.strftime('%Y-%m-%d %H:%M') if hasattr(idx, 'strftime') else str(idx)
+                        st.markdown(f"""**{label}**  
+Price: {row['close']:.4f} | Body: {body_size:.2f}%
+""")
                 else:
                     st.info("No bullish order blocks detected")
 
@@ -815,10 +873,10 @@ class UltimateZANFLOWDashboard:
                 if not bearish_obs.empty:
                     for idx, row in bearish_obs.tail(5).iterrows():
                         body_size = abs(row['close'] - row['open']) / row['open'] * 100
-                        st.markdown(f"""
-                        **{idx.strftime('%Y-%m-%d %H:%M')}**  
-                        Price: {row['close']:.4f} | Body: {body_size:.2f}%
-                        """)
+                        label = idx.strftime('%Y-%m-%d %H:%M') if hasattr(idx, 'strftime') else str(idx)
+                        st.markdown(f"""**{label}**  
+Price: {row['close']:.4f} | Body: {body_size:.2f}%
+""")
                 else:
                     st.info("No bearish order blocks detected")
 
@@ -965,8 +1023,9 @@ class UltimateZANFLOWDashboard:
 
                 if not effort_result_events.empty:
                     for idx, row in effort_result_events.iterrows():
+                        label = idx.strftime('%Y-%m-%d %H:%M') if hasattr(idx, 'strftime') else str(idx)
                         st.markdown(f"""
-                        **{idx.strftime('%Y-%m-%d %H:%M')}**: High volume ({row['volume']:.0f}) 
+                        **{label}**: High volume ({row['volume']:.0f}) 
                         but small price move - Potential accumulation/distribution
                         """)
                 else:
@@ -982,8 +1041,9 @@ class UltimateZANFLOWDashboard:
                 if not climax_events.empty:
                     for idx, row in climax_events.iterrows():
                         price_move = ((row['close'] - row['open']) / row['open']) * 100
+                        label = idx.strftime('%Y-%m-%d %H:%M') if hasattr(idx, 'strftime') else str(idx)
                         st.markdown(f"""
-                        **{idx.strftime('%Y-%m-%d %H:%M')}**: Volume climax ({row['volume']:.0f})
+                        **{label}**: Volume climax ({row['volume']:.0f})
                         with {price_move:+.2f}% price move
                         """)
                 else:
@@ -994,7 +1054,7 @@ class UltimateZANFLOWDashboard:
         st.markdown("## 🎯 Pattern Recognition Analysis")
 
         # Candlestick patterns
-        pattern_columns = [col for col in df.columns if any(pattern in col.lower() for pattern in 
+        pattern_columns = [col for col in df.columns if any(pattern in col.lower() for pattern in
                           ['doji', 'hammer', 'engulfing', 'shooting_star', 'morning_star', 'evening_star'])]
 
         if pattern_columns:
@@ -1012,14 +1072,14 @@ class UltimateZANFLOWDashboard:
 
                 with col1:
                     st.markdown("#### 🟢 Bullish Patterns")
-                    bullish_patterns = {k: v for k, v in pattern_counts.items() 
+                    bullish_patterns = {k: v for k, v in pattern_counts.items()
                                       if any(bp in k.lower() for bp in ['hammer', 'morning_star'])}
                     for pattern, count in bullish_patterns.items():
                         st.markdown(f"**{pattern.replace('_', ' ').title()}**: {count} occurrences")
 
                 with col2:
                     st.markdown("#### 🔴 Bearish Patterns")
-                    bearish_patterns = {k: v for k, v in pattern_counts.items() 
+                    bearish_patterns = {k: v for k, v in pattern_counts.items()
                                       if any(bp in k.lower() for bp in ['shooting_star', 'evening_star'])}
                     for pattern, count in bearish_patterns.items():
                         st.markdown(f"**{pattern.replace('_', ' ').title()}**: {count} occurrences")
@@ -1030,8 +1090,9 @@ class UltimateZANFLOWDashboard:
                 for col in pattern_columns:
                     recent_data = df[df[col] != 0].tail(5)
                     for idx, row in recent_data.iterrows():
+                        label = idx.strftime('%Y-%m-%d %H:%M') if hasattr(idx, 'strftime') else str(idx)
                         recent_patterns.append({
-                            'Date': idx.strftime('%Y-%m-%d %H:%M'),
+                            'Date': label,
                             'Pattern': col.replace('_', ' ').title(),
                             'Value': row[col],
                             'Price': row['close']
@@ -1108,58 +1169,6 @@ class UltimateZANFLOWDashboard:
         except Exception as e:
             st.error(f"Error creating volume profile: {e}")
 
-    def create_risk_analysis(self, df):
-        """Create comprehensive risk analysis"""
-        st.markdown("### ⚠️ Risk Analysis")
-
-        if len(df) > 1:
-            returns = df['close'].pct_change().dropna()
-
-            # Risk metrics
-            col1, col2 = st.columns(2)
-
-            with col1:
-                volatility = returns.std() * np.sqrt(252) * 100
-                st.metric("Annualized Volatility", f"{volatility:.2f}%")
-
-                var_95 = np.percentile(returns, 5) * 100
-                st.metric("VaR (95%)", f"{var_95:.3f}%")
-
-            with col2:
-                skewness = returns.skew()
-                st.metric("Return Skewness", f"{skewness:.3f}")
-
-                kurtosis = returns.kurtosis()
-                st.metric("Return Kurtosis", f"{kurtosis:.3f}")
-
-            # Drawdown analysis
-            cumulative_returns = (1 + returns).cumprod()
-            running_max = cumulative_returns.expanding().max()
-            drawdown = (cumulative_returns - running_max) / running_max
-            max_drawdown = drawdown.min() * 100
-
-            st.metric("Maximum Drawdown", f"{max_drawdown:.2f}%")
-
-            # Risk visualization
-            fig = go.Figure()
-            fig.add_trace(go.Scatter(
-                x=drawdown.index,
-                y=drawdown.values * 100,
-                mode='lines',
-                name='Drawdown %',
-                fill='tonexty',
-                fillcolor='rgba(255, 0, 0, 0.3)',
-                line=dict(color='red')
-            ))
-
-            fig.update_layout(
-                title="Drawdown Analysis",
-                yaxis_title="Drawdown %",
-                template=st.session_state.get('chart_theme', 'plotly_dark'),
-                height=300
-            )
-
-            st.plotly_chart(fig, use_container_width=True)
 
     def create_advanced_analytics_panel(self, df):
         """Create advanced analytics panel"""
@@ -1216,8 +1225,8 @@ class UltimateZANFLOWDashboard:
         st.markdown("#### 🤖 Machine Learning Feature Analysis")
 
         # Technical indicators summary
-        technical_indicators = [col for col in df.columns 
-                              if any(ind in col.upper() for ind in 
+        technical_indicators = [col for col in df.columns
+                              if any(ind in col.upper() for ind in
                                    ['RSI', 'MACD', 'ATR', 'BB', 'EMA', 'SMA'])]
 
         if technical_indicators:
@@ -1226,21 +1235,30 @@ class UltimateZANFLOWDashboard:
             # Recent indicator values
             indicator_data = []
             for indicator in technical_indicators[:10]:  # Show first 10
-                if not pd.isna(df[indicator].iloc[-1]):
-                    indicator_data.append({
-                        'Indicator': indicator,
-                        'Current Value': f"{df[indicator].iloc[-1]:.4f}",
-                        'Mean': f"{df[indicator].mean():.4f}",
-                        'Std': f"{df[indicator].std():.4f}"
-                    })
+                # PATCH: Safe type and column check before accessing df[indicator].iat[-1]
+                if (
+                    isinstance(indicator, str)
+                    and indicator in df.columns
+                    and isinstance(df[indicator], pd.Series)
+                ):
+                    val = df[indicator].iat[-1]
+                    if not pd.isna(val):
+                        indicator_data.append({
+                            'Indicator': indicator,
+                            'Current Value': f"{val:.4f}",
+                            'Mean': f"{df[indicator].mean():.4f}",
+                            'Std': f"{df[indicator].std():.4f}"
+                        })
+                else:
+                    continue
 
             if indicator_data:
                 indicators_df = pd.DataFrame(indicator_data)
                 st.dataframe(indicators_df, use_container_width=True)
 
         # Pattern features
-        pattern_features = [col for col in df.columns 
-                          if any(pattern in col.upper() for pattern in 
+        pattern_features = [col for col in df.columns
+                          if any(pattern in col.upper() for pattern in
                                ['FVG', 'ORDER_BLOCK', 'WYCKOFF', 'STRUCTURE'])]
 
         if pattern_features:
@@ -1278,8 +1296,9 @@ class UltimateZANFLOWDashboard:
 
                         for idx, row in recent_signals.iterrows():
                             signal_type = "🟢 BUY" if row[signal_col] > 0 else "🔴 SELL"
+                            label = idx.strftime('%Y-%m-%d %H:%M') if hasattr(idx, 'strftime') else str(idx)
                             st.markdown(f"""
-                            {idx.strftime('%Y-%m-%d %H:%M')}: {signal_type} 
+                            {label}: {signal_type} 
                             at {row['close']:.4f} (Strength: {abs(row[signal_col])})
                             """)
 

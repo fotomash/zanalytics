@@ -1,3 +1,26 @@
+
+cp -R /Volumes/_bars/* /Users/tom/Documents/_trade/_exports/_tick/_bars
+cp -R /Volumes/_processed/* /Users/tom/Documents/_trade/_exports/_tick/midas_analysis
+cp -R /Volumes/_ticks/* /Users/tom/Documents/_trade/_exports/_tick/
+cp -R /Volumes/out/* /Users/tom/Documents/_trade/_exports/_tick/parquet
+
+'''
+      finnhub_api_key = "d1fiar1r01qig3h21l20d1fiar1r01qig3h21l2g"
+    newsapi_key = "713b3bd82121482aaa0ecdc9af77b6da"
+    trading_economics_api_key = "1750867cdfc34c6:288nxdz64y932qq"
+    fred_api_key = "6a980b8c2421503564570ecf4d765173"
+    data_directory = "/Users/tom/Documents/GitHub/zanalytics/dashboard/data"
+    raw_data_directory = "/Users/tom/Documents/_trade/_exports/_tick/_raw"
+    JSONdir = "/Users/tom/Documents/_trade/_exports/_tick/midas_analysis"
+    bar_data_directory = "/Users/tom/Documents/_trade/_exports/_tick/_bars"
+    data_path = "/Users/tom/Documents/_trade/_exports/_tick"
+    BAR_DATA_DIR = "/Users/tom/Documents/_trade/_exports/_tick/_bars"
+    PARQUET_DATA_DIR = "/Users/tom/Documents/_trade/_exports/_tick/parquet"
+    raw_data = "/Users/tom/Documents/_trade/_exports/_tick"
+    enriched_data = "/Users/tom/Documents/_trade/_exports/_tick/parquet" 
+    tick_data = "/Users/tom/Documents/_trade/_exports/_tick/_raw"
+
+
 cd /Users/tom/Documents/_trade/_exports/_tick
 # Activate venv directly via python binary
 /Users/tom/Documents/GitHub/venv2/bin/python \
@@ -18,7 +41,8 @@ cd /Users/tom/Documents/_trade/_exports/_tick
   --output /Users/tom/Documents/GitHub/zanalytics/dashboard/data --no-dashboard
 
 /Users/tom/Documents/GitHub/venv2/bin/python \
-  /Users/tom/Documents/_trade/_exports/_tick/ncOS_ultimate_microstructure_analyzer_DEFAULTS.py \
+  /Users/tom/Documents/_trade/_exports/_tick/ncOS_ultimate_microstructure_analyzeqwer
+  qwer_DEFAULTS.py \
   --directory ./ \
   --no_compression \
   --output_dir /Users/tom/Documents/GitHub/zanalytics/dashboard/data \
@@ -56,14 +80,17 @@ cd /Users/tom/Documents/_trade/_exports/_tick
 
  cp /Users/tom/Documents/_trade/_exports/_tick/*_bars.csv /Users/tom/Documents/GitHub/zanalytics/dashboard/data/
 
-  
 
-'''
   --file ETHUSD.csv \
 
-
-
-  --json_dir /Users/tom/Documents/GitHub/zanalytics/dashboard/data \
+ /Users/tom/Documents/_trade/_exports/_tick/
+ 
+ python ncos_enhanced_analyzer.py --timeframes_parquet 1min,5min,15min,30min,1h,4h,1d \
+    --max_candles 250 \
+    --output_dir "/Users/tom/Documents/_tick_data/_processed" \
+    --no_compression \
+    --directory "/Users/tom/Library/Application Support/net.metaquotes.wine.metatrader5/drive_c/Program Files/MetaTrader 5/MQL5/Files/_tick_data/_bars" \
+    --json_dir  /Users/tom/Documents/_tick_data/_processed/json 
 
 
 

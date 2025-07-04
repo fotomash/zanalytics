@@ -87,7 +87,7 @@ class ZanalyticsDashboard:
 
         self.data_dir = Path(data_directory)
         self.supported_pairs = ["XAUUSD", "BTCUSD", "EURUSD", "GBPUSD", "USDJPY", "ETHUSD", "USDCAD", "AUDUSD",
-                                "NZDUSD", "DXYCAS"]
+                                "NZDUSD", "DXY", "DXYCAS"]
         self.timeframes = ["1min", "5min", "15min", "30min", "1H", "4H", "1D", "1W", "5T"]
 
         self.economic_manager = EconomicDataManager()
@@ -575,12 +575,128 @@ class ZanalyticsDashboard:
                         plot_bgcolor="rgba(0,0,0,0.02)",
                     )
                     st.plotly_chart(fig_xau_3d, use_container_width=True)
+                    # Render consolidated multi-asset 3-D view
+                    self.create_multi_asset_3d_chart(data_sources)
                 else:
                     st.info("XAUUSD 15min parquet missing 'timestamp' or 'close' column for 3D FVG/SMC chart.")
             else:
                 st.info("No XAUUSD 15min parquet file found for 3D FVG/SMC visualization.")
         except Exception as e:
             st.warning(f"Error loading 3D XAUUSD FVG/SMC chart: {e}")
+
+    # --- Multi-Asset 3D Volume Surface Chart ---
+    def create_multi_asset_3d_chart(self, data_sources):
+        st.markdown("#### 🌐 Multi-Asset 3D Volume Surface – 15-Minute")
+
+        import numpy as np
+
+        assets = {
+            "DXY": "Plasma",
+            "EURUSD": "Cividis",
+            "GBPUSD": "Viridis",
+        }
+
+        parquet_dir = Path(st.secrets["PARQUET_DATA_DIR"])
+        surfaces = []
+
+        for idx, (asset, colorscale) in enumerate(assets.items()):
+            parquet_file = next(parquet_dir.glob(f"**/{asset}*15min*.parquet"), None)
+            if not parquet_file:
+                continue
+
+            df = pd.read_parquet(parquet_file)
+            if not {"timestamp", "close", "volume"}.issubset(df.columns):
+                continue
+
+            df = df.sort_values("timestamp").tail(1000).copy()
+            df["timestamp"] = pd.to_datetime(df["timestamp"])
+            df.dropna(subset=["timestamp", "close", "volume"], inplace=True)
+
+            df["time_bin"] = pd.cut(df.index, bins=50, labels=False)
+            df["price_bin"] = pd.cut(df["close"], bins=50, labels=False)
+
+            pivot = pd.pivot_table(
+                df,
+                values="volume",
+                index="price_bin",
+                columns="time_bin",
+                aggfunc="sum",
+                fill_value=0,
+            )
+
+            if pivot.empty:
+                continue
+
+            surfaces.append(go.Surface(
+                z=np.log1p(pivot.values + 1e-3) + idx * 0.4,
+                colorscale=colorscale,
+                showscale=False,
+                name=asset,
+                opacity=0.9
+            ))
+
+        if surfaces:
+            fig = go.Figure(data=surfaces)
+            # Add labels at the top center of each surface
+            for idx, asset in enumerate(["DXY", "EURUSD", "GBPUSD"]):
+                fig.add_trace(go.Scatter3d(
+                    x=[25],  # Midpoint of time bins
+                    y=[25],  # Midpoint of price bins
+                    z=[np.max([surface.z.max() for surface in surfaces]) + idx * 0.4 + 0.1],
+                    mode='text',
+                    text=[asset],
+                    textposition='top center',
+                    textfont=dict(size=14, color='white'),
+                    showlegend=False
+                ))
+            fig.update_layout(
+                title="Multi-Asset 3D Volume Surface (15-Minute)",
+                scene=dict(
+                    xaxis_title="Time Bin",
+                    yaxis_title="Price Bin",
+                    zaxis_title="Volume"
+                ),
+                template=st.session_state.get("chart_theme", "plotly_dark"),
+                height=500,
+                paper_bgcolor="rgba(0,0,0,0.02)",
+                plot_bgcolor="rgba(0,0,0,0.02)",
+                margin=dict(l=20, r=20, t=40, b=20),
+                legend=dict(
+                    orientation="h",
+                    yanchor="bottom",
+                    y=0.02,
+                    xanchor="center",
+                    x=0.5
+                )
+            )
+            # --- Insert manual legend traces for DXY, EURUSD, GBPUSD ---
+            fig.add_trace(go.Scatter3d(
+                x=[None],
+                y=[None],
+                z=[None],
+                mode='markers',
+                marker=dict(size=8, color='magenta'),
+                name='DXY'
+            ))
+            fig.add_trace(go.Scatter3d(
+                x=[None],
+                y=[None],
+                z=[None],
+                mode='markers',
+                marker=dict(size=8, color='goldenrod'),
+                name='EURUSD'
+            ))
+            fig.add_trace(go.Scatter3d(
+                x=[None],
+                y=[None],
+                z=[None],
+                mode='markers',
+                marker=dict(size=8, color='limegreen'),
+                name='GBPUSD'
+            ))
+            st.plotly_chart(fig, use_container_width=True)
+        else:
+            st.info("No suitable data found for volume surface chart.")
 
         st.markdown("<hr style='margin-top:1.5rem'>", unsafe_allow_html=True)
 

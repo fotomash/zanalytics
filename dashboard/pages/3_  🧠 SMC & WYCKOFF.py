@@ -32,21 +32,20 @@ def scan_parquet_files(parquet_dir):
     for f in Path(parquet_dir).rglob("*.parquet"):
         name = f.stem.upper()
         parent = f.parent.name.upper()
-        # If filename looks like timeframe, parent is symbol
-        if re.match(r"\d+[A-Z]+", name):
+        # First: Try SYMBOL_TIMEFRAME format in filename
+        m = re.match(r"(.+)_([0-9]+[A-Z]+)$", name, re.IGNORECASE)
+        if m:
+            symbol, timeframe = m.group(1).upper(), m.group(2).upper()
+        # Second: If filename looks like timeframe, parent is symbol
+        elif re.match(r"\d+[A-Z]+", name):
             symbol = parent
             timeframe = name
-        # If folder looks like timeframe, filename is symbol
+        # Third: If folder looks like timeframe, filename is symbol
         elif re.match(r"\d+[A-Z]+", parent):
             symbol = name
             timeframe = parent
-        # Fallback: try SYMBOL_TIMEFRAME in filename
         else:
-            m = re.match(r"(.*?)_(\d+[a-zA-Z]+)$", name, re.IGNORECASE)
-            if m:
-                symbol, timeframe = m.group(1).upper(), m.group(2).upper()
-            else:
-                continue
+            continue
         files.append((symbol, timeframe, f.relative_to(parquet_dir)))
     return files
 
@@ -111,7 +110,7 @@ class QRTQuantumAnalyzer(QuantumMicrostructureAnalyzer):
                 )
 
         # Ensure 'timestamp' is a proper pandas datetime (handles tick‑data strings like '2025.06.29 19:21:36')
-        if not np.issubdtype(df['timestamp'].dtype, np.datetime64):
+        if not pd.api.types.is_datetime64_any_dtype(df['timestamp']):
             df['timestamp'] = pd.to_datetime(df['timestamp'], errors='coerce')
             if df['timestamp'].isna().all():
                 raise ValueError("Failed to parse 'timestamp' column to datetime format.")
@@ -261,17 +260,25 @@ class QRTQuantumAnalyzer(QuantumMicrostructureAnalyzer):
 
         high_absorption = df[df['absorption_ratio'] > df['absorption_ratio'].quantile(0.9)]
         for idx in high_absorption.index:
-            if idx > 10 and idx < len(df) - 10:
-                pre_move = abs(df.loc[idx - 10:idx - 1, 'price_mid'].pct_change().sum())
-                post_move = abs(df.loc[idx:idx + 10, 'price_mid'].pct_change().sum())
+            # Convert index label to integer position
+            int_idx = df.index.get_loc(idx)
+            pre_move = 0
+            post_move = 0
+            if int_idx - 10 >= 0 and int_idx + 10 < len(df):
+                pre_prices = df.iloc[int_idx - 10:int_idx]['price_mid']
+                post_prices = df.iloc[int_idx:int_idx + 10]['price_mid']
+                if len(pre_prices) > 1:
+                    pre_move = abs(pre_prices.pct_change().sum())
+                if len(post_prices) > 1:
+                    post_move = abs(post_prices.pct_change().sum())
 
-                if post_move < pre_move * 0.3:
-                    patterns['absorption_zones'].append({
-                        'timestamp': df.loc[idx, 'timestamp'],
-                        'price': df.loc[idx, 'price_mid'],
-                        'absorption_ratio': df.loc[idx, 'absorption_ratio'],
-                        'effectiveness': 1 - (post_move / (pre_move + 1e-9))
-                    })
+            if pre_move > 0 and post_move < pre_move * 0.3:
+                patterns['absorption_zones'].append({
+                    'timestamp': df.loc[idx, 'timestamp'],
+                    'price': df.loc[idx, 'price_mid'],
+                    'absorption_ratio': df.loc[idx, 'absorption_ratio'],
+                    'effectiveness': 1 - (post_move / (pre_move + 1e-9))
+                })
 
         divergence_points = df[abs(df['delta_divergence']) > 0.3]
         for idx in divergence_points.index:
@@ -381,6 +388,22 @@ class QRTQuantumAnalyzer(QuantumMicrostructureAnalyzer):
             reasons.append("No strong confluence")
         return {"signal": signal, "reasons": reasons, "springs": recent_springs, "absorption": strong_abs,
                 "delta_div": bullish_div + bearish_div}
+
+    def _detect_selling_climax(self, df):
+        # TODO: Replace with real selling climax detection logic
+        return False
+
+    def _detect_accumulation_range(self, df):
+        # TODO: Replace with real accumulation range detection logic
+        return False
+
+    def _detect_spring(self, df):
+        # TODO: Replace with real spring detection logic
+        return None
+
+    def _detect_markup_beginning(self, df):
+        # TODO: Replace with real markup beginning detection logic
+        return False
 
 
 class TiquidityEngine:
@@ -506,6 +529,15 @@ with st.sidebar:
             df = pd.read_parquet(full_path)
             df.columns = [c.lower() for c in df.columns]
 
+            # --- PATCH: Robust cleaning: convert price columns with commas to float, and sort by timestamp ascending ---
+            for price_col in ['open', 'high', 'low', 'close']:
+                if price_col in df.columns:
+                    # Remove commas, convert to float (robust for e.g. "1,234.56")
+                    df[price_col] = pd.to_numeric(df[price_col].astype(str).str.replace(",", ""), errors='coerce')
+
+            if 'timestamp' in df.columns:
+                df = df.sort_values('timestamp')
+
             # -- PATCH: Robust cleaning for 1-minute chart data --
             if 'timestamp' in df.columns:
                 df['timestamp'] = pd.to_datetime(df['timestamp'], errors='coerce')
@@ -527,6 +559,7 @@ with st.sidebar:
             # Fill missing OHLC columns only if they don't exist
             ohlc_cols = ['open', 'high', 'low', 'close']
             missing_ohlc = [col for col in ohlc_cols if col not in df.columns]
+            synthetic_bars = False
             if missing_ohlc:
                 # Try to use 'last' or 'price_mid' as fallback for all missing OHLC fields
                 base_price = df['last'] if 'last' in df.columns else df['price_mid'] if 'price_mid' in df.columns else None
@@ -539,10 +572,24 @@ with st.sidebar:
                         df['high'] = pd.concat([df['open'], df['close']], axis=1).max(axis=1)
                     if 'low' not in df.columns:
                         df['low'] = pd.concat([df['open'], df['close']], axis=1).min(axis=1)
+                    synthetic_bars = True
                 else:
                     raise ValueError("Cannot fill missing OHLC columns: no 'last' or 'price_mid' found.")
 
-            # Force all price columns to float for consistency
+            # --- PATCH: Warn if bars are synthetic or appear to be synthetic ---
+            if synthetic_bars:
+                st.warning("⚠️ Synthetic bars detected: OHLC columns were missing and have been constructed from a single price column ('last' or 'price_mid'). These bars may not reflect real market data.")
+
+            # Additional check: even if OHLC exists, warn if they are all (nearly) identical for the most recent bar(s)
+            try:
+                recent = df[['open', 'high', 'low', 'close']].tail(10)
+                # Count how many unique values per row; if <=2, likely synthetic
+                if (recent.nunique(axis=1) <= 2).any():
+                    st.warning("⚠️ Many recent bars have identical or nearly identical OHLC values. This suggests your data source may not contain real OHLC candles. Results may not be reliable for candlestick analysis.")
+            except Exception:
+                pass
+
+            # Force all price columns to float for consistency (again, in case filled above)
             for price_col in ['open', 'high', 'low', 'close']:
                 df[price_col] = pd.to_numeric(df[price_col], errors='coerce')
 
@@ -675,8 +722,23 @@ if st.session_state.df_to_use is not None:
                 }.get(phase, '❓')
                 st.write(f"{phase_emoji} **{phase}**")
                 st.markdown("#### Recent Events")
+                # PATCH: robust timestamp formatting for Wyckoff events (if present)
                 for event in wyckoff_results.get('events', [])[:5]:
-                    st.write(f"• {event['type']} at ${event['price']:.5f}")
+                    price = event.get('price')
+                    # Try to show event time if present
+                    time_str = ""
+                    timestamp = event.get('timestamp') or event.get('datetime')
+                    if pd.notnull(timestamp) if 'timestamp' in event or 'datetime' in event else False:
+                        if not isinstance(timestamp, pd.Timestamp):
+                            try:
+                                timestamp = pd.to_datetime(timestamp)
+                            except Exception:
+                                timestamp = None
+                        if timestamp is not None and pd.notnull(timestamp):
+                            time_str = timestamp.strftime('%Y-%m-%d %H:%M')
+                        else:
+                            time_str = ""
+                    st.write(f"• {event['type']} at ${price:.5f}" + (f" ({time_str})" if time_str else ""))
 
     with tab3:
         st.header("Analysis Reports")
@@ -709,7 +771,30 @@ Generated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
             if st.session_state.analysis_results:
                 for module, results in st.session_state.analysis_results.items():
                     st.subheader(f"{module.upper()} Commentary")
-                    st.json(results)
+                    # PATCH: robust timestamp formatting for commentary (if events present)
+                    if module == "wyckoff" and isinstance(results, dict) and "events" in results:
+                        events = results["events"]
+                        # Format time for each event if possible
+                        formatted_events = []
+                        for event in events:
+                            event_copy = dict(event)
+                            timestamp = event.get('timestamp') or event.get('datetime')
+                            if pd.notnull(timestamp) if 'timestamp' in event or 'datetime' in event else False:
+                                if not isinstance(timestamp, pd.Timestamp):
+                                    try:
+                                        timestamp = pd.to_datetime(timestamp)
+                                    except Exception:
+                                        timestamp = None
+                                if timestamp is not None and pd.notnull(timestamp):
+                                    event_copy['time_str'] = timestamp.strftime('%Y-%m-%d %H:%M')
+                                else:
+                                    event_copy['time_str'] = str(timestamp)
+                            formatted_events.append(event_copy)
+                        display_results = dict(results)
+                        display_results["events"] = formatted_events
+                        st.json(display_results)
+                    else:
+                        st.json(results)
             st.download_button(
                 label="📥 Download Full JSON",
                 data=json.dumps(st.session_state.analysis_results, indent=2, default=str),
@@ -746,3 +831,4 @@ else:
         - **Volume Profile**: Point of control, value areas, volume nodes
         - **Technical Indicators**: Moving averages, RSI, MACD, Bollinger Bands
 ''')
+

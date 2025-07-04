@@ -436,7 +436,7 @@ def create_comprehensive_chart(df, symbol, config):
         row_heights=[0.5, 0.2, 0.2, 0.1]
     )
 
-    # Main candlestick chart
+    # Main candlestick chart (PATCH: sharper pro colors)
     fig.add_trace(
         go.Candlestick(
             x=df.index,
@@ -445,8 +445,8 @@ def create_comprehensive_chart(df, symbol, config):
             low=df['low'],
             close=df['close'],
             name=symbol,
-            increasing_line_color='#00ff88',
-            decreasing_line_color='#ff3366'
+            increasing_line_color='lime',
+            decreasing_line_color='red'
         ),
         row=1, col=1
     )
@@ -472,6 +472,17 @@ def create_comprehensive_chart(df, symbol, config):
             row=1, col=1
         )
 
+    # PATCH: VWAP line pro styling if present
+    if 'vwap' in df.columns:
+        fig.add_trace(
+            go.Scatter(
+                x=df.index, y=df['vwap'],
+                mode='lines', name='VWAP',
+                line=dict(color='gold', width=2, dash='dot')
+            ),
+            row=1, col=1
+        )
+
     # Bollinger Bands
     if all(col in df.columns for col in ['bb_upper', 'bb_lower', 'bb_middle']):
         fig.add_trace(
@@ -488,7 +499,7 @@ def create_comprehensive_chart(df, symbol, config):
                 x=df.index, y=df['bb_lower'],
                 mode='lines', name='BB Lower',
                 line=dict(color='gray', width=1, dash='dot'),
-                fill='tonexty', fillcolor='rgba(128,128,128,0.1)',
+                fill='tonexty', fillcolor='rgba(0,128,128,0.1)',
                 showlegend=False
             ),
             row=1, col=1
@@ -583,14 +594,28 @@ def create_comprehensive_chart(df, symbol, config):
             row=4, col=1
         )
 
-    # Update layout
+    # Update layout (PATCH: pro style, transparent, modern, title, legend, axes)
     fig.update_layout(
-        title=f'{symbol} - Comprehensive Technical Analysis',
+        title=dict(
+            text=f"{symbol} – 15-Minute Candlestick Chart with FVG, Midas VWAP & Wyckoff: <b style='color:#FFD600;'>MARKDOWN</b>",
+            y=0.93,
+            x=0.5,
+            xanchor='center',
+            yanchor='top',
+            font=dict(size=22, color='white', family='Segoe UI, Arial, sans-serif')
+        ),
         template='plotly_dark',
-        height=800,
-        showlegend=True,
-        xaxis_rangeslider_visible=False
+        paper_bgcolor='rgba(0,0,0,0)',
+        plot_bgcolor='rgba(0,0,0,0)',
+        height=450,
+        showlegend=False,
+        xaxis_rangeslider_visible=False,
+        margin=dict(l=20, r=20, t=50, b=30)
     )
+
+    # Remove axis gridlines and zero lines
+    fig.update_xaxes(showgrid=False, zeroline=False)
+    fig.update_yaxes(showgrid=False, zeroline=False)
 
     # Update y-axis labels
     fig.update_yaxes(title_text="Price", row=1, col=1)
@@ -616,42 +641,60 @@ def main():
 
     # Page configuration
     st.set_page_config(
-        page_title="NCOS v11 Trading Dashboard",
+        page_title="Zanalytics – AI/ML Global Market Intelligence",
         page_icon="📈",
         layout="wide",
         initial_sidebar_state="expanded"
     )
 
-    def set_background(image_path):
+    # --- PATCH: Match HOME dashboard background styling ---
+    import base64
+    def get_image_as_base64(path):
+        """Reads an image file and returns its base64 encoded string."""
         try:
-            if not Path(image_path).exists():
-                st.warning("⚠️ Background image not found.")
-                return
-            import base64
-            with open(image_path, "rb") as image_file:
-                encoded = base64.b64encode(image_file.read()).decode()
-            st.markdown(
-                f"""
-                <style>
-                .stApp {{
-                    background-image: url("data:image/png;base64,{encoded}");
-                    background-size: cover;
-                    background-attachment: fixed;
-                    background-repeat: no-repeat;
-                    background-position: center;
-                }}
-                </style>
-                """,
-                unsafe_allow_html=True,
-            )
-        except Exception as e:
-            st.warning(f"Error loading background image: {e}")
+            with open(path, "rb") as image_file:
+                return base64.b64encode(image_file.read()).decode()
+        except FileNotFoundError:
+            st.warning(f"Background image not found at '{path}'. Please ensure it's in the same directory as the script.")
+            return None
 
-    set_background("./theme/transparent_grid.png")
+    img_base64 = get_image_as_base64("./pages/image_af247b.jpg")
+    if img_base64:
+        st.markdown(f"""
+        <style>
+        [data-testid="stAppViewContainer"] > .main {{
+            background-image: linear-gradient(rgba(0,0,0,0.8), rgba(0,0,0,0.8)), url(data:image/jpeg;base64,{img_base64});
+            background-size: cover;
+            background-position: center;
+            background-repeat: no-repeat;
+            background-attachment: fixed;
+        }}
+        .main .block-container {{
+            background-color: rgba(0,0,0,0.025) !important;
+        }}
+        #MainMenu {{visibility: hidden;}}
+        footer {{visibility: hidden;}}
+        </style>
+        """, unsafe_allow_html=True)
 
-    # Main header
-    st.title("📈 NCOS v11 Trading Analysis Dashboard")
-    st.markdown("**Comprehensive Market Analysis with Multiple Data Sources**")
+    # Main header (matching HOME screen style)
+    st.markdown(
+        """
+        <div style='
+            background: rgba(64, 36, 101, 0.78);
+            border-radius: 16px;
+            padding: 22px 30px;
+            margin-bottom: 25px;
+            text-align: center;
+            border: 1px solid #9e9e9e;
+            box-shadow: 0 0 20px rgba(0,0,0,0.6);
+        '>
+            <h2 style='color:#FFFFFF;margin:0;'>ZANALYTICS</h2>
+            <p style='color:#DDDDDD;font-size:0.85rem;margin:6px 0 0;'>AI / ML Powered Global Market Intelligence</p>
+        </div>
+        """,
+        unsafe_allow_html=True
+    )
 
     # Load configuration
     config = load_config_from_secrets()
@@ -738,13 +781,86 @@ def main():
             else:
                 st.metric("Indicators", len([col for col in df.columns if any(x in col for x in ['sma', 'ema', 'rsi', 'macd'])]))
 
+        # Data table (moved above chart, foldable, smaller text)
+        with st.expander("📋 Recent Data (click to expand)"):
+            st.markdown(
+                "<style>div[data-testid='stDataFrame'] {font-size:0.93em !important;}</style>",
+                unsafe_allow_html=True
+            )
+            st.dataframe(df.tail(20), use_container_width=True)
+
         # Create and display chart
         chart = create_comprehensive_chart(df, selected_symbol, config)
         st.plotly_chart(chart, use_container_width=True)
 
-        # Data table
-        st.subheader("📋 Recent Data")
-        st.dataframe(df.tail(20), use_container_width=True)
+        # ===============================
+        # MICROSTRUCTURE ANALYSIS SECTION
+        # ===============================
+        # Inject CSS for styled chart containers (HOME dashboard theme)
+        st.markdown("""
+            <style>
+            .element-container:has(> div[data-testid="stPlotlyChart"]) {
+                background-color: rgba(0, 0, 0, 0.6);
+                padding: 15px;
+                border-radius: 12px;
+                box-shadow: 0 0 10px rgba(0,0,0,0.6);
+                margin-bottom: 20px;
+            }
+            </style>
+        """, unsafe_allow_html=True)
+
+        st.subheader("🔬 Microstructure Analysis")
+
+        # --- Price Change Distribution ---
+        with st.container():
+            st.markdown("**Price Change Distribution**", unsafe_allow_html=True)
+            price_changes = df['close'].diff().dropna()
+            fig_dist = go.Figure()
+            fig_dist.add_trace(go.Histogram(
+                x=price_changes,
+                nbinsx=40,
+                marker_color='#FFD600',
+                opacity=0.85,
+                name='Price Change'
+            ))
+            fig_dist.update_layout(
+                title=dict(
+                    text="Distribution of Price Changes",
+                    font=dict(size=16)
+                ),
+                template='plotly_dark',
+                plot_bgcolor='rgba(0,0,0,0)',
+                paper_bgcolor='rgba(0,0,0,0)',
+                font=dict(color='white'),
+                margin=dict(l=10, r=10, t=30, b=30)
+            )
+            st.plotly_chart(fig_dist, use_container_width=True)
+
+        # --- Volatility Clustering ---
+        with st.container():
+            st.markdown("**Volatility Clustering**", unsafe_allow_html=True)
+            returns = df['close'].pct_change().dropna()
+            rolling_vol = returns.rolling(window=20).std()
+            fig_vol = go.Figure()
+            fig_vol.add_trace(go.Scatter(
+                x=rolling_vol.index,
+                y=rolling_vol,
+                mode='lines',
+                name='Rolling Volatility',
+                line=dict(color='#00BFFF', width=2)
+            ))
+            fig_vol.update_layout(
+                title=dict(
+                    text="20-Period Rolling Volatility",
+                    font=dict(size=16)
+                ),
+                template='plotly_dark',
+                plot_bgcolor='rgba(0,0,0,0)',
+                paper_bgcolor='rgba(0,0,0,0)',
+                font=dict(color='white'),
+                margin=dict(l=10, r=10, t=30, b=30)
+            )
+            st.plotly_chart(fig_vol, use_container_width=True)
 
         # Pattern signals
         signals = []
@@ -772,60 +888,119 @@ def main():
             st.subheader("🎯 Recent Signals")
             signals_df = pd.DataFrame(signals)
             st.dataframe(signals_df, use_container_width=True)
-    
+
+        # --- Microstructure / Tick Ingestion Insights Small Charts Section ---
+        # PATCH: Consistent styling for small charts as main charts
+        # Example: Microstructure histogram and tick line chart
+        if 'microstructure' in df.columns or 'tick_count' in df.columns:
+            st.markdown("### 🪶 Microstructure & Tick Insights")
+            chart_cols = st.columns(2)
+            with chart_cols[0]:
+                # Microstructure histogram
+                if 'microstructure' in df.columns:
+                    hist_color = '#00FFD0'
+                    fig_micro = go.Figure()
+                    fig_micro.add_trace(go.Histogram(
+                        x=df['microstructure'],
+                        nbinsx=30,
+                        marker_color=hist_color,
+                        opacity=0.84,
+                        name='Microstructure'
+                    ))
+                    fig_micro.update_layout(
+                        title=dict(
+                            text='Microstructure Distribution',
+                            font=dict(size=14, color='white'),
+                            x=0.5
+                        ),
+                        template='plotly_dark',
+                        paper_bgcolor='#07272C',
+                        plot_bgcolor='#07272C',
+                        margin=dict(l=10, r=10, t=30, b=20),
+                        font=dict(color='white', size=11),
+                        showlegend=False
+                    )
+                    st.plotly_chart(fig_micro, use_container_width=True)
+            with chart_cols[1]:
+                # Tick ingestion line chart
+                if 'tick_count' in df.columns:
+                    tick_color = '#FFD600'
+                    fig_tick = go.Figure()
+                    fig_tick.add_trace(go.Scatter(
+                        x=df.index,
+                        y=df['tick_count'],
+                        mode='lines',
+                        name='Tick Count',
+                        line=dict(color=tick_color, width=2)
+                    ))
+                    fig_tick.update_layout(
+                        title=dict(
+                            text='Tick Ingestion Over Time',
+                            font=dict(size=14, color='white'),
+                            x=0.5
+                        ),
+                        template='plotly_dark',
+                        paper_bgcolor='#07272C',
+                        plot_bgcolor='#07272C',
+                        margin=dict(l=10, r=10, t=30, b=20),
+                        font=dict(color='white', size=11),
+                        showlegend=False
+                    )
+                    st.plotly_chart(fig_tick, use_container_width=True)
+
     elif data_source == "Yahoo Finance":
         st.subheader("📈 Yahoo Finance Data")
-        
+
         col1, col2, col3 = st.columns(3)
-        
+
         with col1:
             symbol = st.text_input("Enter Symbol", value="AAPL", help="Enter stock symbol (e.g., AAPL, TSLA)")
-        
+
         with col2:
             period = st.selectbox("Period", ["1d", "5d", "1mo", "3mo", "6mo", "1y", "2y"])
-        
+
         with col3:
             interval = st.selectbox("Interval", ["1m", "2m", "5m", "15m", "30m", "60m", "90m", "1h", "1d"])
-        
+
         if st.button("Fetch Yahoo Finance Data"):
             try:
                 with st.spinner(f"Fetching {symbol} data from Yahoo Finance..."):
                     ticker = yf.Ticker(symbol)
                     df = ticker.history(period=period, interval=interval)
-                    
+
                     if not df.empty:
                         # Calculate indicators
                         df.columns = df.columns.str.lower()
                         df = calculate_technical_indicators(df)
                         df = detect_patterns(df)
-                        
+
                         # Display chart
                         chart = create_comprehensive_chart(df, symbol, config)
                         st.plotly_chart(chart, use_container_width=True)
-                        
+
                         # Display data
                         st.dataframe(df.tail(10), use_container_width=True)
-                    
+
                     else:
                         st.error("No data found for the specified symbol and period")
-            
+
             except Exception as e:
                 st.error(f"Error fetching data: {e}")
-    
+
     elif data_source == "Finnhub API":
         st.subheader("📊 Finnhub Real-time Data")
-        
+
         if not config['api_keys']['finnhub']:
             st.error("❌ Finnhub API key not configured")
             return
-        
+
         finnhub = FinnhubAPI(config['api_keys']['finnhub'])
-        
+
         symbol = st.text_input("Enter Symbol", value="AAPL", help="Enter stock symbol")
-        
+
         if st.button("Get Real-time Data"):
             with st.spinner("Fetching real-time data..."):
-                
+
                 # Get stock price
                 price_data = finnhub.get_stock_price(symbol)
                 if price_data:
@@ -839,7 +1014,7 @@ def main():
                         st.metric("High", f"${price_data.get('h', 0):.2f}")
                     with col4:
                         st.metric("Low", f"${price_data.get('l', 0):.2f}")
-                
+
                 # Get company profile
                 profile = finnhub.get_company_profile(symbol)
                 if profile:
@@ -853,7 +1028,7 @@ def main():
                         st.write(f"**Market Cap**: ${profile.get('marketCapitalization', 0):,.0f}M")
                         st.write(f"**Exchange**: {profile.get('exchange', 'N/A')}")
                         st.write(f"**Currency**: {profile.get('currency', 'N/A')}")
-                
+
                 # Get market news
                 news = finnhub.get_market_news()
                 if news:
@@ -864,16 +1039,16 @@ def main():
                             st.write(f"**Source**: {article.get('source', 'Unknown')}")
                             if article.get('url'):
                                 st.markdown(f"[Read more]({article['url']})")
-    
+
     elif data_source == "Economic Data":
         st.subheader("📈 Economic Data Analysis")
-        
+
         if not config['api_keys']['fred']:
             st.error("❌ FRED API key not configured")
             return
-        
+
         fred = FREDData(config['api_keys']['fred'])
-        
+
         # Popular economic indicators
         indicators = {
             'GDP': 'GDP',
@@ -883,23 +1058,23 @@ def main():
             'Initial Claims': 'ICSA',
             'Consumer Sentiment': 'UMCSENT'
         }
-        
+
         selected_indicator = st.selectbox("Select Economic Indicator", list(indicators.keys()))
         series_id = indicators[selected_indicator]
-        
+
         if st.button("Fetch Economic Data"):
             with st.spinner(f"Fetching {selected_indicator} data..."):
                 data = fred.get_series_data(series_id)
-                
+
                 if data and 'observations' in data:
                     observations = data['observations']
-                    
+
                     # Convert to DataFrame
                     df = pd.DataFrame(observations)
                     df['date'] = pd.to_datetime(df['date'])
                     df['value'] = pd.to_numeric(df['value'], errors='coerce')
                     df = df.dropna().sort_values('date')
-                    
+
                     if not df.empty:
                         # Create line chart
                         fig = go.Figure()
@@ -908,19 +1083,25 @@ def main():
                             y=df['value'],
                             mode='lines',
                             name=selected_indicator,
-                            line=dict(color='blue', width=2)
+                            line=dict(color='#FFD600', width=2)
                         ))
-                        
                         fig.update_layout(
-                            title=f'{selected_indicator} Over Time',
+                            title=dict(
+                                text=f'{selected_indicator} Over Time',
+                                font=dict(size=18, color='white'),
+                                x=0.5
+                            ),
                             xaxis_title='Date',
                             yaxis_title='Value',
-                            template='plotly_white',
-                            height=400
+                            template='plotly_dark',
+                            paper_bgcolor='#07272C',
+                            plot_bgcolor='#07272C',
+                            height=400,
+                            margin=dict(l=10, r=10, t=30, b=20),
+                            font=dict(color='white', size=12),
+                            showlegend=False
                         )
-                        
                         st.plotly_chart(fig, use_container_width=True)
-                        
                         # Display recent data
                         st.subheader("Recent Values")
                         st.dataframe(df.tail(10)[['date', 'value']], use_container_width=True)
