@@ -16,7 +16,7 @@ def check_requirements():
         'zanalytics_integration.py',
         'zanalytics_signal_generator.py',
         'zanalytics_llm_formatter.py',
-        'dashboard/app.py',
+        '🏠 Home.py',
         'zanalytics_backtester.py',
         'zanalytics_advanced_analytics.py',
         'zanalytics_market_monitor.py',
@@ -76,7 +76,7 @@ def main():
     print("\nAll checks passed! You can now run:")
     print("  python zanalytics_integrated_orchestrator.py")
     print("\nFor the dashboard, run in a separate terminal:")
-    print("  streamlit run dashboard/app.py")
+    print("  streamlit run 🏠 Home.py")
     print("\nTo run specific components:")
     print("  python zanalytics_market_monitor.py  # For real-time monitoring")
     print("  python zanalytics_backtester.py      # For backtesting")

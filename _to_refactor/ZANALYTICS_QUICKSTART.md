@@ -51,7 +51,7 @@ asyncio.run(main())
 
 ```bash
 # Start dashboard
-streamlit run dashboard/app.py
+streamlit run 🏠 Home.py
 
 # View exports
 ls exports/

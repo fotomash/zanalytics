@@ -53,7 +53,7 @@ class SystemDeployer:
         required_scripts = [
             'ultimate_strategy_merger.py',
             'ultimate_strategy_api.py', 
-            'dashboard/app.py',
+            '🏠 Home.py',
             'ncOS_ultimate_microstructure_analyzer_DEFAULTS.py'
         ]
 
@@ -98,8 +98,8 @@ class SystemDeployer:
         print(f"📊 Starting Streamlit dashboard on port {self.streamlit_port}...")
 
         cmd = [
-            sys.executable, '-m', 'streamlit', 'run', 
-            'dashboard/app.py',
+            sys.executable, '-m', 'streamlit', 'run',
+            '🏠 Home.py',
             '--server.port', str(self.streamlit_port),
             '--server.headless', 'true'
         ]

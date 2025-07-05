@@ -84,7 +84,7 @@ Comprehensive backtesting with multiple engines.
 - Custom strategy testing
 - Walk-forward analysis
 
-### 7. **Dashboard** (`dashboard/app.py`)
+### 7. **Dashboard** (`🏠 Home.py`)
 Interactive Streamlit dashboard for visualization.
 
 **Features:**
@@ -142,7 +142,7 @@ zanalytics/
     ├── zanalytics_llm_formatter.py
     ├── zanalytics_backtester.py
     ├── zanalytics_backtest_analyzer.py
-    └── dashboard/app.py
+     └── 🏠 Home.py
 ```
 
 ## Quick Start
@@ -161,7 +161,7 @@ asyncio.run(orchestrator.execute_pipeline())
 
 ### 2. Running the Dashboard
 ```bash
-streamlit run dashboard/app.py
+streamlit run 🏠 Home.py
 ```
 
 ### 3. Generating LLM-Ready Data
