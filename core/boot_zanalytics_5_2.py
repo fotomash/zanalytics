@@ -12,7 +12,7 @@ When you receive a zanalytics_<version>.zip, initialize with:
 
 🚀 PRE-BOOT VALIDATION
 0. Confirm main orchestrator exists:
-    test -f main_orchestrator.py || echo "ERROR: main_orchestrator.py missing"
+    test -f core/orchestrators/main_orchestrator.py || echo "ERROR: main_orchestrator.py missing"
 1. Ensure orchestrator imports:
     from runtime.copilot_orchestrator import CopilotOrchestrator
     from runtime.advanced_smc_orchestrator import AdvancedSMCOrchestrator
@@ -69,7 +69,7 @@ Initialized with:
 
 ▶️ RUN
 From terminal:
-    python main_orchestrator.py --variant Inv --symbol XAUUSD
+    python core/orchestrators/main_orchestrator.py --variant Inv --symbol XAUUSD
 
 From notebook:
     main(variant="Inv", symbol="XAUUSD", wyckoff=True, smc=True)
