@@ -61,16 +61,13 @@ class ComponentLoader:
             'llm_formatter': 'zanalytics_llm_formatter.py',
             'dashboard': '🏠 Home.py',
             'backtester': 'zanalytics_backtester.py',
-            'advanced_analytics': 'zanalytics_advanced_analytics.py',
-            'market_monitor': 'zanalytics_market_monitor.py',
             'llm_framework': 'zanalytics_llm_framework.py'
         }
 
         # Also try to load the original analyzers if they exist
         optional_components = {
-            'microstructure_analyzer': 'zanflow_microstructure_analyzer.py',
-            'ncOS_analyzer': 'ncOS_ultimate_microstructure_analyzer.py',
-            'smc_converter': 'convert_final_enhanced_smc_ULTIMATE.py'
+            'microstructure_analyzer': 'utils/zanflow_microstructure_analyzer.py',
+            'ncOS_analyzer': 'ncOS_ultimate_microstructure_analyzer.py'
         }
 
         # Load required components
@@ -86,6 +83,8 @@ class ComponentLoader:
             file_path = self.base_path / filename
             if file_path.exists():
                 self.load_module(name, str(file_path))
+            else:
+                logger.info(f"Optional component skipped: {name} ({filename}) not found")
 
 
 class ZAnalyticsIntegratedOrchestrator:
