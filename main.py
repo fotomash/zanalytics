@@ -15,6 +15,7 @@ import redis.asyncio as redis
 import hashlib
 import os
 from dataclasses import dataclass, asdict
+from core.orchestrator import AnalysisOrchestrator
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -37,6 +38,9 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Initialize orchestrator
+analysis_orchestrator = AnalysisOrchestrator()
 
 # ============================================================================
 # DATA MODELS
@@ -671,6 +675,12 @@ async def health_check():
         },
         "version": "3.0.0"
     }
+
+
+@app.post("/log")
+async def log_event(payload: Dict[str, Any]):
+    """Route user payloads through the analysis orchestrator."""
+    return await analysis_orchestrator.run(payload)
 
 @app.get("/")
 async def root():
