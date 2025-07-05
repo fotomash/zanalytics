@@ -11,8 +11,8 @@ from typing import Dict, Any, List, Optional
 from loguru import logger
 from collections import deque
 
-from ncos.core.base import BaseComponent, AgentResponse
-from ncos.core.memory.manager import MemoryManager
+from ..base import BaseComponent, AgentResponse
+from ..memory.manager import MemoryManager
 # Import specific strategies and agent base class when they are created
 # from ncos.core.strategies.adaptive import AdaptiveStrategy
 # from ncos.agents.base_agent import BaseAgent
