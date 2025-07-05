@@ -140,9 +140,10 @@ The command prints a JSON summary describing each stage.
 
 ### zsi_config.yaml
 
-Define available orchestrators and the default selection in `zsi_config.yaml` at the project root:
+Define available orchestrators and the default selection in `zsi_config.yaml` at the project root. The CLI reads this file automatically and you can provide a different path via `--config` or the `ZSI_CONFIG_PATH` environment variable:
 
 ```yaml
+default_orchestrator: copilot
 orchestrators:
   copilot:
     module: core.copilot_orchestrator
@@ -150,10 +151,9 @@ orchestrators:
   advanced_smc:
     module: core.advanced_smc_orchestrator
     callable: run_advanced_smc_strategy
-default_orchestrator: copilot
 ```
 
-The CLI reads this file automatically (override with `ZSI_CONFIG_PATH`) and falls back to `default_orchestrator` when `--strategy` is omitted.
+The orchestrator falls back to `default_orchestrator` when `--strategy` is omitted.
 
 ## ISPTS Pipeline Example
 
