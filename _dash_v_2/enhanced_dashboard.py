@@ -58,10 +58,13 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
+from dashboard.config import get_api_url
+
+
 class TradingDashboard:
     def __init__(self):
-        self.api_base_url = "http://localhost:8000"
-        self.ws_url = "ws://localhost:8000/ws"
+        self.api_base_url = get_api_url()
+        self.ws_url = self.api_base_url.replace("http", "ws") + "/ws"
         self.redis_client = redis.Redis(host='localhost', port=6379, decode_responses=True)
         self.tick_buffer = deque(maxlen=1000)
         self.ws_connection = None
