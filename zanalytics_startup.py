@@ -7,6 +7,7 @@ Ensures all components are properly configured before starting
 import os
 import sys
 import json
+import yaml
 from pathlib import Path
 
 def check_requirements():
@@ -53,8 +54,8 @@ def create_default_configs():
         "enable_llm_analysis": True
     }
 
-    with open(config_dir / "orchestrator_config.json", 'w') as f:
-        json.dump(orchestrator_config, f, indent=2)
+    with open(config_dir / "orchestrator_config.yaml", 'w') as f:
+        yaml.safe_dump(orchestrator_config, f)
 
     print("Created default configuration files")
 
@@ -69,7 +70,7 @@ def main():
         sys.exit(1)
 
     # Create configs if needed
-    if not Path("config/orchestrator_config.json").exists():
+    if not Path("config/orchestrator_config.yaml").exists():
         create_default_configs()
 
     print("\nAll checks passed! You can now run:")

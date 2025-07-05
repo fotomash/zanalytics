@@ -119,7 +119,7 @@ pip install backtrader vectorbt streamlit plotly loguru
 ```
 zanalytics/
 ├── config/
-│   ├── orchestrator_config.json
+│   ├── orchestrator_config.yaml
 │   ├── pipeline_config.json
 │   ├── signal_config.json
 │   └── backtest_config.json
@@ -240,7 +240,7 @@ signals = generator.generate_signals(
 
 ### Exchange Connections
 ```python
-# Configure in orchestrator_config.json
+# Configure in orchestrator_config.yaml
 {
   "exchange": {
     "name": "binance",
