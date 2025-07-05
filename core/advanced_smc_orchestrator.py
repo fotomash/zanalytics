@@ -3,8 +3,9 @@ from typing import Dict, Optional, List
 import json
 from pathlib import Path
 from core.orchestrator_utils import load_strategy_profile
-import traceback # For detailed error logging
+import traceback  # For detailed error logging
 import numpy as np  # Needed for example usage random operations
+from core.analysis.pipeline import EnrichmentPipeline
 
 # Version: 5.1.9 (Fully Prop Desk Compliant)
 
@@ -103,6 +104,16 @@ def run_advanced_smc_strategy(
     poi_tap_check_tf = variant_config.get("poi_tap_check_timeframe", "m15") # TF to check for POI tap
     confirmation_tf = variant_config.get("confirmation_timeframe", "m5")
     execution_tf = variant_config.get("execution_timeframe", "m1")
+
+    # --- Apply Enrichment Pipeline to all timeframe data ---
+    pipeline_cfg = variant_config.get("pipeline")
+    if pipeline_cfg is not False:
+        pl = EnrichmentPipeline(pipeline_cfg or {})
+        for tf, df in all_tf_data.items():
+            all_tf_data[tf] = pl.apply(df)
+        orchestration_result["steps"].append({"step": "Enrichment Pipeline", "status": "applied"})
+    else:
+        orchestration_result["steps"].append({"step": "Enrichment Pipeline", "status": "skipped"})
 
     required_tfs = {htf_structure_tf, poi_tf, poi_tap_check_tf, confirmation_tf, execution_tf}
     for tf in required_tfs:
