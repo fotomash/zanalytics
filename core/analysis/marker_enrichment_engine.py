@@ -48,7 +48,7 @@ except ImportError:
     VWAP_ENGINE_LOADED = False
 
 try:
-    from divergence_engine import add_rsi_divergence # Assumed function name - To be scaffolded
+    from .divergence_engine import add_rsi_divergence  # Updated import
     DIVERGENCE_ENGINE_LOADED = True
 except ImportError:
     print("[WARN][MarkerEnrichment] divergence_engine.py not found or failed to import 'add_rsi_divergence'.")
@@ -73,7 +73,7 @@ except ImportError:
     WYCKOFF_ENGINE_LOADED = False
 
 try:
-    from mentfx_ici_engine import tag_mentfx_ici
+    from .mentfx_ici_engine import tag_mentfx_ici
     MENTFX_ENGINE_LOADED = True
 except ImportError:
     print("[ERROR][MarkerEnrichment] mentfx_ici_engine.py not found or failed to import 'tag_mentfx_ici'.")
@@ -81,7 +81,7 @@ except ImportError:
     MENTFX_ENGINE_LOADED = False
 
 try:
-    from smc_enrichment_engine import tag_smc_zones
+    from .smc_enrichment_engine import tag_smc_zones
     SMC_ENGINE_LOADED = True
 except ImportError:
     print("[ERROR][MarkerEnrichment] smc_enrichment_engine.py not found or failed to import 'tag_smc_zones'.")
