@@ -146,14 +146,22 @@ Define available orchestrators and the default selection in `zsi_config.yaml` at
 default_orchestrator: copilot
 orchestrators:
   copilot:
-    module: core.copilot_orchestrator
+    module: core.strategies.copilot
     callable: handle_prompt
   advanced_smc:
-    module: core.advanced_smc_orchestrator
+    module: core.strategies.advanced_smc
     callable: run_advanced_smc_strategy
+  icc:
+    module: core.strategies.icc
+    callable: run
 ```
 
 The orchestrator falls back to `default_orchestrator` when `--strategy` is omitted.
+
+Old modules `advanced_smc_orchestrator.py`, `copilot_orchestrator.py` and
+`icc_orchestrator.py` remain in the repository only for backwards
+compatibility and now emit a `DeprecationWarning`. Their main entry points
+have moved under `core/strategies/`.
 
 ## ISPTS Pipeline Example
 

@@ -55,13 +55,14 @@ class AnalysisOrchestrator:
             "orchestrators",
             {
                 "copilot": {
-                    "module": "core.copilot_orchestrator",
+                    "module": "core.strategies.copilot",
                     "callable": "handle_prompt",
                 },
                 "advanced_smc": {
-                    "module": "core.advanced_smc_orchestrator",
+                    "module": "core.strategies.advanced_smc",
                     "callable": "run_advanced_smc_strategy",
                 },
+                "icc": {"module": "core.strategies.icc", "callable": "run"},
             },
         )
         for name, spec in modules.items():
