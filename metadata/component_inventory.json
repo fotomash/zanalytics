@@ -4,17 +4,6 @@
   "components": {
     "core": [
       {
-        "name": "UnifiedOrchestrator",
-        "file": "core/orchestrators/unified_orchestrator.py",
-        "type": "orchestrator",
-        "description": "Core orchestration logic for the Neural Agent Mesh",
-        "dependencies": [
-          "SessionState",
-          "TokenBudgetManager",
-          "MemoryManager"
-        ]
-      },
-      {
         "name": "NeuralMeshKernel",
         "file": "src/kernel.py",
         "type": "orchestrator",
