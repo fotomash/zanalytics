@@ -21,7 +21,7 @@ except ImportError as e:
     print("Make sure all required files are in the same directory:")
     print("  - zanalytics_adapter.py")
     print("  - data_flow_manager.py")
-    print("  - zanalytics_config.json")
+    print("  - zanalytics_config.json (project root)")
     sys.exit(1)
 
 def setup_logging():
@@ -73,8 +73,9 @@ def print_banner():
 def print_status_dashboard():
     """Print current system status"""
     try:
-        if os.path.exists('zanalytics_config.json'):
-            with open('zanalytics_config.json', 'r') as f:
+        config_path = Path(__file__).resolve().parent.parent / 'zanalytics_config.json'
+        if config_path.exists():
+            with open(config_path, 'r') as f:
                 config = json.load(f)
 
             print("\n📋 CURRENT CONFIGURATION:")

@@ -103,8 +103,9 @@ class ZAnalyticsDashboard:
         # Directory Monitoring
         print("║ 📁 MONITORED DIRECTORIES:" + " " * 51 + "║")
         try:
-            if os.path.exists('zanalytics_config.json'):
-                with open('zanalytics_config.json', 'r') as f:
+            config_path = Path(__file__).resolve().parent.parent / 'zanalytics_config.json'
+            if config_path.exists():
+                with open(config_path, 'r') as f:
                     config = json.load(f)
                     directories = config.get('watch_directories', [])
                     for i, directory in enumerate(directories[:3]):  # Show first 3
