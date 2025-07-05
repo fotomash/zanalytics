@@ -10,3 +10,7 @@ cron.log
 *.zip
 *.pkl
 *.log
+/.cache
+/.cache/prices
+*.pkl
+*.pkl

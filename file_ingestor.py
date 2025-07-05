@@ -11,7 +11,7 @@ import redis.asyncio as redis
 # IMPORTANT: Update this path to the 'tick_data.csv' file inside your MT5 Data Folder
 # Example Windows: 'C:/Users/YourUser/AppData/Roaming/MetaQuotes/Terminal/InstanceID/MQL5/Files/tick_data.csv'
 # Example Linux/Wine: '/home/user/.wine/drive_c/users/user/Application Data/MetaQuotes/Terminal/InstanceID/MQL5/Files/tick_data.csv'
-TICK_DATA_FILE_PATH = "tick_data.csv" # <-- PLEASE UPDATE THIS PATH
+TICK_DATA_FILE_PATH = "/Users/tom/Documents/_tick_data/_bridge/BTCUSD_M1_bars.csv"
 
 REDIS_HOST = "localhost"
 REDIS_PORT = 6379
