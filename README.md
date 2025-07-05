@@ -13,6 +13,7 @@ This bundle is your **modular trading logic engine**. It’s structured for use 
 - `/profiles/*.yaml` – Modular agents with composable logic.
 - `/schemas/agent_profile.schema.yaml` – JSON schema for validation.
 - `runner.py` – Minimal YAML loader to validate logic integration.
+- `/exports/` – Sample analysis JSON files watched by `DataFlowManager`.
 
 ## 🧠 GPT & LLM Integration Instructions
 

@@ -1,0 +1,17 @@
+{
+  "metadata": {
+    "symbol": "XAUUSD",
+    "timeframe": "M1",
+    "generated": "2024-01-01T00:00:00Z"
+  },
+  "analysis": {
+    "M1": {
+      "summary": "Example bar analysis",
+      "indicators": {
+        "rsi": 55.2,
+        "sma": 1899.7
+      }
+    }
+  },
+  "indicators": ["rsi", "sma"]
+}
