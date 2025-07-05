@@ -3,8 +3,6 @@ import sys
 from pathlib import Path
 import pytest
 
-pytest.skip("FastAPI not fully available in test environment", allow_module_level=True)
-
 from fastapi.testclient import TestClient
 
 os.environ["ZANALYTICS_TEST_MODE"] = "1"
@@ -24,3 +22,16 @@ def test_log_endpoint_success():
     )
     assert response.status_code == 200
     assert isinstance(response.json(), dict)
+
+
+def test_ingest_candle_missing_field():
+    response = client.post(
+        "/api/v1/ingest/candle",
+        json={"candle": {"symbol": "EURUSD"}},
+    )
+    assert response.status_code == 422
+
+
+def test_confluence_no_data_returns_404():
+    response = client.get("/api/v1/analysis/confluence/EURUSD")
+    assert response.status_code == 404

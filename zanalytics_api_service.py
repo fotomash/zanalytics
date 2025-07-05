@@ -12,6 +12,7 @@ import pandas as pd
 from pydantic import BaseModel
 import logging
 from redis_server import redis_manager
+from redis.exceptions import RedisError
 
 # Import your custom modules (assuming they exist)
 try:
@@ -64,10 +65,10 @@ class AppState:
                 self.system_status = "ONLINE"
                 logger.info("All components initialized successfully")
             except Exception as e:
-                logger.warning(f"Could not initialize full system: {e}")
+                logger.exception("Could not initialize full system", exc_info=e)
                 self.system_status = "STANDALONE"
         except Exception as e:
-            logger.error(f"Failed to initialize: {e}")
+            logger.exception("Failed to initialize", exc_info=e)
             self.system_status = "ERROR"
 
     async def process_zanalytics_event(self, event_data):
@@ -88,7 +89,7 @@ class AppState:
 
             logger.info(f"Processed ZANALYTICS event for {symbol}")
         except Exception as e:
-            logger.error(f"Error processing ZANALYTICS event: {e}")
+            logger.exception("Error processing ZANALYTICS event", exc_info=e)
 
     async def broadcast_to_websockets(self, message):
         """Broadcast message to all connected WebSocket clients"""
@@ -99,7 +100,8 @@ class AppState:
         for websocket in self.websocket_connections:
             try:
                 await websocket.send_json(message)
-            except:
+            except Exception as e:
+                logger.exception("WebSocket send failed", exc_info=e)
                 disconnected.append(websocket)
 
         # Remove disconnected clients
@@ -217,8 +219,11 @@ async def get_agent_decisions():
             return {"decisions": mock_decisions, "total": len(mock_decisions)}
 
         return {"decisions": recent_decisions, "total": len(recent_decisions)}
+    except RedisError as e:
+        logger.exception("Redis error getting agent decisions", exc_info=e)
+        raise HTTPException(status_code=503, detail="Redis unavailable")
     except Exception as e:
-        logger.error(f"Error getting agent decisions: {e}")
+        logger.exception(f"Error getting agent decisions: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.post("/agents/decisions")
@@ -227,8 +232,11 @@ async def record_agent_decision(decision: AgentDecision):
     try:
         state.store_agent_decision(decision.dict())
         return {"status": "stored"}
+    except RedisError as e:
+        logger.exception("Redis error storing agent decision", exc_info=e)
+        raise HTTPException(status_code=503, detail="Redis unavailable")
     except Exception as e:
-        logger.error(f"Error storing agent decision: {e}")
+        logger.exception(f"Error storing agent decision: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.get("/analysis/summary/{symbol}")
@@ -263,8 +271,11 @@ async def get_analysis_summary(symbol: str, timeframe: str = "M1"):
         }
 
         return mock_analysis
+    except RedisError as e:
+        logger.exception("Redis error fetching analysis", exc_info=e)
+        raise HTTPException(status_code=503, detail="Redis unavailable")
     except Exception as e:
-        logger.error(f"Error getting analysis for {symbol}: {e}")
+        logger.exception(f"Error getting analysis for {symbol}: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.get("/symbols")
@@ -286,8 +297,11 @@ async def trigger_analysis(symbol: str, timeframe: str = "M1"):
         else:
             # Mock response
             return {"status": "triggered", "symbol": symbol, "timeframe": timeframe, "message": "Analysis queued"}
+    except RedisError as e:
+        logger.exception("Redis error triggering analysis", exc_info=e)
+        raise HTTPException(status_code=503, detail="Redis unavailable")
     except Exception as e:
-        logger.error(f"Error triggering analysis for {symbol}: {e}")
+        logger.exception(f"Error triggering analysis for {symbol}: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.websocket("/ws")
@@ -318,7 +332,7 @@ async def websocket_endpoint(websocket: WebSocket):
             except WebSocketDisconnect:
                 break
             except Exception as e:
-                logger.error(f"WebSocket error: {e}")
+                logger.exception("WebSocket error", exc_info=e)
                 break
 
     except WebSocketDisconnect:

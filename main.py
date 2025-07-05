@@ -533,8 +533,10 @@ async def ingest_candle(request: IngestRequest, background_tasks: BackgroundTask
             "message": f"Data enriched and stored for {request.candle.symbol}"
         }
         
+    except HTTPException as exc:
+        raise exc
     except Exception as e:
-        logger.error(f"Ingestion error: {e}")
+        logger.exception("Ingestion error", exc_info=e)
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.get("/api/v1/data/latest/{symbol}", response_model=List[UnifiedAnalyticsBar])
@@ -553,8 +555,10 @@ async def get_latest_data(symbol: str, timeframe: str = "H1", count: int = 100):
         bars = analysis_orchestrator.analyze_dataframe(df)
         return bars
 
+    except HTTPException as exc:
+        raise exc
     except Exception as e:
-        logger.error(f"Data retrieval error: {e}")
+        logger.exception("Data retrieval error", exc_info=e)
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.get("/api/v1/analysis/confluence/{symbol}")
@@ -588,8 +592,10 @@ async def analyze_confluence(symbol: str, timeframe: str = "H1"):
             "recent_data": data[:5]  # Last 5 bars for context
         }
         
+    except HTTPException as exc:
+        raise exc
     except Exception as e:
-        logger.error(f"Analysis error: {e}")
+        logger.exception("Analysis error", exc_info=e)
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.post("/api/v1/analyze/csv")
@@ -641,8 +647,10 @@ async def analyze_csv_data(request: AnalysisRequest):
         
         return sample_analysis
         
+    except HTTPException as exc:
+        raise exc
     except Exception as e:
-        logger.error(f"CSV analysis error: {e}")
+        logger.exception("CSV analysis error", exc_info=e)
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.post("/api/v1/snapshot/create")
@@ -657,8 +665,10 @@ async def create_snapshot(symbol: Optional[str] = None):
             "timestamp": datetime.now().isoformat()
         }
         
+    except HTTPException as exc:
+        raise exc
     except Exception as e:
-        logger.error(f"Snapshot creation error: {e}")
+        logger.exception("Snapshot creation error", exc_info=e)
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.get("/api/v1/health")
