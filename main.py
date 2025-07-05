@@ -16,6 +16,7 @@ import hashlib
 import os
 from dataclasses import dataclass, asdict
 from core.orchestrator import AnalysisOrchestrator
+from core.schema import UnifiedAnalyticsBar
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -536,22 +537,22 @@ async def ingest_candle(request: IngestRequest, background_tasks: BackgroundTask
         logger.error(f"Ingestion error: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
-@app.get("/api/v1/data/latest/{symbol}")
+@app.get("/api/v1/data/latest/{symbol}", response_model=List[UnifiedAnalyticsBar])
 async def get_latest_data(symbol: str, timeframe: str = "H1", count: int = 100):
-    """Get latest enriched data for analysis"""
+    """Get latest enriched data for analysis."""
     try:
         if redis_writer:
             data = await redis_writer.get_latest_data(symbol.upper(), timeframe, count)
         else:
             data = []
-        
-        return {
-            "symbol": symbol.upper(),
-            "timeframe": timeframe,
-            "count": len(data),
-            "data": data
-        }
-        
+
+        if not data:
+            return []
+
+        df = pd.DataFrame(data)
+        bars = analysis_orchestrator.analyze_dataframe(df)
+        return bars
+
     except Exception as e:
         logger.error(f"Data retrieval error: {e}")
         raise HTTPException(status_code=500, detail=str(e))
