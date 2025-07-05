@@ -3,6 +3,18 @@ import sys
 from pathlib import Path
 
 import pandas as pd
+import types
+
+# stub talib to avoid heavy dependency
+talib_stub = types.SimpleNamespace(
+    SMA=lambda x, timeperiod=1: x,
+    EMA=lambda x, timeperiod=1: x,
+    MACD=lambda x, fastperiod=12, slowperiod=26, signalperiod=9: (x, x, x),
+    RSI=lambda x, timeperiod=14: x,
+    STOCH=lambda h, l, c: (h, h),
+    STOCHF=lambda h, l, c: (h, h),
+)
+sys.modules.setdefault("talib", talib_stub)
 
 # ensure test mode and import path
 os.environ["ZANALYTICS_TEST_MODE"] = "1"

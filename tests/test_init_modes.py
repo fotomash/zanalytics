@@ -1,6 +1,11 @@
 import importlib
+import importlib.util
 import os
 import sys
+import pytest
+
+if importlib.util.find_spec("ncos") is None:
+    pytest.skip("ncos package missing", allow_module_level=True)
 
 
 def reload_zanalytics(monkeypatch, test_mode):
