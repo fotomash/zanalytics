@@ -88,7 +88,7 @@ The assistant should treat the following uploaded documents as authoritative kno
 - `annotate_extended_traits()`  
 - `intermarket_sentiment.py` / `macro_enrichment_engine.py`  
 - `confluence_engine.py`  
-- `marker_enrichment_engine.py`  
+- `core/analysis/marker_enrichment_engine.py`
 - `liquidity_vwap_detector.py`  
 
 ZBAR Outputs:  
