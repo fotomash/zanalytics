@@ -1,16 +1,18 @@
-"""Demonstrate Advanced SMC Orchestrator volatility regime handling."""
-import importlib.util
+"""Demonstrate volatility regime detection using AnalysisOrchestrator."""
+
 from pathlib import Path
 import sys
 import pandas as pd
 import numpy as np
 
+from core.orchestrator import AnalysisOrchestrator
+import core.advanced_smc_orchestrator as adv
+
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
-spec = importlib.util.spec_from_file_location("orch", ROOT / "core" / "advanced_smc_orchestrator.py")
-orch = importlib.util.module_from_spec(spec)
-spec.loader.exec_module(orch)
+orch = AnalysisOrchestrator()
+run_strategy = orch.select_strategy("advanced_smc")
 
 
 def make_data():
@@ -37,20 +39,20 @@ def run_variant(vol_cfg):
         "poi_tap_config": {},
         "volatility_config": vol_cfg,
     }
-    orch.analyze_market_structure = lambda df: {"htf_bias": "Bullish"}
-    orch.find_and_validate_smc_pois = lambda *a, **k: [
+    adv.analyze_market_structure = lambda df: {"htf_bias": "Bullish"}
+    adv.find_and_validate_smc_pois = lambda *a, **k: [
         {"range": [0.999, 1.0], "type": "Bullish", "timestamp": df.index[0], "source_tf": "m1"}
     ]
-    orch.check_poi_tap_smc = lambda **kw: {"is_tapped": True, "tap_time": df.index[-1]}
-    orch.confirm_smc_entry = lambda **kw: {
+    adv.check_poi_tap_smc = lambda **kw: {"is_tapped": True, "tap_time": df.index[-1]}
+    adv.confirm_smc_entry = lambda **kw: {
         "confirmation_status": True,
         "ltf_poi_timestamp": df.index[-1],
         "ltf_poi_range": [1.0, 1.0],
         "mitigated_htf_poi": {"type": "Bullish"},
     }
-    orch.execute_smc_entry = lambda **kw: {"entry_confirmed": True}
-    orch.load_strategy_profile = lambda variant: profile
-    res = orch.run_advanced_smc_strategy(all_tf, "demo", df.index[-1])
+    adv.execute_smc_entry = lambda **kw: {"entry_confirmed": True}
+    adv.load_strategy_profile = lambda variant: profile
+    res = run_strategy(all_tf, "demo", df.index[-1])
     print(f"Volatility regime: {res['context'].get('volatility_regime')}")
 
 

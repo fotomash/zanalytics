@@ -16,6 +16,6 @@ def test_equal_entry_and_stop_raises():
 
 def test_calculate_risk_normal():
     rr, risk, reward = calculate_risk(101, 100, 106)
-    assert rr == pytest.approx(6 / 1)
+    assert rr == pytest.approx(5 / 1)
     assert risk == 1
     assert reward == 5

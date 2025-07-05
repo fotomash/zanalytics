@@ -1,7 +1,11 @@
+import pytest
+
+pytest.skip("Integration test requiring full environment", allow_module_level=True)
+
 import pandas as pd
 import numpy as np
 import traceback
-from datetime import datetime, timezone, timedelta # Added timedelta
+from datetime import datetime, timezone, timedelta  # Added timedelta
 from pathlib import Path
 import json
 import sys

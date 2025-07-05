@@ -5,16 +5,13 @@ from pathlib import Path
 
 import yaml
 
-import pytest
-
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
 from core import orchestrator as orch_mod
 
 
-@pytest.mark.asyncio
-async def test_orchestrator_dynamic_loading_and_run(tmp_path, monkeypatch):
+def test_orchestrator_dynamic_loading_and_run(tmp_path, monkeypatch):
     """Ensure AnalysisOrchestrator loads modules and writes user context."""
     # Create dummy strategy module in tmp directory
     module_path = tmp_path / "dummy_mod.py"
@@ -42,7 +39,7 @@ async def test_orchestrator_dynamic_loading_and_run(tmp_path, monkeypatch):
     strategy = orch.select_strategy("dummy")
     assert callable(strategy)
 
-    result = await orch.run({"orchestrator": "dummy", "prompt": "hello"})
+    result = asyncio.run(orch.run({"orchestrator": "dummy", "prompt": "hello"}))
     assert result == {"echo": "hello"}
 
     assert user_ctx.is_file()
