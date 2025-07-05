@@ -7,9 +7,11 @@ import json
 import os
 from datetime import datetime
 from typing import Dict, List, Optional, Any
+from dataclasses import asdict, is_dataclass
 import pandas as pd
 from pydantic import BaseModel
 import logging
+from redis_server import redis_manager
 
 # Import your custom modules (assuming they exist)
 try:
@@ -47,8 +49,6 @@ class AppState:
         self.agent_registry = None
         self.zanalytics_adapter = None
         self.websocket_connections: List[WebSocket] = []
-        self.analysis_cache = {}
-        self.agent_decisions = []
         self.system_status = "INITIALIZING"
 
     async def initialize(self):
@@ -73,17 +73,20 @@ class AppState:
     async def process_zanalytics_event(self, event_data):
         """Process ZANALYTICS events"""
         try:
-            # Cache the analysis
-            self.analysis_cache[event_data.get('symbol', 'UNKNOWN')] = event_data
+            # Convert dataclass events to dict and store in Redis
+            data_dict = asdict(event_data) if is_dataclass(event_data) else event_data
+            symbol = data_dict.get('symbol', 'UNKNOWN')
+            timeframe = data_dict.get('timeframe', 'unknown')
+            redis_manager.store_latest_analysis(symbol, data_dict)
 
             # Broadcast to WebSocket clients
             await self.broadcast_to_websockets({
                 "type": "analysis_update",
-                "data": event_data,
+                "data": data_dict,
                 "timestamp": datetime.now().isoformat()
             })
 
-            logger.info(f"Processed ZANALYTICS event for {event_data.get('symbol', 'UNKNOWN')}")
+            logger.info(f"Processed ZANALYTICS event for {symbol}")
         except Exception as e:
             logger.error(f"Error processing ZANALYTICS event: {e}")
 
@@ -102,6 +105,18 @@ class AppState:
         # Remove disconnected clients
         for ws in disconnected:
             self.websocket_connections.remove(ws)
+
+    def store_agent_decision(self, decision: Dict):
+        """Persist an agent decision in Redis"""
+        redis_manager.store_agent_decision(decision)
+
+    def get_recent_agent_decisions(self, count: int = 50) -> List[Dict]:
+        """Retrieve recent agent decisions from Redis"""
+        return redis_manager.get_recent_agent_decisions(count)
+
+    def get_latest_analysis(self, symbol: str) -> Optional[Dict]:
+        """Fetch the latest cached analysis"""
+        return redis_manager.get_latest_analysis(symbol)
 
 # Global app state
 state = AppState()
@@ -165,9 +180,9 @@ async def get_system_status():
         status=state.system_status,
         timestamp=datetime.now().isoformat(),
         components=components,
-        active_symbols=len(state.analysis_cache),
-        events_processed=len(state.agent_decisions),
-        analysis_count=len(state.analysis_cache)
+        active_symbols=len(redis_manager.get_active_symbols()),
+        events_processed=len(state.get_recent_agent_decisions(100)),
+        analysis_count=len(redis_manager.get_active_symbols())
     )
 
 @app.get("/agents/decisions")
@@ -175,7 +190,7 @@ async def get_agent_decisions():
     """Get recent agent decisions"""
     try:
         # Return recent decisions (last 50)
-        recent_decisions = state.agent_decisions[-50:] if state.agent_decisions else []
+        recent_decisions = state.get_recent_agent_decisions(50)
 
         # If no real decisions, return mock data for demo
         if not recent_decisions:
@@ -206,14 +221,24 @@ async def get_agent_decisions():
         logger.error(f"Error getting agent decisions: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
+@app.post("/agents/decisions")
+async def record_agent_decision(decision: AgentDecision):
+    """Record a new agent decision"""
+    try:
+        state.store_agent_decision(decision.dict())
+        return {"status": "stored"}
+    except Exception as e:
+        logger.error(f"Error storing agent decision: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
 @app.get("/analysis/summary/{symbol}")
 async def get_analysis_summary(symbol: str, timeframe: str = "M1"):
     """Get analysis summary for a symbol"""
     try:
-        # Check cache first
-        if symbol in state.analysis_cache:
-            cached_data = state.analysis_cache[symbol]
-            return cached_data
+        # Check Redis cache first
+        cached = state.get_latest_analysis(symbol)
+        if cached:
+            return cached
 
         # If no cached data, return mock analysis for demo
         mock_analysis = {
@@ -245,7 +270,9 @@ async def get_analysis_summary(symbol: str, timeframe: str = "M1"):
 @app.get("/symbols")
 async def get_active_symbols():
     """Get list of active symbols"""
-    symbols = list(state.analysis_cache.keys()) if state.analysis_cache else ["XAUUSD", "EURUSD"]
+    symbols = redis_manager.get_active_symbols()
+    if not symbols:
+        symbols = ["XAUUSD", "EURUSD"]
     return {"symbols": symbols, "total": len(symbols)}
 
 @app.post("/analysis/trigger/{symbol}")
