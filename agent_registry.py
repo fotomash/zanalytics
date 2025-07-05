@@ -1,5 +1,11 @@
 # Agent registry module
-"""Registry for runtime agents"""
+"""Runtime registry for agent instances.
+
+This module exposes :class:`AgentRegistry` for managing in-memory agent
+objects while keeping the legacy ``AGENT_PROFILES`` mapping available for
+older code that still imports it. Newer code should use the ``AgentRegistry``
+class for all runtime interactions.
+"""
 
 from typing import Any, Dict
 import inspect
