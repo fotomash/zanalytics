@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# DEPRECATED: This module is retained for reference only.
 """
 ZANFLOW ULTIMATE MEGA DASHBOARD
 Comprehensive trading analysis platform with all features from various dashboard versions
