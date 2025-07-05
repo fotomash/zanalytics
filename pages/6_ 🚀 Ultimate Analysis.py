@@ -75,7 +75,31 @@ class UltimateZANFLOWDashboard:
             initial_sidebar_state="expanded"
         )
 
-        # --- Sidebar styling block (from Home.py) ---
+        # --- Match Home.py visual style (background, sidebar, panels) ---
+        def get_image_as_base64(path):
+            try:
+                with open(path, "rb") as image_file:
+                    return base64.b64encode(image_file.read()).decode()
+            except Exception:
+                return None
+
+        img_base64 = get_image_as_base64("image_af247b.jpg")  # NOT "./pages/..."
+        if img_base64:
+            st.markdown(f"""
+            <style>
+            [data-testid="stAppViewContainer"] > .main {{
+                background-image: linear-gradient(rgba(0,0,0,0.8), rgba(0,0,0,0.8)), url(data:image/jpeg;base64,{img_base64});
+                background-size: cover;
+                background-position: center;
+                background-repeat: no-repeat;
+                background-attachment: fixed;
+            }}
+            #MainMenu {{visibility: hidden;}}
+            footer {{visibility: hidden;}}
+            </style>
+            """, unsafe_allow_html=True)
+
+        # Sidebar (copy from Home.py)
         st.markdown("""
 <style>
 section[data-testid="stSidebar"] {
@@ -93,32 +117,8 @@ button[kind="secondary"] {
 </style>
 """, unsafe_allow_html=True)
 
-        # --- PATCH: HOME background and style ---
-        def get_image_as_base64(path):
-            try:
-                with open(path, "rb") as image_file:
-                    return base64.b64encode(image_file.read()).decode()
-            except Exception:
-                return None
-
-        img_base64 = get_image_as_base64("./pages/image_af247b.jpg")
-        if img_base64:
-            st.markdown(f"""
-            <style>
-            [data-testid="stAppViewContainer"] > .main {{
-                background-image: linear-gradient(rgba(0,0,0,0.8), rgba(0,0,0,0.8)), url(data:image/jpeg;base64,{img_base64});
-                background-size: cover;
-                background-position: center;
-                background-repeat: no-repeat;
-                background-attachment: fixed;
-            }}
-            #MainMenu {{visibility: hidden;}}
-            footer {{visibility: hidden;}}
-            </style>
-            """, unsafe_allow_html=True)
-
-            # --- Panel transparency patch (from Home.py) ---
-            st.markdown("""
+        # Panel transparency (copy from Home.py)
+        st.markdown("""
 <style>
 .main .block-container {
     background-color: rgba(0,0,0,0.025) !important;
