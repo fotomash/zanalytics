@@ -75,6 +75,24 @@ class UltimateZANFLOWDashboard:
             initial_sidebar_state="expanded"
         )
 
+        # --- Sidebar styling block (from Home.py) ---
+        st.markdown("""
+<style>
+section[data-testid="stSidebar"] {
+    background-color: rgba(0,0,0,0.8) !important;
+    box-shadow: none !important;
+}
+button[kind="secondary"] {
+    background-color: #242424 !important;
+    color: #fff !important;
+    border: 1px solid rgba(250,250,250,0.12) !important;
+    font-weight: 600 !important;
+    padding: 0.5em 1em !important;
+    border-radius: 8px !important;
+}
+</style>
+""", unsafe_allow_html=True)
+
         # --- PATCH: HOME background and style ---
         def get_image_as_base64(path):
             try:
@@ -94,13 +112,19 @@ class UltimateZANFLOWDashboard:
                 background-repeat: no-repeat;
                 background-attachment: fixed;
             }}
-            .main .block-container {{
-                background-color: rgba(0,0,0,0.025) !important;
-            }}
             #MainMenu {{visibility: hidden;}}
             footer {{visibility: hidden;}}
             </style>
             """, unsafe_allow_html=True)
+
+            # --- Panel transparency patch (from Home.py) ---
+            st.markdown("""
+<style>
+.main .block-container {
+    background-color: rgba(0,0,0,0.025) !important;
+}
+</style>
+""", unsafe_allow_html=True)
 
         # Remove old .main-header CSS block (now commented out)
         # st.markdown("""
