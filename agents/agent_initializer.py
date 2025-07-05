@@ -5,8 +5,7 @@ from .agent_macroanalyser import MacroAnalyzerAgent
 from .agent_riskmanager import RiskManagerAgent
 from .agent_tradejournalist import TradeJournalistAgent
 from .agent_htfanalyst import HTFAnalystAgent
-from .agent_reputationauditor import ReputationAuditorAgent
-from core.agent_semanticdss import SemanticDecisionSupportAgent
+from .agent_semanticdss import SemanticDecisionSupportAgent
 
 
 def initialize_agents(config):
@@ -31,8 +30,6 @@ def initialize_agents(config):
         agents["trade_journalist"] = TradeJournalistAgent(context=shared_context)
     if config.get("agents", {}).get("htf_phase_analyst", {}).get("active", True):
         agents["htf_phase_analyst"] = HTFAnalystAgent("htf", shared_context, None)
-    if config.get("agents", {}).get("reputation_auditor", {}).get("active", True):
-        agents["reputation_auditor"] = ReputationAuditorAgent(context=shared_context)
     if config.get("agents", {}).get("semantic_dss", {}).get("active", True):
         agents["semantic_dss"] = SemanticDecisionSupportAgent(context=shared_context)
     return agents
