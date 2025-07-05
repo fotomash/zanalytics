@@ -10,6 +10,9 @@ import pandas as pd
 import numpy as np
 from typing import Dict, Optional, Tuple
 import traceback
+import logging
+
+log = logging.getLogger(__name__)
 
 # Default fractal length if config does not provide one
 DEFAULT_FRACTAL_N = 2
@@ -32,7 +35,7 @@ def _tag_fractals(high: pd.Series, low: pd.Series, n: int = 2) -> Tuple[pd.Serie
     """
     nan_series = pd.Series(np.nan, index=high.index)
     if high.isnull().all() or low.isnull().all() or len(high) < 2*n+1:
-        print("[WARN][_tag_fractals] Insufficient data or NaN series for fractal calculation.")
+        log.warning("[_tag_fractals] Insufficient data or NaN series for fractal calculation.")
         return nan_series, nan_series
 
     fractal_high = pd.Series(np.nan, index=high.index)
@@ -77,16 +80,16 @@ def tag_liquidity_sweeps(
     """
     df_out = df.copy()
     log_prefix = f"[LiqSweepDetect][{tf}]" # Add TF to log prefix
-    print(f"{log_prefix} Running Liquidity Sweep detection...")
+    log.info("%s Running Liquidity Sweep detection...", log_prefix)
 
     required_cols = ['High', 'Low', 'Close']
     if not all(col in df_out.columns for col in required_cols):
-        print(f"{log_prefix} WARN: Missing required columns (HLC). Skipping.")
+        log.warning("%s WARN: Missing required columns (HLC). Skipping.", log_prefix)
         df_out['liq_sweep_fractal_high'] = np.nan
         df_out['liq_sweep_fractal_low'] = np.nan
         return df_out
     if df_out.empty:
-        print(f"{log_prefix} WARN: Input DataFrame empty. Skipping.")
+        log.warning("%s WARN: Input DataFrame empty. Skipping.", log_prefix)
         return df_out
 
     # --- Configuration ---
@@ -123,10 +126,10 @@ def tag_liquidity_sweeps(
 
         sweep_high_count = sweep_high_mask.sum()
         sweep_low_count = sweep_low_mask.sum()
-        print(f"{log_prefix} Completed. Found {sweep_high_count} High Sweeps, {sweep_low_count} Low Sweeps.")
+        log.info("%s Completed. Found %s High Sweeps, %s Low Sweeps.", log_prefix, sweep_high_count, sweep_low_count)
 
     except Exception as e:
-        print(f"{log_prefix} ERROR: Failed during Liquidity Sweep detection: {e}")
+        log.error("%s ERROR: Failed during Liquidity Sweep detection: %s", log_prefix, e)
         traceback.print_exc()
         # Ensure columns exist even if error occurs
         if 'liq_sweep_fractal_high' not in df_out: df_out['liq_sweep_fractal_high'] = np.nan

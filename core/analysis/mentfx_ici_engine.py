@@ -6,8 +6,11 @@
 #   OB-type tags, DSS zone logic. Requires implementation based on MAZ/Mentfx
 #   structural entry logic.
 
-import pandas as pd # Corrected indentation
-from typing import Dict, Optional # Added Optional and Dict typing
+import pandas as pd  # Corrected indentation
+from typing import Dict, Optional  # Added Optional and Dict typing
+import logging
+
+log = logging.getLogger(__name__)
 
 def tag_mentfx_ici(df: pd.DataFrame, tf: str = "1min", **kwargs) -> pd.DataFrame: # Added **kwargs
     """
@@ -26,8 +29,8 @@ def tag_mentfx_ici(df: pd.DataFrame, tf: str = "1min", **kwargs) -> pd.DataFrame
           - 'ici_type': 'OB' / 'IMB' / 'Refinement' / None
           - 'ici_retest': True/False
     """
-    df = df.copy() # Work on a copy
-    print(f"[INFO][Mentfx] ICI placeholders tagging for TF={tf} (Placeholder)...") # Added print statement
+    df = df.copy()  # Work on a copy
+    log.info("[Mentfx] ICI placeholders tagging for TF=%s (Placeholder)...", tf)
 
     # Add dummy columns
     df["ici_valid"] = False
@@ -50,12 +53,12 @@ def tag_mentfx_ici(df: pd.DataFrame, tf: str = "1min", **kwargs) -> pd.DataFrame
     # Requires analyzing candle patterns, structure (BOS/CHoCH),
     # liquidity sweeps, and potentially DSS state relative to price action.
 
-    print(f"[INFO][Mentfx] ICI placeholders tagged for TF={tf}")
+    log.info("[Mentfx] ICI placeholders tagged for TF=%s", tf)
     return df
 
 # --- Example Usage ---
 if __name__ == '__main__':
-    print("--- Testing Mentfx ICI Engine (Placeholder) ---")
+    log.info("--- Testing Mentfx ICI Engine (Placeholder) ---")
     # Create dummy data
     data = {
         'Open': [105, 104, 103, 103.5, 102, 101, 101.5, 100, 101, 104],
@@ -69,6 +72,6 @@ if __name__ == '__main__':
 
     enriched_df = tag_mentfx_ici(dummy_df.copy(), tf='M5')
 
-    print("\nDataFrame with Mentfx ICI Tags (Placeholder):")
-    print(enriched_df[['Close', 'ici_valid', 'ici_type', 'ici_retest']])
-    print("\n--- Test Complete ---")
+    log.info("\nDataFrame with Mentfx ICI Tags (Placeholder):")
+    log.info(enriched_df[['Close', 'ici_valid', 'ici_type', 'ici_retest']])
+    log.info("\n--- Test Complete ---")

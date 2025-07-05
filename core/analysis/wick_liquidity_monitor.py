@@ -6,6 +6,9 @@
 import pandas as pd
 import os
 import glob
+import logging
+
+log = logging.getLogger(__name__)
 
 # Input and Output Directories
 MACRO_DATA_DIR = "intel_data/macro/"
@@ -23,7 +26,7 @@ def analyze_wick_structure(filepath: str):
         df = pd.read_csv(filepath, parse_dates=["timestamp"])
 
         if df.empty:
-            print(f"[WARN] No data in {asset_name}")
+            log.warning("No data in %s", asset_name)
             return
 
         latest_candle = df.iloc[-1]
@@ -33,7 +36,7 @@ def analyze_wick_structure(filepath: str):
         close_price = latest_candle["close"]
 
         if (high - low) == 0:
-            print(f"[WARN] Zero range candle in {asset_name}")
+            log.warning("Zero range candle in %s", asset_name)
             return
 
         top_wick = (high - max(open_price, close_price)) / (high - low)
@@ -59,10 +62,10 @@ def analyze_wick_structure(filepath: str):
             for sig in signals:
                 f.write(f"- {sig}\n")
 
-        print(f"[OK] Wick analysis complete for {asset_name}")
+        log.info("Wick analysis complete for %s", asset_name)
 
     except Exception as e:
-        print(f"[ERR] Failed to analyze {asset_name}: {e}")
+        log.error("Failed to analyze %s: %s", asset_name, e)
 
 # Batch analyze all assets
 def batch_analyze_wicks():

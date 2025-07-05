@@ -6,8 +6,11 @@
 #   Break of Structure (BOS), Change of Character (CHoCH), Fair Value Gaps (FVG),
 #   Liquidity Sweeps, Mitigation Blocks, etc., directly on OHLCV data.
 
-import pandas as pd # Corrected indentation
-from typing import Dict, Optional # Added typing
+import pandas as pd  # Corrected indentation
+from typing import Dict, Optional  # Added typing
+import logging
+
+log = logging.getLogger(__name__)
 
 # Renamed function based on user's marker_enrichment_engine code
 def tag_smc_zones(df: pd.DataFrame, tf: str = "1min", **kwargs) -> pd.DataFrame: # Added tf and **kwargs
@@ -27,8 +30,8 @@ def tag_smc_zones(df: pd.DataFrame, tf: str = "1min", **kwargs) -> pd.DataFrame:
           - 'fvg_zone': price area (optional) / None
           - 'liq_sweep': 'buy'/'sell'/None
     """
-    df = df.copy() # Work on a copy
-    print(f"[INFO][SMC] Placeholder SMC tags processing for TF={tf}...") # Added print
+    df = df.copy()  # Work on a copy
+    log.info("[SMC] Placeholder SMC tags processing for TF=%s...", tf)
 
     # Add dummy columns
     # Initialize with None or appropriate default
@@ -44,7 +47,7 @@ def tag_smc_zones(df: pd.DataFrame, tf: str = "1min", **kwargs) -> pd.DataFrame:
     # FVG detection uses the standard 3-bar pattern (inherently non-lookahead).
     # Sweep detection checks wicks relative to *previous* highs/lows.
 
-    print(f"[INFO][SMC] Placeholder tags added for TF={tf}")
+    log.info("[SMC] Placeholder tags added for TF=%s", tf)
     return df
 
 
@@ -80,7 +83,7 @@ def detect_swings(df: pd.DataFrame, left: int = 2, right: int = 2) -> pd.DataFra
 
 # --- Example Usage ---
 if __name__ == '__main__':
-    print("--- Testing SMC Enrichment Engine (Placeholder) ---")
+    log.info("--- Testing SMC Enrichment Engine (Placeholder) ---")
     # Create dummy data
     data = {
         'Open': [100, 101, 102, 101, 103, 104, 105, 104, 106, 105, 107, 106, 105, 104, 103],
@@ -94,7 +97,7 @@ if __name__ == '__main__':
 
     enriched_df = tag_smc_zones(dummy_df.copy(), tf='H1')
 
-    print("\nDataFrame with SMC Tags (Placeholder):")
-    print(enriched_df[['Close', 'bos', 'choch', 'fvg_zone', 'liq_sweep']])
-    print("\n--- Test Complete ---")
+    log.info("\nDataFrame with SMC Tags (Placeholder):")
+    log.info(enriched_df[['Close', 'bos', 'choch', 'fvg_zone', 'liq_sweep']])
+    log.info("\n--- Test Complete ---")
 

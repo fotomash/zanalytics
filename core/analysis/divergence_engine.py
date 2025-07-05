@@ -1,6 +1,9 @@
 import pandas as pd
 import numpy as np
 from typing import Dict, Optional
+import logging
+
+log = logging.getLogger(__name__)
 
 # Optional: Import or define indicator calculation (e.g., RSI)
 try:
@@ -29,9 +32,9 @@ def add_rsi_divergence(df: pd.DataFrame, config: Optional[Dict] = None) -> pd.Da
     Returns:
         DataFrame with added 'rsi_divergence' column ('Bullish', 'Bearish', 'HiddenBullish', 'HiddenBearish', None).
     """
-    print(f"[INFO][DivergenceEngine] Running RSI Divergence detection (Placeholder)...")
+    log.info("[DivergenceEngine] Running RSI Divergence detection (Placeholder)...")
     if 'Close' not in df.columns:
-        print("[WARN][DivergenceEngine] 'Close' column missing. Skipping RSI Divergence.")
+        log.warning("[DivergenceEngine] 'Close' column missing. Skipping RSI Divergence.")
         df['rsi_divergence'] = 'N/A (Missing Close)'
         return df
 
@@ -56,20 +59,20 @@ def add_rsi_divergence(df: pd.DataFrame, config: Optional[Dict] = None) -> pd.Da
     if rsi_col_name not in df.columns:
         if TALIB_AVAILABLE:
             df[rsi_col_name] = talib.RSI(df['Close'], timeperiod=rsi_period)
-            print(f"[DEBUG][DivergenceEngine] Calculated RSI({rsi_period}) using TA-Lib.")
+            log.debug("[DivergenceEngine] Calculated RSI(%s) using TA-Lib.", rsi_period)
         else:
             df[rsi_col_name] = calculate_rsi(df['Close'], rsi_period)
-            print(f"[DEBUG][DivergenceEngine] Calculated RSI({rsi_period}) using pandas.")
+            log.debug("[DivergenceEngine] Calculated RSI(%s) using pandas.", rsi_period)
 
     # Add dummy column for now
     df['rsi_divergence'] = None # Values: 'Bullish', 'Bearish', 'HiddenBullish', 'HiddenBearish'
 
-    print(f"[INFO][DivergenceEngine] Completed RSI Divergence detection (Placeholder).")
+    log.info("[DivergenceEngine] Completed RSI Divergence detection (Placeholder).")
     return df
 
 # --- Example Usage ---
 if __name__ == '__main__':
-    print("--- Testing Divergence Engine (Placeholder) ---")
+    log.info("--- Testing Divergence Engine (Placeholder) ---")
     # Create dummy data
     data = {
         'Open': [100, 101, 102, 101, 103, 104, 105, 104, 106, 105, 107, 106, 105, 104, 103],
@@ -83,8 +86,8 @@ if __name__ == '__main__':
 
     enriched_df = add_rsi_divergence(dummy_df.copy())
 
-    print("\nDataFrame with RSI Divergence (Placeholder):")
+    log.info("\nDataFrame with RSI Divergence (Placeholder):")
     # Check if RSI column was added (if not present before)
     rsi_col = [c for c in enriched_df.columns if 'rsi_' in c]
-    print(enriched_df[['Close'] + rsi_col + ['rsi_divergence']])
-    print("\n--- Test Complete ---")
+    log.info(enriched_df[['Close'] + rsi_col + ['rsi_divergence']])
+    log.info("\n--- Test Complete ---")
