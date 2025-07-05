@@ -72,4 +72,4 @@ echo ""
 echo "--- Starting Streamlit Dashboard ---"
 echo "You can access the dashboard at http://localhost:8501"
 echo "To stop all services, use the 'stop_services.sh' script."
-streamlit run enhanced_dashboard.py
+streamlit run 🏠 Home.py
