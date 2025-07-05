@@ -126,46 +126,41 @@ button[kind="secondary"] {
 </style>
 """, unsafe_allow_html=True)
 
-        # Remove old .main-header CSS block (now commented out)
-        # st.markdown("""
-        # <style>
-        # .main-header {
-        #     background: linear-gradient(90deg, #1e3c72 0%, #2a5298 100%);
-        #     padding: 1rem;
-        #     border-radius: 10px;
-        #     color: white;
-        #     text-align: center;
-        #     margin-bottom: 2rem;
-        # }
-        # .metric-card {
-        #     background: #f0f2f6;
-        #     padding: 1rem;
-        #     border-radius: 8px;
-        #     border-left: 4px solid #1e3c72;
-        # }
-        # .wyckoff-phase {
-        #     padding: 0.5rem;
-        #     border-radius: 5px;
-        #     margin: 0.25rem 0;
-        #     font-weight: bold;
-        # }
-        # .accumulation { background-color: #e8f5e8; color: #2e7d2e; }
-        # .distribution { background-color: #ffe8e8; color: #cc0000; }
-        # .markup { background-color: #e8f8ff; color: #0066cc; }
-        # .markdown { background-color: #fff3e0; color: #e65100; }
-        # </style>
-        # """, unsafe_allow_html=True)
-
-        # Dashboard main title - match HOME
+        # --- New prominent gold-accented banner (from Home.py) ---
         st.markdown(
             """
-            <div style='text-align:center; margin-bottom:2rem;'>
-                <span style='font-size:2rem; font-weight:700; color:#fff; letter-spacing:0.03em;'>
-                    ZANFLOW Ultimate Dashboard
+            <div style='
+                margin: 0 auto 1.1rem auto;
+                max-width: 100%;
+                width: 100%;
+                text-align: center;
+                padding: 0.2em 0 0.1em 0;
+                background: linear-gradient(to right, rgba(103,116,255,0.15), rgba(176,66,255,0.15));
+                border-radius: 12px;
+                border: 2px solid rgba(251,213,1,0.4);
+                box-shadow: 0 2px 12px rgba(103,116,255,0.10);
+            '>
+                <span style='
+                    font-family: "Segoe UI", "Montserrat", "Inter", "Arial", sans-serif;
+                    font-size: 2.1rem;
+                    font-weight: 800;
+                    color: #fff;
+                    letter-spacing: 0.02em;
+                    display: block;
+                    margin-bottom: 0.13em;
+                    text-transform: uppercase;
+                '>
+                    ZANALYTICS
                 </span>
-                <br>
-                <span style='font-size:1.1rem; color:#eee; font-weight:500;'>
-                    Comprehensive SMC, Wyckoff & Microstructure Analytics
+                <span style='
+                    font-family: "Segoe UI", "Montserrat", "Inter", "Arial", sans-serif;
+                    font-size: 1.12rem;
+                    color: #eee;
+                    font-weight: 600;
+                    display: block;
+                    margin-bottom: 0.19em;
+                '>
+                    AI / ML Powered Global Market Intelligence
                 </span>
             </div>
             """,
