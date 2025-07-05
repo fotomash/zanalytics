@@ -99,6 +99,8 @@ data. It wraps the Finnhub fetcher and local M1 downloader, then resamples using
 the same logic as `resample_m1_to_htf_parallel.py`. Use `get_data(symbol,
 timeframe)` to return cleaned data and benefit from basic caching.
 
+Tick CSVs are parsed according to header profiles defined in `core/tick_header_profiles.json`.
+
 ### Logging
 
 Logging is configured via `config/logging.json`. Running the pipeline writes
