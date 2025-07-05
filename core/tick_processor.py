@@ -83,5 +83,5 @@ def ticks_to_bars(
         bars.dropna(subset=['open','high','low','close'], inplace=True)
 
     # 5) Standardize column names
-    bars.columns = ['Open','High','Low','Close','Volume']
+    bars.columns = ['Open', 'High', 'Low', 'Close', 'Volume']
     return bars
