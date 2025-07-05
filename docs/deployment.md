@@ -106,7 +106,8 @@ jobs:
           pip install -r requirements.txt  # core deps
           pip install -r tests/requirements.txt
       - run: flake8 . && mypy .
-      - run: pytest --cov
+      - run: pytest --cov  # run full suite including dashboard tests
+        # ensures /summary/consolidated responses stay consistent
 
   deploy:
     needs: test
