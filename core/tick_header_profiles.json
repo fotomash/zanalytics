@@ -1,4 +1,4 @@
-from marker_enrichment_engine import add_all_indicators
+from core.analysis.marker_enrichment_engine import add_all_indicators
 
 # --- 2b. Enrich OHLCV with indicators ---
 print("\nStep 2b: Enriching with SMC/Mentfx/Wyckoff/Markers...")
