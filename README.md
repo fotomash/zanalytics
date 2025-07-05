@@ -126,13 +126,13 @@ Run it from the CLI using the strategy selector. Any extra flags are passed
 directly to the chosen strategy:
 
 ```bash
-python -m core.orchestrator --strategy smc --symbol OANDA:EUR_USD --json
+python -m core.orchestrator --strategy advanced_smc --symbol OANDA:EUR_USD --json
 ```
 
 Set `ZSI_CONFIG_PATH` or supply `--config` to load a different YAML file:
 
 ```bash
-python -m core.orchestrator --strategy smc -c custom.yml --symbol OANDA:EUR_USD
+python -m core.orchestrator --strategy advanced_smc -c custom.yml --symbol OANDA:EUR_USD
 ```
 
 The command prints a JSON summary describing each stage.
