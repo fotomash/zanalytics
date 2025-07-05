@@ -12,6 +12,11 @@
    streamlit run tick_manipulation_dashboard.py
    ```
 
+3. Or launch the entire stack:
+   ```bash
+   python run_full_stack.py --ngrok
+   ```
+
 ### Configuration
 
 Set the `ZAN_API_URL` environment variable if your API is not running on

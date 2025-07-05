@@ -16,6 +16,14 @@ Convenience launcher that verifies Redis is running and then starts the API serv
 python run_system.py
 ```
 
+## run_full_stack.py
+Starts the FastAPI service and Streamlit dashboard together. Use `--orchestrator` to also launch the
+CLI orchestrator and `--ngrok` to expose the dashboard via a tunnel.
+
+```bash
+python run_full_stack.py --api-port 8000 --dash-port 8501 --orchestrator --ngrok
+```
+
 ## runner.py
 Minimal YAML loader that validates agent profiles.
 
