@@ -117,8 +117,14 @@ try: from core.confirmation_engine_smc import confirm_smc_entry
 except ImportError: log_info("ERROR: core/confirmation_engine_smc.py not found.", "ERROR"); confirm_smc_entry = None
 try: from core.entry_executor_smc import execute_smc_entry, calculate_trade_risk, generate_pine_payload
 except ImportError: log_info("ERROR: core/entry_executor_smc.py or helpers not found.", "ERROR"); execute_smc_entry=None; calculate_trade_risk=None; generate_pine_payload=None
-try: from core.advanced_smc_orchestrator import run_advanced_smc_strategy, load_strategy_profile
-except ImportError: log_info("ERROR: core/advanced_smc_orchestrator.py not found! Cannot route to advanced strategies.", "ERROR"); run_advanced_smc_strategy = None; load_strategy_profile = None
+try: from core.advanced_smc_orchestrator import run_advanced_smc_strategy
+except ImportError:
+    log_info("ERROR: core/advanced_smc_orchestrator.py not found! Cannot route to advanced strategies.", "ERROR")
+    run_advanced_smc_strategy = None
+try: from core.orchestrator_utils import load_strategy_profile
+except ImportError:
+    log_info("ERROR: core/orchestrator_utils.py not found!", "ERROR")
+    load_strategy_profile = None
 try: from core.accum_engine import tag_accumulation
 except ImportError: log_info("WARN: core/accum_engine.py not found.", "WARN"); tag_accumulation = None
 try: from core.mentfx_ici_engine import tag_mentfx_ici

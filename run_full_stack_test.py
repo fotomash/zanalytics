@@ -66,13 +66,14 @@ def main():
     except ImportError: tag_liquidity_sweeps = None; print("WARN: Liquidity Sweep Detector not found.")
     # Import charting function from orchestrator
     try:
-        from core.copilot_orchestrator import generate_analysis_chart_json, load_strategy_profile
+        from core.copilot_orchestrator import generate_analysis_chart_json
+        from core.orchestrator_utils import load_strategy_profile
         print("Charting import successful")
     except ImportError as import_err:
         generate_analysis_chart_json = None
         load_strategy_profile = None
         import traceback
-        print("WARN: Charting/Profile functions from orchestrator not found.")
+        print("WARN: Charting/Profile functions not found.")
         print("DETAILS:", import_err)
         traceback.print_exc()
     

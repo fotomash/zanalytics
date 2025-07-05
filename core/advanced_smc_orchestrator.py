@@ -2,6 +2,7 @@ import pandas as pd
 from typing import Dict, Optional, List
 import json
 from pathlib import Path
+from core.orchestrator_utils import load_strategy_profile
 import traceback # For detailed error logging
 import numpy as np  # Needed for example usage random operations
 
@@ -68,31 +69,6 @@ def dispatch_pine_payload(entry_result: Dict):
         print(f"[INFO][AdvSMCOrch] === SIGNAL DISPATCH COMPLETE ===")
     else:
         print("[WARN][AdvSMCOrch] No valid Pine payload found in entry result to dispatch.")
-
-# --- Function to load strategy profiles ---
-def load_strategy_profile(variant_name: str) -> Dict:
-    """ Loads specific configuration for a strategy variant from strategy_profiles.json. Fallbacks to default if not found. """
-    config_path = Path("strategy_profiles.json")
-    if not config_path.exists():
-        print(f"[ERROR][AdvSMCOrch] strategy_profiles.json not found at {config_path.resolve()}.")
-        return {}
-    try:
-        with open(config_path, "r") as f:
-            all_profiles = json.load(f)
-        profile = None
-        if variant_name in all_profiles:
-            profile = all_profiles[variant_name]
-            print(f"[INFO][AdvSMCOrch] Loaded strategy profile for variant: {variant_name}")
-        elif "default" in all_profiles:
-            print(f"[WARN][AdvSMCOrch] Strategy variant '{variant_name}' not found in profiles. Falling back to 'default'.")
-            profile = all_profiles["default"]
-        else:
-            print(f"[WARN][AdvSMCOrch] Strategy variant '{variant_name}' not found and no 'default' profile present. Using empty config.")
-            profile = {}
-        return profile
-    except Exception as e:
-        print(f"[ERROR][AdvSMCOrch] Failed to load or parse strategy_profiles.json: {e}")
-        return {}
 
 # --- Main Orchestration Function ---
 def run_advanced_smc_strategy(
