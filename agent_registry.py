@@ -4,6 +4,9 @@
 from typing import Any, Dict
 import inspect
 
+# Public exports
+__all__ = ["AgentRegistry", "AGENT_PROFILES"]
+
 # Retain legacy agent profiles for backward compatibility
 AGENT_PROFILES = {
     "Bożenka": {
