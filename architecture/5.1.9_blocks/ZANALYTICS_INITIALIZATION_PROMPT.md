@@ -170,7 +170,7 @@ You are booting the ZANALYTICS Session Intelligence Engine, a multi-phase macro-
 • Config: scalp_config.json 
 • Triggered inside: entry_executor_smc.py and copilot_orchestrator.py 
 5. Run Full Analysis
-• Entry Point: copilot_orchestrator.run_full_analysis() → advanced_smc_orchestrator.run()
+• Entry Point: copilot_orchestrator.run_full_analysis() → run_advanced_smc_strategy()
 • Logic:
 • Analyze POIs, CHoCH, HTF bias
 • Confirm microstructure alignment
