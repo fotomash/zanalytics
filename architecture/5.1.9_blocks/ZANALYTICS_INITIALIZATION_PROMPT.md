@@ -31,7 +31,7 @@ You are booting the **ZANALYTICS Session Intelligence Engine**, a multi-phase ma
 - Injects: `context_overall_bias`
 
 ### 4. Run Full Analysis
-- Use `copilot_orchestrator.run_full_analysis()` → `advanced_smc_orchestrator.run_strategy()`
+- Use `AnalysisOrchestrator.run()`
 - Core stack includes:
   - HTF bias
   - POI validation (OB/FVG/BK)
@@ -114,9 +114,9 @@ You are booting the ZANALYTICS Session Intelligence Engine, a multi-phase macro-
 • Module: microstructure_filter.py 
 • Hook: validate_scalp_signal(...) 
 • Config: scalp_config.json 
-• Triggered inside: entry_executor_smc.py and copilot_orchestrator.py 
+• Triggered inside: entry_executor_smc.py via the AnalysisOrchestrator
 5. Run Full Analysis
-• Entry Point: copilot_orchestrator.run_full_analysis() → advanced_smc_orchestrator.run_strategy() 
+• Entry Point: AnalysisOrchestrator.run()
 • Logic:
 • Analyze POIs, CHoCH, HTF bias
 • Confirm microstructure alignment
@@ -137,7 +137,9 @@ You are booting the ZANALYTICS Session Intelligence Engine, a multi-phase macro-
 • journal/micro_rejections.md ---🔁 Loop Mode:
 
 Use run_zanalytics_batch.sh to auto-process multi-asset sessions.
-Add --scalping-enabled flag to run scalper-only evaluations.  🧠 ZANALYTICS INITIALIZATION PROMPT (v5.1.9 + Scalping Engine)
+• Triggered inside: entry_executor_smc.py via the AnalysisOrchestrator
+• Entry Point: AnalysisOrchestrator.run()
+| <code>core/orchestrator.py</code> | `AnalysisOrchestrator` triggers scalp mode |
 
 You are booting the ZANALYTICS Session Intelligence Engine, a multi-phase macro-aware trading system integrating:
 
