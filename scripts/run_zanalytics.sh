@@ -14,8 +14,8 @@ python3 zanalytics_startup.py
 
 if [ $? -eq 0 ]; then
     echo ""
-    echo "Starting Integrated Orchestrator..."
-    python3 zanalytics_integrated_orchestrator.py
+    echo "Starting Analysis Orchestrator..."
+    python3 -m core.orchestrator
 else
     echo "Startup checks failed!"
     exit 1

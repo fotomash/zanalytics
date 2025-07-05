@@ -20,8 +20,7 @@ def check_requirements():
         'zanalytics_backtester.py',
         'zanalytics_advanced_analytics.py',
         'zanalytics_market_monitor.py',
-        'zanalytics_llm_framework.py',
-        'zanalytics_integrated_orchestrator.py'
+        'zanalytics_llm_framework.py'
     ]
 
     missing_files = []
@@ -74,7 +73,7 @@ def main():
         create_default_configs()
 
     print("\nAll checks passed! You can now run:")
-    print("  python zanalytics_integrated_orchestrator.py")
+    print("  python -m core.orchestrator")
     print("\nFor the dashboard, run in a separate terminal:")
     print("  streamlit run 🏠 Home.py")
     print("\nTo run specific components:")
