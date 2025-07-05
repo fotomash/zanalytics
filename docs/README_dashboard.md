@@ -12,6 +12,11 @@
    streamlit run tick_manipulation_dashboard.py
    ```
 
+### Configuration
+
+Set the `ZAN_API_URL` environment variable if your API is not running on
+`http://localhost:8000`.
+
 ## Features
 
 - **Dynamic Module Loading**: Automatically loads your analyzer modules
