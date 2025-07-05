@@ -176,6 +176,12 @@ Run the local engine without external API keys:
 
 The script installs minimal requirements, launches `ncos_local_engine.py` on port 8000, and verifies the `/status` endpoint.
 
+### Configuration File
+
+JSON is the canonical format for runtime settings. All monitoring utilities load
+`zanalytics_config.json` from the project root. Keep this file alongside the
+codebase when running scripts from the `_connector` folder or the root directory.
+
 ### API Service
 
 Run `zanalytics_api_service.py` to expose a REST API with optional WebSocket streaming:
