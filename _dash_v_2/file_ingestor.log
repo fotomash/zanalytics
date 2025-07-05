@@ -1,0 +1,4 @@
+Traceback (most recent call last):
+  File "/Volumes/tom/Documents/GitHub/zanalytics/_dash_v_2/file_ingestor.py", line 7, in <module>
+    from hybrid_data_pipeline import HybridDataPipeline, DataConfig, get_data_for_llm
+ModuleNotFoundError: No module named 'hybrid_data_pipeline'
