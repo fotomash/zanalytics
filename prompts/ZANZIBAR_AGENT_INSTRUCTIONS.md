@@ -64,15 +64,15 @@ The assistant should treat the following uploaded documents as authoritative kno
    - `advanced_SL_TP.md` informs the logic used in `entry_executor_smc.py` for SL/TP precision. Referenced by the SL_Placement_Agent and integrated during POI entry confirmation.
    • If TIMESTAMP is split into separate DATE and TIME fields, do not error out. Instead, merge the fields into a single TIMESTAMP and ensure proper UTC casting.
 3. **Inject Intermarket Sentiment**: run `intermarket_sentiment.py` → `sentiment_snapshot.json` (sets `context_overall_bias` & scalping config).  
-4. **Activate Scalping Filter**: load `microstructure_filter.py`, `scalp_filters.py`, `micro_wyckoff_phase_engine.py`; hook into `entry_executor_smc.py` & `copilot_orchestrator.py`.  
--5. **Run Full Analysis**: `copilot_orchestrator.run_full_analysis()` → `advanced_smc_orchestrator.run_strategy()` (POI → CHoCH → bias → micro confirmation → SL/TP calc → journal + optional Telegram alert).  
+4. **Activate Scalping Filter**: load `microstructure_filter.py`, `scalp_filters.py`, `micro_wyckoff_phase_engine.py`; hook into `entry_executor_smc.py` & `core/orchestrator.py`.
+-5. **Run Full Analysis**: `AnalysisOrchestrator.run_strategy()` (POI → CHoCH → bias → micro confirmation → SL/TP calc → journal + optional Telegram alert).
 
 6. **Apply ZBAR Protocol Across All Timeframes**:  
    Apply ZBAR structural logic (CHoCH, BOS, sweeps, mitigations) on all relevant timeframes: M1, M5, M15, H1, H4, D.  
    Align this with logic outlined in v10.md and all zan_flow_x (zan_flow_1.md, zan_flow_2.md, zan_flow_3.md) to ensure consistent structural, macro, and conviction-based layering.
 
   🧠 LLM Logic Integration Awareness:
-  While scanning and orchestration rely on `copilot_orchestrator.py` and `advanced_smc_orchestrator.py`, the system is also aware that `orchestrator.py` located in the root or runtime folder may contain core execution logic. Although direct execution is not within LLM capabilities, the logic within these Python scripts is expected to be interpreted and reflected through LLM-first orchestration layers. Full scanning of all `.py` files is encouraged for mapping signal triggers, structural logic, and fallback behaviors.
+ While scanning and orchestration rely on `core/orchestrator.py`, the system is also aware that legacy orchestrators may exist in older folders. Although direct execution is not within LLM capabilities, the logic within these Python scripts is expected to be interpreted and reflected through LLM-first orchestration layers. Full scanning of all `.py` files is encouraged for mapping signal triggers, structural logic, and fallback behaviors.
 - If no direct API pull is possible, the assistant may reference public sources (e.g. TradingView, OANDA GoldPrice, VIX tickers) for approximate price levels or structure. These values should be used qualitatively and labeled as “public approximation”.  
 - Preferred session activation window is 04:30–20:30 UK local time. Execution should prioritize real-time responsiveness during these hours.  
 - *Error Handling*: Notify the user and abort if any phase fails.
@@ -179,7 +179,7 @@ Confirm with `fvg8am.md` logic – use as priority confluence zone for all XAUUS
   - Price context (last close, high, low)
   - Detected structure type
   - Optional: macro bias alignment (if computed in memory snapshot)
-  - Reference orchestration logic found in `runtime/orchestrator.py` if present. Convert any relevant structural or signal logic to LLM-invoked workflows.
+ - Reference orchestration logic found in `core/orchestrator.py` if present. Convert any relevant structural or signal logic to LLM-invoked workflows.
 
 ## 7. Macro Snapshot Memory & Refresh Cycle
 - Daily snapshot in memory  
@@ -244,7 +244,7 @@ These YAML files declare:
 - Dynamic gating filters (`spread_spike`, `tick_density`)
 - Full workflow sequence (`workflow:` block)
 
-The orchestration layer (e.g., `copilot_orchestrator.py`) interprets the YAML structure and executes each phase accordingly.
+The orchestration layer (e.g., `core/orchestrator.py`) interprets the YAML structure and executes each phase accordingly.
 
 **Reference YAML Example:**  
 See `profiles/zanflow_tick_enriched.yaml` for a full agent definition including tick-based gating.

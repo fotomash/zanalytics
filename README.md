@@ -114,16 +114,16 @@ pipeline.run_full()
 
 ## Integrated Context–Catalyst Orchestrator
 
-`core/icc_orchestrator.py` coordinates trading logic across three layers:
+`core/orchestrator.py` exposes the `AnalysisOrchestrator` class which coordinates trading logic across three layers:
 
 1. **Strategic** – runs Wyckoff regime detection and selects a playbook.
 2. **Operational** – executes a Context → Catalyst → Confirmation → Execution sequence.
 3. **Technical** – fetches data via `DataManager` and broadcasts events on a simple message bus.
 
-Run it from the CLI:
+Run it from the CLI using the new strategy selector:
 
 ```bash
-python -m core.icc_orchestrator --symbol OANDA:EUR_USD --json
+python -m core.orchestrator --strategy smc --symbol OANDA:EUR_USD --json
 ```
 
 The command prints a JSON summary describing each stage.

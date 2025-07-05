@@ -12,7 +12,7 @@
 ### 2. Inducement & Inversion Strategy
 - **ZSI Agent Framework**: Inducement-Sweep-POI detection
 - **Liquidity Engine**: `core.liquidity_engine_smc`
-- **Advanced SMC Orchestrator**: `core.advanced_smc_orchestrator`
+- **Analysis Orchestrator**: `core.orchestrator.AnalysisOrchestrator`
 
 ### 3. Wyckoff Analysis
 - **Phase Engine**: `core.wyckoff_phase_engine`
