@@ -5,10 +5,10 @@ import sys
 from datetime import datetime
 from trait_engine import merge_config
 from core.intermarket_sentiment import snapshot_sentiment
-from copilot_orchestrator import run_full_analysis
+from core.copilot_orchestrator import run_full_analysis
 
 # Additional modules from zanalytics package
-from advanced_smc_orchestrator import AdvancedSMCOrchestrator
+from core.advanced_smc_orchestrator import AdvancedSMCOrchestrator
 from liquidity_vwap_detector import detect_liquidity_sweeps
 from optimizer_loop import run_optimizer_loop
 from feedback_analysis_engine import analyze_feedback
