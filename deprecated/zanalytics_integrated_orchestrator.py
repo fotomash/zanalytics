@@ -7,6 +7,7 @@ Main orchestration system that loads and coordinates all components
 import os
 import sys
 import json
+import yaml
 import time
 import logging
 import threading
@@ -92,7 +93,7 @@ class ZAnalyticsIntegratedOrchestrator:
     Integrated orchestrator that actually uses the loaded components
     """
 
-    def __init__(self, config_path: str = "config/orchestrator_config.json"):
+    def __init__(self, config_path: str = "orchestrator_config.yaml"):
         self.config = self._load_config(config_path)
         self.component_loader = ComponentLoader()
         self.components = {}
@@ -107,7 +108,7 @@ class ZAnalyticsIntegratedOrchestrator:
         """Load orchestrator configuration"""
         try:
             with open(config_path, 'r') as f:
-                return json.load(f)
+                return yaml.safe_load(f)
         except:
             logger.warning("Config file not found, using defaults")
             return {

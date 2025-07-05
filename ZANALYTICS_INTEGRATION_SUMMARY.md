@@ -55,7 +55,7 @@ formatted = llm_formatter.format(llm_context)
 
 ## Configuration Files
 
-1. `orchestrator_config.json` - Master configuration
+1. `orchestrator_config.yaml` - Master configuration
 2. `pipeline_config.json` - Data processing settings
 3. `integration_config.json` - Analyzer settings
 4. `signal_config.json` - Signal generation rules

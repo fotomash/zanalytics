@@ -52,7 +52,7 @@ ls exports/
 
 ## 5. Customize
 
-Edit `config/orchestrator_config.json`:
+Edit `config/orchestrator_config.yaml`:
 - Add your symbols
 - Set your timeframes
 - Configure risk limits
