@@ -327,58 +327,6 @@ class WorkflowEngine:
             graph[task.name] = task.dependencies or []
         return graph
 
-class Scheduler:
-    """Manages scheduled tasks"""
-
-    def __init__(self, workflow_engine: WorkflowEngine):
-        self.workflow_engine = workflow_engine
-        self.scheduled_tasks = {}
-        self.running = False
-
-    def schedule_task(self, task: Task):
-        """Schedule a task"""
-        self.scheduled_tasks[task.name] = task
-
-        # Parse schedule and set up
-        if task.schedule == 'realtime':
-            schedule.every(1).minutes.do(
-                lambda: asyncio.create_task(self._run_task(task))
-            )
-        elif task.schedule == 'hourly':
-            schedule.every().hour.do(
-                lambda: asyncio.create_task(self._run_task(task))
-            )
-        elif task.schedule == 'daily':
-            schedule.every().day.do(
-                lambda: asyncio.create_task(self._run_task(task))
-            )
-        elif task.schedule == 'weekly':
-            schedule.every().week.do(
-                lambda: asyncio.create_task(self._run_task(task))
-            )
-
-    async def _run_task(self, task: Task):
-        """Run a scheduled task"""
-        try:
-            result = await self.workflow_engine.executor.execute_task(task)
-            logger.info(f"Scheduled task {task.name} completed: {result['status']}")
-        except Exception as e:
-            logger.error(f"Scheduled task {task.name} failed: {e}")
-
-    def start(self):
-        """Start scheduler"""
-        self.running = True
-        asyncio.create_task(self._scheduler_loop())
-
-    def stop(self):
-        """Stop scheduler"""
-        self.running = False
-
-    async def _scheduler_loop(self):
-        """Scheduler loop"""
-        while self.running:
-            schedule.run_pending()
-            await asyncio.sleep(1)
 
 class ZAnalyticsOrchestrator:
     """Main orchestrator class"""
@@ -392,7 +340,10 @@ class ZAnalyticsOrchestrator:
         self.data_store = DataStore()
         self.task_executor = TaskExecutor(self.registry, self.data_store)
         self.workflow_engine = WorkflowEngine(self.task_executor)
-        self.scheduler = Scheduler(self.workflow_engine)
+
+        # Scheduler state
+        self.scheduled_tasks: Dict[str, str] = {}
+        self.running = False
 
         # Component instances (would be imported in production)
         self.components = {}
@@ -526,15 +477,26 @@ class ZAnalyticsOrchestrator:
         """Schedule tasks based on configuration"""
         for workflow_name, workflow_config in self.config['workflows'].items():
             if 'schedule' in workflow_config:
-                # Create a task to run the workflow
-                workflow_task = Task(
-                    name=f"run_{workflow_name}",
-                    module='orchestrator',
-                    method='run_workflow',
-                    params={'workflow_name': workflow_name},
-                    schedule=workflow_config['schedule']
-                )
-                self.scheduler.schedule_task(workflow_task)
+                schedule_str = workflow_config['schedule']
+                task_name = f"run_{workflow_name}"
+                self.scheduled_tasks[task_name] = schedule_str
+
+                if schedule_str == 'realtime':
+                    schedule.every(1).minutes.do(
+                        lambda wf=workflow_name: asyncio.create_task(self.run_workflow(wf))
+                    )
+                elif schedule_str == 'hourly':
+                    schedule.every().hour.do(
+                        lambda wf=workflow_name: asyncio.create_task(self.run_workflow(wf))
+                    )
+                elif schedule_str == 'daily':
+                    schedule.every().day.do(
+                        lambda wf=workflow_name: asyncio.create_task(self.run_workflow(wf))
+                    )
+                elif schedule_str == 'weekly':
+                    schedule.every().week.do(
+                        lambda wf=workflow_name: asyncio.create_task(self.run_workflow(wf))
+                    )
 
     async def run_workflow(self, workflow_name: str) -> Dict[str, Any]:
         """Run a specific workflow"""
@@ -544,7 +506,8 @@ class ZAnalyticsOrchestrator:
     async def start(self):
         """Start the orchestrator"""
         await self.initialize()
-        self.scheduler.start()
+        self.running = True
+        asyncio.create_task(self._scheduler_loop())
 
         # Start maintenance tasks
         asyncio.create_task(self._maintenance_loop())
@@ -555,9 +518,15 @@ class ZAnalyticsOrchestrator:
         """Stop the orchestrator"""
         logger.info("Stopping orchestrator...")
         self.state = OrchestratorState.SHUTDOWN
-        self.scheduler.stop()
+        self.running = False
         await asyncio.sleep(1)  # Allow tasks to complete
         logger.info("Orchestrator stopped")
+
+    async def _scheduler_loop(self):
+        """Internal scheduler loop"""
+        while self.running:
+            schedule.run_pending()
+            await asyncio.sleep(1)
 
     async def _maintenance_loop(self):
         """Maintenance loop for cleanup and monitoring"""
@@ -584,7 +553,7 @@ class ZAnalyticsOrchestrator:
             'state': self.state.value,
             'components': self.registry.get_all_statuses(),
             'running_workflows': list(self.workflow_engine.running_workflows.keys()),
-            'scheduled_tasks': list(self.scheduler.scheduled_tasks.keys()),
+            'scheduled_tasks': list(self.scheduled_tasks.keys()),
             'data_store_keys': self.data_store.get_keys()
         }
 
