@@ -168,6 +168,16 @@ Run the local engine without external API keys:
 
 The script installs minimal requirements, launches `ncos_local_engine.py` on port 8000, and verifies the `/status` endpoint.
 
+### API Service
+
+Run `zanalytics_api_service.py` to expose a REST API with optional WebSocket streaming:
+
+```bash
+python zanalytics_api_service.py
+```
+
+Endpoints like `/status` and `/analysis/summary/{symbol}` will be available on port `5010`.
+
 ### Regenerating cache files
 
 Running the Streamlit dashboard will recreate any missing `.cache/*.pkl` files automatically.
