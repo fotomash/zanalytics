@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# DEPRECATED: This module is retained for reference only.
 """
 ZANFLOW v12 Ultimate Trading Dashboard
 Comprehensive microstructure, SMC, Wyckoff, and top-down analysis

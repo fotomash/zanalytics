@@ -1,3 +1,4 @@
+# DEPRECATED: This module is retained for reference only.
 import streamlit as st
 import pandas as pd
 import numpy as np
