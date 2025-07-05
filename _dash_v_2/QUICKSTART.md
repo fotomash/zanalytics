@@ -4,7 +4,7 @@
 
 ### 1. Install Dependencies
 ```bash
-pip install -r requirements_enhanced.txt
+pip install -r requirements.txt
 ```
 
 ### 2. Configure API Keys

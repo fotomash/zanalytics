@@ -102,7 +102,9 @@ jobs:
       - uses: actions/checkout@v3
       - uses: actions/setup-python@v4
         with: python-version: '3.11'
-      - run: pip install -r requirements.txt  # includes loguru
+      - run: |
+          pip install -r requirements.txt  # core deps
+          pip install -r tests/requirements.txt
       - run: flake8 . && mypy .
       - run: pytest --cov
 
