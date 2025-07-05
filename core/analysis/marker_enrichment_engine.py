@@ -15,58 +15,18 @@ logger = logging.getLogger(__name__)
 
 # --- Import Specialized Engines ---
 
-# Assume these engines exist and have the primary function defined
-# Using try-except blocks for robustness during development
+# Import indicator engines with real implementations
+from dss_engine import add_dss
+from bollinger_engine import add_bollinger_bands
+from fractal_engine import add_fractals
+from vwap_engine import add_vwap
+from .divergence_engine import add_rsi_divergence
 
-try:
-    from dss_engine import add_dss # Assumed function name
-    DSS_ENGINE_LOADED = True
-except ImportError:
-    logger.warning(
-        "[MarkerEnrichment] dss_engine.py not found or failed to import 'add_dss'."
-    )
-    def add_dss(df, **kwargs): df[['dss_k', 'dss_d']] = 'N/A (DSS Engine Missing)'; return df # Dummy
-    DSS_ENGINE_LOADED = False
-
-try:
-    from bollinger_engine import add_bollinger_bands # Assumed function name
-    BB_ENGINE_LOADED = True
-except ImportError:
-    logger.warning(
-        "[MarkerEnrichment] bollinger_engine.py not found or failed to import 'add_bollinger_bands'."
-    )
-    def add_bollinger_bands(df, **kwargs): df[['bb_upper', 'bb_lower', 'bb_mid']] = 'N/A (BB Engine Missing)'; return df # Dummy
-    BB_ENGINE_LOADED = False
-
-try:
-    from fractal_engine import add_fractals # Assumed function name
-    FRACTAL_ENGINE_LOADED = True
-except ImportError:
-    logger.warning(
-        "[MarkerEnrichment] fractal_engine.py not found or failed to import 'add_fractals'."
-    )
-    def add_fractals(df, **kwargs): df[['fractal_high', 'fractal_low']] = None; return df # Dummy
-    FRACTAL_ENGINE_LOADED = False
-
-try:
-    from vwap_engine import add_vwap # Assumed function name - To be scaffolded
-    VWAP_ENGINE_LOADED = True
-except ImportError:
-    logger.warning(
-        "[MarkerEnrichment] vwap_engine.py not found or failed to import 'add_vwap'."
-    )
-    def add_vwap(df, **kwargs): df['vwap'] = 'N/A (VWAP Engine Missing)'; return df # Dummy
-    VWAP_ENGINE_LOADED = False
-
-try:
-    from .divergence_engine import add_rsi_divergence  # Updated import
-    DIVERGENCE_ENGINE_LOADED = True
-except ImportError:
-    logger.warning(
-        "[MarkerEnrichment] divergence_engine.py not found or failed to import 'add_rsi_divergence'."
-    )
-    def add_rsi_divergence(df, **kwargs): df['rsi_divergence'] = 'N/A (Div Engine Missing)'; return df # Dummy
-    DIVERGENCE_ENGINE_LOADED = False
+DSS_ENGINE_LOADED = True
+BB_ENGINE_LOADED = True
+FRACTAL_ENGINE_LOADED = True
+VWAP_ENGINE_LOADED = True
+DIVERGENCE_ENGINE_LOADED = True
 
 try:
     from accum_engine import add_accumulation # Assumed function name - To be scaffolded
