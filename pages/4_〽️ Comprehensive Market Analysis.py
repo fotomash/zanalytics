@@ -726,9 +726,7 @@ def main():
 
     # Main content area
     if data_source == "Local Files":
-        if "selected_symbol" not in locals():
-            selected_symbol = "UNKNOWN"
-        st.subheader(f"📈 {selected_symbol}")
+        st.subheader("📁 Local Data Analysis")
 
         # === Sidebar data selection block replacement ===
         with st.sidebar:
@@ -771,7 +769,7 @@ def main():
         # Display metrics
         col1, col2, col3, col4 = st.columns(4)
         with col1:
-            st.metric("Current Price", f"{df['close'].iloc[-1]:.2f}")
+            st.metric("Total Bars", len(df))
         with col2:
             st.metric("Date Range", f"{df.index.min().date()} to {df.index.max().date()}")
         with col3:
@@ -790,31 +788,6 @@ def main():
                 unsafe_allow_html=True
             )
             st.dataframe(df.tail(20), use_container_width=True)
-
-        # ========== Live Data Ingestion Test ==========
-        st.subheader("🛰️ Live Data Ingestion Test")
-
-        if st.button("Ingest Live Candle"):
-            import requests
-            import numpy as np
-            try:
-                candle = {
-                    "timestamp": df.index[-1].isoformat(),
-                    "symbol": selected_symbol,
-                    "timeframe": selected_tf,
-                    "open": float(df['open'].iloc[-1]),
-                    "high": float(df['high'].iloc[-1]),
-                    "low": float(df['low'].iloc[-1]),
-                    "close": float(df['close'].iloc[-1]),
-                    "volume": float(df['volume'].iloc[-1]) if 'volume' in df.columns else 1.0
-                }
-                resp = requests.post("http://localhost:8000/api/v1/ingest/candle", json={"candle": candle})
-                if resp.status_code == 200:
-                    st.success("Live candle ingested successfully!")
-                else:
-                    st.error(f"Error: {resp.status_code} - {resp.text}")
-            except Exception as e:
-                st.error(f"Exception during ingestion: {e}")
 
         # Create and display chart
         chart = create_comprehensive_chart(df, selected_symbol, config)

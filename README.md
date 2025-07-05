@@ -141,7 +141,3 @@ Run the local engine without external API keys:
 ```
 
 The script installs minimal requirements, launches `ncos_local_engine.py` on port 8000, and verifies the `/status` endpoint.
-
-## Cached Data & Logs
-
-Running the framework creates pickled caches under `.cache/` and various log files under `logs/`. These binary artifacts can grow large and are excluded from version control. They will be automatically generated the next time you start the system. Any auxiliary ZIP bundles (e.g., dashboards) should be downloaded separately as needed.

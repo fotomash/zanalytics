@@ -11,8 +11,8 @@ from typing import Dict, Any, List, Optional, Set
 from datetime import datetime
 from loguru import logger
 
-from ..core.base import BaseComponent
-from ..core.memory.manager import MemoryManager
+from ncos.core.base import BaseComponent
+from ncos.core.memory.manager import MemoryManager
 
 class BaseAgent(BaseComponent, ABC):
     """

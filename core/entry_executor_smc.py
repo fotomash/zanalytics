@@ -1,76 +1,10 @@
-"""Entry execution helpers and confluence scanner.
-
-This module contains utility functions used by the SMC entry executor.  The
-``scan_confluences`` function evaluates a series of indicator checks and
-produces a report which can be serialised in YAML for downstream analysis.
-
-The following YAML schema is used for serialising confluence results:
-
-```
-confluence_report:
-  timestamp: "<UTC ISO format>"
-  symbol: "<string>"
-  variant: "<Inv|MAZ2|TMC|Mentfx|Other>"
-  checks:
-    structure_ok: <true|false|null>
-    poi_mitigated: <true|false|null>
-    micro_ok: <true|false|null>
-    atr_ok: <true|false|null>
-    vwap_ok: <true|false|null>
-    macd_h4_ok: <true|false|null>
-    dss_ok: <true|false|null>
-    fvg_retest_ok: <true|false|null>
-    bos_confirmed: <true|false|null>
-    rsi_ok: <true|false|null>
-    pattern_ok: <true|false|null>
-  raw_values:
-    latest_atr: <float|null>
-    vwap_deviation: <float|null>
-    macd_h4_histogram: <float|null>
-    dss_slope: <float|null>
-  notes: "<string>"
-  version: "v1.0"
-```
-
-Summary of improvements:
-* Explicit handling of ``None``/``NaN`` values for all indicators.
-* Raw indicator values returned alongside boolean checks for auditability.
-* Function parameters validated for robustness.
-"""
-
-# YAML schema string for programmatic reference
-CONFLUENCE_SCHEMA = """
-confluence_report:
-  timestamp: "<UTC ISO format>"
-  symbol: "<string>"
-  variant: "<Inv|MAZ2|TMC|Mentfx|Other>"
-  checks:
-    structure_ok: <true|false|null>
-    poi_mitigated: <true|false|null>
-    micro_ok: <true|false|null>
-    atr_ok: <true|false|null>
-    vwap_ok: <true|false|null>
-    macd_h4_ok: <true|false|null>
-    dss_ok: <true|false|null>
-    fvg_retest_ok: <true|false|null>
-    bos_confirmed: <true|false|null>
-    rsi_ok: <true|false|null>
-    pattern_ok: <true|false|null>
-  raw_values:
-    latest_atr: <float|null>
-    vwap_deviation: <float|null>
-    macd_h4_histogram: <float|null>
-    dss_slope: <float|null>
-  notes: "<string>"
-  version: "v1.0"
-"""
-
 import pandas as pd
 import numpy as np
-from typing import Dict, Tuple, Optional, List, Any
+from typing import Dict, Tuple, Optional, List
 from datetime import datetime
 from core.confirmation_engine_smc import detect_structure_break, ConfirmationConstants
 import logging
+from typing import Optional, Dict, Any
 from core.telegram_alert_engine import send_simple_summary_alert
 
 # Default SL buffer in pips if profile does not override
@@ -90,71 +24,44 @@ def scan_confluences(
     confluence_data: Dict[str, Any],
     risk_model_config: Dict[str, Any],
     config: Optional[Dict[str, Any]] = None
-) -> Dict[str, Any]:
-    """Evaluate confluence checks and return a structured report.
-
-    Parameters are intentionally flexible to support unit tests where some
-    values may be ``None``.  All numeric inputs are validated for ``NaN`` before
-    comparison against configurable thresholds.
+) -> Dict[str, Optional[bool]]:
     """
-
+    Build a confluence report of indicator checks. Config-driven and handles NaNs gracefully.
+    """
     if config is None:
         config = {}
     thresholds = config.get("confluence", {})
-
-    # Helper to normalise numeric inputs
-    def _num_or_none(val: Any) -> Optional[float]:
-        return float(val) if val is not None and not pd.isna(val) else None
-
-    checks: Dict[str, Optional[bool]] = {}
-    raw_values: Dict[str, Optional[float]] = {}
-
-    raw_values['latest_atr'] = _num_or_none(latest_atr)
+    report = {}
+    # Structure break present
+    report['structure_ok'] = structure_break is not None
+    # POI mitigation present
+    report['poi_mitigated'] = mitigation_candle is not None
+    # Microstructure confirmation
+    report['micro_ok'] = bool(micro_res and micro_res.get('confirmed', False))
+    # ATR check
     atr_thr = thresholds.get('atr_max', float('inf'))
-    checks['atr_ok'] = (
-        raw_values['latest_atr'] is not None and raw_values['latest_atr'] <= atr_thr
-    )
-
-    # Structure break presence
-    checks['structure_ok'] = structure_break is not None
-    # POI mitigation presence
-    checks['poi_mitigated'] = mitigation_candle is not None
-    # Microstructure confirmation flag
-    checks['micro_ok'] = bool(micro_res and micro_res.get('confirmed', False))
-
-    raw_values['vwap_deviation'] = _num_or_none(confluence_data.get('vwap_deviation'))
+    report['atr_ok'] = latest_atr is not None and not pd.isna(latest_atr) and latest_atr <= atr_thr
+    # VWAP deviation check
     vwap_thr = thresholds.get('vwap_deviation_max', 2.0)
-    checks['vwap_ok'] = (
-        raw_values['vwap_deviation'] is not None and abs(raw_values['vwap_deviation']) <= vwap_thr
-    )
-
-    raw_values['macd_h4_histogram'] = _num_or_none(confluence_data.get('macd_h4_histogram'))
+    vwap_dev = confluence_data.get('vwap_deviation')
+    report['vwap_ok'] = vwap_dev is not None and not pd.isna(vwap_dev) and abs(vwap_dev) <= vwap_thr
+    # MACD H4 histogram check
     macd_thr = thresholds.get('macd_h4_hist_min', 0.0)
-    checks['macd_h4_ok'] = (
-        raw_values['macd_h4_histogram'] is not None and raw_values['macd_h4_histogram'] >= macd_thr
-    )
-
-    raw_values['dss_slope'] = _num_or_none(confluence_data.get('dss_slope'))
+    macd_val = confluence_data.get('macd_h4_histogram')
+    report['macd_h4_ok'] = macd_val is not None and not pd.isna(macd_val) and macd_val >= macd_thr
+    # DSS slope check
     dss_thr = thresholds.get('dss_slope_min', 0.0)
-    checks['dss_ok'] = (
-        raw_values['dss_slope'] is not None and raw_values['dss_slope'] >= dss_thr
-    )
-
-    # Variant-specific boolean flags
-    for flag in ['fvg_retest_ok', 'bos_confirmed', 'rsi_ok', 'pattern_ok']:
-        if flag in confluence_data:
-            checks[flag] = bool(confluence_data[flag])
-
-    report = {
-        'timestamp': datetime.utcnow().isoformat() + 'Z',
-        'symbol': confluence_data.get('symbol'),
-        'variant': confluence_data.get('variant', 'Other'),
-        'checks': checks,
-        'raw_values': raw_values,
-        'notes': confluence_data.get('notes', ''),
-        'version': 'v1.0',
-    }
-
+    dss_slope = confluence_data.get('dss_slope')
+    report['dss_ok'] = dss_slope is not None and not pd.isna(dss_slope) and dss_slope >= dss_thr
+    # Variant-specific flags passed via confluence_data
+    if 'fvg_retest_ok' in confluence_data:
+        report['fvg_retest_ok'] = bool(confluence_data['fvg_retest_ok'])
+    if 'bos_confirmed' in confluence_data:
+        report['bos_confirmed'] = bool(confluence_data['bos_confirmed'])
+    if 'rsi_ok' in confluence_data:
+        report['rsi_ok'] = bool(confluence_data['rsi_ok'])
+    if 'pattern_ok' in confluence_data:
+        report['pattern_ok'] = bool(confluence_data['pattern_ok'])
     log.debug(f"Confluence report: {report}")
     return report
 

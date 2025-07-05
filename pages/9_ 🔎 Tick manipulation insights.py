@@ -371,11 +371,6 @@ def create_microstructure_heatmap(df):
 
 # ==================== MAIN DASHBOARD ====================
 def main():
-    """
-    Main function for launching the Streamlit dashboard with data selection,
-    manipulation detection, and export features.
-    """
-    # --- Streamlit UI and Logic Begins ---
     st.title("🎯 Xanalytics Unified Microstructure Dashboard")
     st.markdown("### Advanced Tick Manipulation & Market Microstructure Analysis")
 

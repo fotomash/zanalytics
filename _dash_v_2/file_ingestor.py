@@ -4,15 +4,14 @@ import os
 import time
 from datetime import datetime
 import pandas as pd
-from hybrid_data_pipeline import HybridDataPipeline, DataConfig, get_data_for_llm
+from utils.hybrid_data_pipeline import HybridDataPipeline, DataConfig, get_data_for_llm
 import redis.asyncio as redis
 
 # --- Configuration ---
 # IMPORTANT: Update this path to the 'tick_data.csv' file inside your MT5 Data Folder
 # Example Windows: 'C:/Users/YourUser/AppData/Roaming/MetaQuotes/Terminal/InstanceID/MQL5/Files/tick_data.csv'
 # Example Linux/Wine: '/home/user/.wine/drive_c/users/user/Application Data/MetaQuotes/Terminal/InstanceID/MQL5/Files/tick_data.csv'
-TICK_DATA_FILE_PATH = "tick_data.csv" # <-- PLEASE UPDATE THIS PATH
-
+TICK_DATA_FILE_PATH = "/Users/tom/Documents/_tick_data/_bridge"
 REDIS_HOST = "localhost"
 REDIS_PORT = 6379
 
@@ -25,7 +24,7 @@ class FileIngestor:
         self._file = None
         print(f"File Ingestor initialized. Watching: {self.file_path}")
 
-    async def start_watching(self):
+    async def start_watching(self):e
         """Starts the loop to watch the file for new data."""
         print("Waiting for the data file to be created...")
         while not os.path.exists(self.file_path):

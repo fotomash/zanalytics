@@ -1,6 +1,4 @@
 # config/settings.py - Add Wyckoff-specific settings
-from pydantic import BaseSettings
-
 
 class Settings(BaseSettings):
     # ... existing settings ...

@@ -51,15 +51,6 @@ This framework uses [Pydantic Settings](https://pydantic-docs.helpmanual.io/usag
 - `DATABASE_URL`: Connection string for your persistence layer
 - `LOG_LEVEL`: `DEBUG`, `INFO`, `WARN`, or `ERROR`
 
-Example usage:
-
-```python
-from config.settings import Settings
-
-settings = Settings()
-print(settings.WYCKOFF_ENABLED)
-```
-
 ## Observability
 The framework includes hooks for OpenTelemetry and structured logging. To enable:
 1. Configure exporters in your `.env`.
