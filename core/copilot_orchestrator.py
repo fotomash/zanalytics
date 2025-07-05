@@ -621,19 +621,34 @@ def parse_user_prompt(prompt):  # FIXED
     if tf_raw: tf = tf_map_internal.get(tf_raw.lower(), "m15")
     final_parsed_args = {"pair": pair, "timestamp_str": target_timestamp_str, "tf": tf, "strategy_variant": detected_variant}; log_info(f"Parsed prompt successfully: {final_parsed_args}"); return final_parsed_args
 
-def handle_prompt(...): # Collapsed
-    # ... (Function body remains the same) ...
+def handle_prompt(prompt: str) -> dict:
+    """Parse a user prompt and run a price check."""
     log_info(f"Received prompt for handling: '{prompt}'")
     parsed_args = parse_user_prompt(prompt)
-    if not parsed_args: log_info("Prompt parsing failed."); return {"status": "error", "message": "Could not parse the prompt. Use format 'SYMBOL at HH:MM [am/pm] [TF] [using VARIANT strategy]' or 'SYMBOL now [TF] [variant]'."}
-    result = handle_price_check(**parsed_args); return result
+    if not parsed_args:
+        log_info("Prompt parsing failed.")
+        return {
+            "status": "error",
+            "message": "Could not parse the prompt. Use format 'SYMBOL at HH:MM [am/pm] [TF] [using VARIANT strategy]' or 'SYMBOL now [TF] [variant]'."
+        }
+    result = handle_price_check(**parsed_args)
+    return result
 
-def send_webhook_alert(...): # Collapsed
-    # ... (Function body remains the same) ...
-    webhook_url = os.environ.get("SCANNER_WEBHOOK_URL");
-    if not webhook_url: log_info("No webhook URL found in environment (SCANNER_WEBHOOK_URL). Skipping alert.", "WARN"); return
-    try: response = requests.post(webhook_url, json=payload, timeout=10); response.raise_for_status(); log_info(f"Webhook alert sent successfully to {webhook_url}.")
-    except requests.exceptions.RequestException as e: log_info(f"Exception sending webhook alert: {e}", "ERROR")
+def send_webhook_alert(payload: dict) -> None:
+    """Send a webhook alert using the configured URL."""
+    webhook_url = os.environ.get("SCANNER_WEBHOOK_URL")
+    if not webhook_url:
+        log_info(
+            "No webhook URL found in environment (SCANNER_WEBHOOK_URL). Skipping alert.",
+            "WARN",
+        )
+        return
+    try:
+        response = requests.post(webhook_url, json=payload, timeout=10)
+        response.raise_for_status()
+        log_info(f"Webhook alert sent successfully to {webhook_url}.")
+    except requests.exceptions.RequestException as e:
+        log_info(f"Exception sending webhook alert: {e}", "ERROR")
 
 def log_session_result(result: dict, log_dir: str, format: str): # UPDATED for Wyckoff
     """ Logs the result of a session scan to CSV or JSON file. """
@@ -667,9 +682,15 @@ def run_session_scan(pairs: list, tf: str, log_dir: str, log_format: str, strate
         timestamp_str = datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M:%S'); log_info(f"Analyzing {pair} @ {timestamp_str} (TF: {tf})...")
         result = handle_price_check(pair, timestamp_str, tf, strategy_variant=strategy)
         if result.get("status") == "ok":
-            log_info(f"Analysis OK for {pair}."); log_session_result(result, log_dir, log_format); entry_confirmed = result.get("final_entry_result", {}).get("entry_confirmed", False); confluence_strength = "weak" # Placeholder
-            alert_reason = None;
-            if entry_confirmed: alert_reason = "Confirmed Entry Signal"; elif confluence_strength == "strong": alert_reason = "Strong Confluence Detected"
+            log_info(f"Analysis OK for {pair}.")
+            log_session_result(result, log_dir, log_format)
+            entry_confirmed = result.get("final_entry_result", {}).get("entry_confirmed", False)
+            confluence_strength = "weak"  # Placeholder
+            alert_reason = None
+            if entry_confirmed:
+                alert_reason = "Confirmed Entry Signal"
+            elif confluence_strength == "strong":
+                alert_reason = "Strong Confluence Detected"
             if alert_reason:
                 log_info(f"ALERT condition met for {pair}: {alert_reason}")
                 alert_payload = {
