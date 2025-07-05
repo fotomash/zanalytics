@@ -262,6 +262,30 @@ orchestrator.config["webhooks"] = {
 }
 ```
 
+## Dashboard Data Flow
+
+Analysis results are produced by the orchestrator once a workflow finishes. The
+`update_dashboard` task forwards those results to the API, which then
+broadcasts them to all connected dashboards. The Streamlit app polls the REST
+endpoints and listens on the WebSocket for real‑time updates.
+
+```
+┌──────────────┐     REST / WS     ┌──────────────┐     WebSocket/HTTP    ┌──────────────┐
+│ Orchestrator │ ───────────────▶ │    API       │ ───────────────▶ │  Streamlit   │
+└──────────────┘                   │  Service    │                   │  Dashboard   │
+                                  └──────────────┘                   └──────────────┘
+```
+
+### Local Deployment Notes
+
+- `ZAN_API_URL` – Dashboard uses this to locate the API service (defaults to
+  `http://localhost:8000`).
+- `REDIS_HOST`/`REDIS_PORT` – Configure Redis caching for the API (defaults to
+  `localhost:6379`).
+- `FASTAPI_HOST`/`FASTAPI_PORT` – Set the bind address for the API service.
+- `ZSI_CONFIG_PATH` – Path to the orchestrator configuration YAML.
+
+
 ## Advanced Features
 
 ### 1. Multi-Strategy Backtesting
