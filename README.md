@@ -122,16 +122,17 @@ pipeline.run_full()
 2. **Operational** – executes a Context → Catalyst → Confirmation → Execution sequence.
 3. **Technical** – fetches data via `DataManager` and broadcasts events on a simple message bus.
 
-Run it from the CLI using the new strategy selector:
+Run it from the CLI using the strategy selector. Any extra flags are passed
+directly to the chosen strategy:
 
 ```bash
 python -m core.orchestrator --strategy smc --symbol OANDA:EUR_USD --json
 ```
 
-Set `ZSI_CONFIG_PATH` or use `--config` to load a different YAML:
+Set `ZSI_CONFIG_PATH` or supply `--config` to load a different YAML file:
 
 ```bash
-ZSI_CONFIG_PATH=custom.yml python -m core.orchestrator --strategy smc --symbol OANDA:EUR_USD
+python -m core.orchestrator --strategy smc -c custom.yml --symbol OANDA:EUR_USD
 ```
 
 The command prints a JSON summary describing each stage.

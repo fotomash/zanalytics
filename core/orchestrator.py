@@ -127,13 +127,9 @@ def main() -> None:
         help="Name of the orchestrator strategy to run",
     )
     parser.add_argument(
-        "--symbol",
-        help="Trading symbol passed to the strategy",
-    )
-    parser.add_argument(
         "--prompt",
-        help="Prompt text for copilot-style strategies",
         default="",
+        help="Prompt text for copilot-style strategies",
     )
     parser.add_argument(
         "--json",
@@ -147,12 +143,32 @@ def main() -> None:
         help="Path to config YAML",
     )
 
-    args = parser.parse_args()
+    args, unknown = parser.parse_known_args()
+
+    extra_args: Dict[str, Any] = {}
+    key = None
+    for item in unknown:
+        if item.startswith("--"):
+            item = item.lstrip("-")
+            if "=" in item:
+                k, v = item.split("=", 1)
+                extra_args[k] = v
+                key = None
+            else:
+                if key:
+                    extra_args[key] = True
+                key = item
+        else:
+            if key:
+                extra_args[key] = item
+                key = None
+    if key:
+        extra_args[key] = True
 
     orch = AnalysisOrchestrator(config_path=args.config)
     payload: Dict[str, Any] = {"orchestrator": args.strategy}
-    if args.symbol:
-        payload["args"] = {"symbol": args.symbol}
+    if extra_args:
+        payload["args"] = extra_args
     if args.prompt:
         payload["prompt"] = args.prompt
 
