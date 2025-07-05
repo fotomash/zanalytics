@@ -199,6 +199,12 @@ Use the following command:
 streamlit run "🏠 Home.py"
 ```
 
+To spin up both the API and dashboard together you can run:
+
+```bash
+python run_full_stack.py --api-port 8000 --dash-port 8501
+```
+
 The application populates the cache as data is requested.
 
 ## License
