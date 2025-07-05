@@ -4,7 +4,7 @@ from typing import Dict, Any, Callable, List
 
 import pandas as pd
 
-from core.data_manager import DataManager
+from core.data.client import get_market_data
 from core.phase_detector_wyckoff_v1 import detect_wyckoff_multi_tf
 
 
@@ -28,8 +28,8 @@ class MessageBus:
 class ICCOrchestrator:
     """Coordinate strategic, operational and technical layers."""
 
-    def __init__(self, data_manager: DataManager | None = None, bus: MessageBus | None = None) -> None:
-        self.data_manager = data_manager or DataManager()
+    def __init__(self, bus: MessageBus | None = None) -> None:
+        self.bus = bus or MessageBus()
         self.bus = bus or MessageBus()
         self.playbook_map = {
             "A": "accumulation_setup",
@@ -45,7 +45,7 @@ class ICCOrchestrator:
     def run_wyckoff_regime(self, symbol: str) -> Dict[str, Any]:
         """Detect regime and select playbook based on H4 phase."""
         try:
-            df = self.data_manager.get_data(symbol, "h4", days_back=60)
+            df = get_market_data(symbol, "h4", bars=500)
         except Exception as e:  # pragma: no cover - network/local fetch may fail
             print(f"[ICC] Data fetch failed for {symbol}: {e}")
             df = pd.DataFrame()
@@ -61,7 +61,7 @@ class ICCOrchestrator:
     # --------------------------------------------------------------
     def context_step(self, symbol: str) -> Dict[str, Any]:
         try:
-            df = self.data_manager.get_data(symbol, "h1", days_back=2)
+            df = get_market_data(symbol, "h1", bars=120)
             last_close = float(df["Close"].iloc[-1])
         except Exception as e:  # pragma: no cover
             print(f"[ICC] Context fetch failed: {e}")
@@ -72,7 +72,7 @@ class ICCOrchestrator:
 
     def catalyst_step(self, symbol: str, _context: Dict[str, Any]) -> Dict[str, Any]:
         try:
-            df = self.data_manager.get_data(symbol, "m15", days_back=1)
+            df = get_market_data(symbol, "m15", bars=96)
             volume = float(df["Volume"].iloc[-1]) if not df.empty else 0.0
         except Exception as e:  # pragma: no cover
             print(f"[ICC] Catalyst fetch failed: {e}")

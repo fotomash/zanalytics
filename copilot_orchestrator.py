@@ -44,13 +44,12 @@ try:
 except Exception as cfg_err:
     log_info(f"WARN: Failed loading {DEFAULT_CHART_CONFIG_PATH}: {cfg_err}", "WARN")
 
-# --- Unified Data Manager ---
+# --- Market Data Client ---
 try:
-    from core.data_manager import DataManager
-    DATA_MANAGER = DataManager()
+    from core.data.client import get_market_data
 except Exception as e:
-    DATA_MANAGER = None
-    log_info(f"DataManager init failed: {e}", "ERROR")
+    get_market_data = None
+    log_info(f"Market data client init failed: {e}", "ERROR")
 
 # --- Dynamic Imports ---
 # (Imports remain the same, including the new liquidity_sweep_detector)
@@ -355,16 +354,13 @@ def handle_price_check(pair: str, timestamp_str: str, tf: str = 'm15', strategy_
         except Exception as e: return {"status": "error", "message": f"Invalid timestamp format: '{timestamp_str}'."}
 
         # --- Data Fetching & Aggregation ---
-        if not DATA_MANAGER:
-            return {"status": "error", "message": "DataManager unavailable"}
-        fetch_window_delta = timedelta(days=30)
-        start_dt = target_dt_utc - fetch_window_delta
-        end_dt = target_dt_utc + timedelta(hours=1)
-        log_info(f"Task: Fetching data via DataManager. Symbol={pair}")
+        if not get_market_data:
+            return {"status": "error", "message": "Market data client unavailable"}
+        log_info(f"Task: Fetching data. Symbol={pair}")
         tfs = ['m1', 'm5', 'm15', 'h1', 'h4']
         all_tf_data = {}
         for tf_needed in tfs:
-            df = DATA_MANAGER.get_data(pair, tf_needed, days_back=30)
+            df = get_market_data(pair, tf_needed, bars=500)
             if not df.empty:
                 all_tf_data[tf_needed] = df
         if not all_tf_data:

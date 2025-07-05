@@ -18,7 +18,7 @@ from schemas.agent_profile_schemas import AgentProfileSchema
 from core.phase_detector_wyckoff_v1 import detect_wyckoff_multi_tf
 from market_structure_analyzer_smc import analyze_market_structure
 from liquidity_detector import detect_swing_highs_lows
-from core.tick_processor import ticks_to_bars
+from core.data.resampling import ticks_to_bars
 
 
 class ISPTSPipeline:
