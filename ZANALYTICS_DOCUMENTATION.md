@@ -161,7 +161,7 @@ asyncio.run(orchestrator.execute_pipeline())
 
 ### 2. Running the Dashboard
 ```bash
-streamlit run 🏠 Home.py
+streamlit run "🏠 Home.py"
 ```
 
 ### 3. Generating LLM-Ready Data

@@ -184,7 +184,7 @@ Running the Streamlit dashboard will recreate any missing `.cache/*.pkl` files a
 Use the following command:
 
 ```bash
-streamlit run 🏠\ Home.py
+streamlit run "🏠 Home.py"
 ```
 
 The application populates the cache as data is requested.
