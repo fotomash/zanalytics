@@ -10,7 +10,7 @@ from typing import Dict, Any, List, Optional, Tuple
 from abc import ABC, abstractmethod
 from loguru import logger
 import numpy as np
-from ncos.core.base import BaseComponent, DataModel
+from ..base import BaseComponent, DataModel
 
 class VectorStoreInterface(ABC):
     """
