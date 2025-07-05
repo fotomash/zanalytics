@@ -86,13 +86,13 @@ All runtime settings, endpoints, and feature flags must be resolved via environm
    from fastapi import FastAPI, Depends, Header, HTTPException
    from dotenv import load_dotenv
    import os
-   from core.orchestrator import handle_user_input
+   from core.orchestrator import AnalysisOrchestrator
 
    # Load environment
    load_dotenv()
    API_KEY_NAME = os.getenv("API_KEY_HEADER_NAME", "X-API-KEY")
    VALID_API_KEY = os.getenv("API_KEY")
-
+analysis_orchestrator = AnalysisOrchestrator()
    app = FastAPI(
        title="ZSI Copilot Framework",
        version="1.0.0",
@@ -108,7 +108,7 @@ All runtime settings, endpoints, and feature flags must be resolved via environm
 
    @app.post("/api/log", tags=["zsi"], dependencies=[Depends(verify_api_key)])
    async def log_event(payload: dict):
-       return await handle_user_input(payload)
+       return await analysis_orchestrator.run(payload)
 
    @app.get("/api/ping", tags=["zsi"])
    def ping():
