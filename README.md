@@ -179,6 +179,17 @@ python zanalytics_api_service.py
 
 Endpoints like `/status` and `/analysis/summary/{symbol}` will be available on port `5010`.
 
+### Redis Configuration
+
+The API caches analysis results and agent decisions in Redis. Configure the host and port via environment variables before starting the service:
+
+```bash
+export REDIS_HOST=localhost
+export REDIS_PORT=6379
+```
+
+These values default to `localhost:6379` if unset and are loaded by `config_helper.RedisConfig`.
+
 ### Regenerating cache files
 
 Running the Streamlit dashboard will recreate any missing `.cache/*.pkl` files automatically.
