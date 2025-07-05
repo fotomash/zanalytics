@@ -3,7 +3,9 @@ import importlib
 import inspect
 import os
 from pathlib import Path
-from typing import Any, Dict, Callable, Awaitable
+from typing import Any, Dict, Callable, Awaitable, List
+from dataclasses import dataclass, field
+import pandas as pd
 
 try:
     import yaml
@@ -12,6 +14,19 @@ except Exception:  # pragma: no cover - optional dependency
 
 CONFIG_PATH = Path(os.getenv("ZSI_CONFIG_PATH", "zsi_config.yaml"))
 USER_CONTEXT_PATH = Path("data/user_context.json")
+
+
+@dataclass
+class UnifiedAnalyticsBar:
+    """Container for enriched bar data from all analysis modules."""
+
+    timestamp: pd.Timestamp
+    open: float
+    high: float
+    low: float
+    close: float
+    volume: float
+    data: Dict[str, Any] = field(default_factory=dict)
 
 
 class AnalysisOrchestrator:
@@ -111,6 +126,53 @@ class AnalysisOrchestrator:
         context["last_result"] = result
         self._write_user_context(context)
         return result
+
+    def analyze_dataframe(
+        self, df: pd.DataFrame, analyses: Dict[str, Any] | None = None
+    ) -> List[UnifiedAnalyticsBar]:
+        """Run configured analysis modules on a DataFrame."""
+
+        cfg = analyses or self.config.get("analyses", {})
+
+        df_proc = df.copy()
+
+        pipeline_cfg = cfg.get("pipeline")
+        if pipeline_cfg is not False:
+            from core.analysis.pipeline import EnrichmentPipeline
+
+            pl = EnrichmentPipeline(pipeline_cfg or {})
+            df_proc = pl.apply(df_proc)
+
+        wyckoff_result = None
+        if cfg.get("wyckoff"):
+            try:
+                from core.wyckoff.unified_wyckoff_engine import UnifiedWyckoffEngine
+
+                engine = UnifiedWyckoffEngine(cfg.get("wyckoff") or {})
+                wyckoff_result = engine.analyze(df_proc)
+            except Exception as exc:  # pragma: no cover - optional
+                wyckoff_result = {"error": str(exc)}
+
+        bars: List[UnifiedAnalyticsBar] = []
+        df_reset = df_proc.reset_index()
+        for _, row in df_reset.iterrows():
+            ts = row.get("timestamp", row.get("index"))
+            data = row.to_dict()
+            for key in ["timestamp", "index"]:
+                data.pop(key, None)
+            bars.append(
+                UnifiedAnalyticsBar(
+                    timestamp=pd.to_datetime(ts),
+                    open=float(data.pop("Open", data.pop("open", 0.0))),
+                    high=float(data.pop("High", data.pop("high", 0.0))),
+                    low=float(data.pop("Low", data.pop("low", 0.0))),
+                    close=float(data.pop("Close", data.pop("close", 0.0))),
+                    volume=float(data.pop("Volume", data.pop("volume", 0.0))),
+                    data={**data, **({"wyckoff": wyckoff_result} if wyckoff_result else {})},
+                )
+            )
+
+        return bars
 
 
 def main() -> None:
