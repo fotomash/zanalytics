@@ -24,8 +24,9 @@ pip install loguru
 # Create directory structure
 mkdir -p config data exports logs
 
-# Copy all zanalytics_*.py files to current directory
 # Copy configuration files to config/
+# All orchestration now happens through `core/orchestrator.py`.
+# Legacy files like `zanalytics_orchestrator.py` are no longer needed.
 ```
 
 ## 3. First Run (1 minute)
@@ -39,6 +40,15 @@ python -m core.orchestrator --strategy advanced_smc
 This launches `core.orchestrator.AnalysisOrchestrator` with the
 strategy defined in your `zsi_config.yaml` file and prints a summary
 when the run completes.
+
+Programmatic usage is also supported:
+
+```python
+from core.orchestrator import AnalysisOrchestrator
+
+orc = AnalysisOrchestrator("config/orchestrator_config.yaml")
+orc.run()
+```
 
 ## 4. View Results
 
