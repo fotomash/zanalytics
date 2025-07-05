@@ -1,6 +1,8 @@
 import json
+import importlib
+import inspect
 from pathlib import Path
-from typing import Any, Dict
+from typing import Any, Dict, Callable, Awaitable
 
 try:
     import yaml
@@ -10,56 +12,101 @@ except Exception:  # pragma: no cover - optional dependency
 CONFIG_PATH = Path("zsi_config.yaml")
 USER_CONTEXT_PATH = Path("data/user_context.json")
 
-def _load_config() -> Dict[str, Any]:
-    if CONFIG_PATH.is_file() and yaml:
-        try:
-            with CONFIG_PATH.open("r", encoding="utf-8") as f:
-                return yaml.safe_load(f) or {}
-        except Exception:
-            return {}
-    return {}
 
-def _read_user_context() -> Dict[str, Any]:
-    if USER_CONTEXT_PATH.is_file():
-        try:
-            with USER_CONTEXT_PATH.open("r", encoding="utf-8") as f:
-                return json.load(f)
-        except Exception:
-            return {}
-    return {}
+class AnalysisOrchestrator:
+    """Load config, dynamically import orchestrator modules and execute them."""
 
-def _write_user_context(ctx: Dict[str, Any]) -> None:
-    USER_CONTEXT_PATH.parent.mkdir(parents=True, exist_ok=True)
-    with USER_CONTEXT_PATH.open("w", encoding="utf-8") as f:
-        json.dump(ctx, f, indent=2)
+    def __init__(self, config_path: str | None = None) -> None:
+        self.config_path = Path(config_path) if config_path else CONFIG_PATH
+        self.config: Dict[str, Any] = self._load_config()
+        self.strategies: Dict[str, Callable[..., Any]] = {}
+        self.load_modules()
 
-async def handle_user_input(payload: Dict[str, Any]) -> Dict[str, Any]:
-    """Route payloads to the appropriate orchestrator."""
-    _load_config()  # Loaded for side effects if needed
-    context = _read_user_context()
+    def _load_config(self) -> Dict[str, Any]:
+        if self.config_path.is_file() and yaml:
+            try:
+                with self.config_path.open("r", encoding="utf-8") as f:
+                    return yaml.safe_load(f) or {}
+            except Exception:
+                return {}
+        return {}
 
-    orchestrator = payload.get("orchestrator")
-    if orchestrator == "copilot":
-        try:
-            from core.copilot_orchestrator import handle_prompt
-            result = handle_prompt(payload.get("prompt", ""))
-        except Exception as exc:  # pragma: no cover - optional
-            result = {"status": "error", "message": str(exc)}
-    elif orchestrator == "advanced_smc":
-        try:
-            from core.advanced_smc_orchestrator import run_advanced_smc_strategy
-            result = run_advanced_smc_strategy(**payload.get("args", {}))
-        except Exception as exc:  # pragma: no cover - optional
-            result = {"status": "error", "message": str(exc)}
-    else:
-        try:
-            from main_orchestrator import MainOrchestrator
-            mo = MainOrchestrator()
-            mo.run_all_agents_from_yaml()
-            result = {"status": "ok"}
-        except Exception as exc:  # pragma: no cover - optional
-            result = {"status": "error", "message": str(exc)}
+    def _read_user_context(self) -> Dict[str, Any]:
+        if USER_CONTEXT_PATH.is_file():
+            try:
+                with USER_CONTEXT_PATH.open("r", encoding="utf-8") as f:
+                    return json.load(f)
+            except Exception:
+                return {}
+        return {}
 
-    context["last_result"] = result
-    _write_user_context(context)
-    return result
+    def _write_user_context(self, ctx: Dict[str, Any]) -> None:
+        USER_CONTEXT_PATH.parent.mkdir(parents=True, exist_ok=True)
+        with USER_CONTEXT_PATH.open("w", encoding="utf-8") as f:
+            json.dump(ctx, f, indent=2)
+
+    def load_modules(self) -> None:
+        """Import orchestrator modules defined in config."""
+        modules = self.config.get(
+            "orchestrators",
+            {
+                "copilot": {
+                    "module": "core.copilot_orchestrator",
+                    "callable": "handle_prompt",
+                },
+                "advanced_smc": {
+                    "module": "core.advanced_smc_orchestrator",
+                    "callable": "run_advanced_smc_strategy",
+                },
+            },
+        )
+        for name, spec in modules.items():
+            mod_path = spec.get("module")
+            attr_name = spec.get("callable")
+            if not mod_path or not attr_name:
+                continue
+            try:
+                module = importlib.import_module(mod_path)
+                self.strategies[name] = getattr(module, attr_name)
+            except Exception:
+                self.strategies[name] = None
+
+    def select_strategy(self, orchestrator_name: str) -> Callable[..., Any] | None:
+        return self.strategies.get(orchestrator_name)
+
+    async def run(self, payload: Dict[str, Any]) -> Dict[str, Any]:
+        """Execute selected orchestrator and persist result."""
+        orchestrator_name = payload.get(
+            "orchestrator", self.config.get("default_orchestrator")
+        )
+        strategy = self.select_strategy(orchestrator_name)
+
+        if strategy is None:
+            try:
+                from main_orchestrator import MainOrchestrator
+
+                mo = MainOrchestrator()
+                mo.run_all_agents_from_yaml()
+                result: Dict[str, Any] = {"status": "ok"}
+            except Exception as exc:  # pragma: no cover - optional
+                result = {"status": "error", "message": str(exc)}
+        else:
+            try:
+                args = payload.get("args", {})
+                if inspect.iscoroutinefunction(strategy):
+                    if args:
+                        result = await strategy(**args)
+                    else:
+                        result = await strategy(payload.get("prompt", ""))
+                else:
+                    if args:
+                        result = strategy(**args)
+                    else:
+                        result = strategy(payload.get("prompt", ""))
+            except Exception as exc:  # pragma: no cover - optional
+                result = {"status": "error", "message": str(exc)}
+
+        context = self._read_user_context()
+        context["last_result"] = result
+        self._write_user_context(context)
+        return result
