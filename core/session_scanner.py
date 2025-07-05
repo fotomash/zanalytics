@@ -14,7 +14,7 @@ import requests
 import argparse
 from datetime import datetime
 
-from copilot_orchestrator import handle_price_check
+from core.copilot_orchestrator import handle_price_check
 
 # --- Webhook Alert Function ---
 def send_webhook_alert(payload: dict):

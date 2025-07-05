@@ -24,7 +24,7 @@ if str(Path(__file__).resolve().parent.parent) not in sys.path:
 
 # Import orchestrator lazily to avoid heavy imports when not running tests
 try:
-    from advanced_smc_orchestrator import run_advanced_smc_strategy
+    from core.advanced_smc_orchestrator import run_advanced_smc_strategy
 except Exception:  # pragma: no cover - orchestrator may not be present
     run_advanced_smc_strategy = None
 
