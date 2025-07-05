@@ -1,23 +1,24 @@
-version: "3.8"
+version: '3.8'
 
 services:
-  app:
+  zanalytics-api:
     build: .
-    container_name: zanalytics_app
-    volumes:
-      - ./data:/app/data
-      - ./uploads:/app/uploads
-      - ./exports:/app/exports
     ports:
-      - "8501:8501"
-      - "5010:5010"
-
-  ngrok:
-    image: wernight/ngrok:latest        # tiny pre-built image
+      - "8000:8000"
     environment:
-      - NGROK_AUTHTOKEN=${NGROK_TOKEN}  # put in .env file or export
-      - NGROK_REGION=eu
-    command: >
-      http zanalytics_app:8501
+      - REDIS_URL=redis://redis:6379
     depends_on:
-      - app
+      - redis
+    volumes:
+      - ./snapshots:/app/snapshots
+      - ./data:/app/data
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+
+volumes:
+  redis_data:

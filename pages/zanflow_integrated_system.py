@@ -22,7 +22,7 @@ import aiohttp
 import requests
 import os
 
-# Add project paths
+# Add project root to Python path
 sys.path.append(str(Path.cwd()))
 sys.path.append(str(Path.cwd() / 'zanalytics-main'))
 sys.path.append(str(Path.cwd() / 'zanalytics-main' / 'core'))
@@ -446,35 +446,50 @@ async def run_integrated_dashboard():
             # Load data
             try:
                 # Use configured data path
+                # ------------------------------------------------------------------
+                # 🔍 Find all CSV *and* Parquet files, in any sub-folder
+                # ------------------------------------------------------------------
                 data_path = Path(DATA_PATHS.get("enriched_data", "."))
-                available_files = list(data_path.glob("*.csv"))
 
-                if available_files:
+                pattern_list = ["*.csv", "*.parquet"]
+                available_files = []
+                for pattern in pattern_list:
+                    available_files.extend(data_path.rglob(pattern))  # recursive search
+
+                available_files = sorted(available_files, key=lambda p: str(p))
+
+                if not available_files:
+                    st.warning(
+                        f"No CSV or Parquet files found under {data_path}. "
+                        "Check DATA_PATHS['enriched_data'] in your secrets."
+                    )
+                else:
                     selected_file = st.selectbox(
                         "Select Data File",
                         available_files,
-                        format_func=lambda x: x.name
+                        format_func=lambda p: str(p.relative_to(data_path))  # show relative path
                     )
 
-                    df = pd.read_csv(selected_file)
-                    st.success(f"Loaded {len(df)} rows from {selected_file.name}")
+                    # 🗂️ Load whichever type the user picked
+                    if selected_file.suffix == ".csv":
+                        df = pd.read_csv(selected_file)
+                    else:  # .parquet
+                        df = pd.read_parquet(selected_file)
+
+                    st.success(f"Loaded {len(df):,} rows from {selected_file}")
 
                     # Run analysis button
                     if st.button("🚀 Run Complete Analysis", type="primary"):
                         with st.spinner("Running comprehensive analysis..."):
-                            # Mock strategy results for demo
-                            strategy_results = {
-                                "smc_liquidity_sweep": {"detected": True, "level": 2350.5},
-                                "wyckoff_phase": {"phase": "Distribution", "strength": 0.8},
-                                "risk_metrics": {"atr": 5.2, "volatility": "Medium"}
+                            # Build pattern_data from actual DataFrame
+                            pattern_data = {
+                                "timestamp": str(df.iloc[-1].get('timestamp', df.index[-1]) if 'timestamp' in df.columns else df.index[-1]),
+                                "price": float(df.iloc[-1]['close']) if 'close' in df.columns else float(df.iloc[-1][0]),
+                                "volume_profile": str(df.iloc[-100:]['volume'].describe()) if 'volume' in df.columns else "N/A"
                             }
 
-                            # Get LLM analysis
-                            pattern_data = {
-                                "timestamp": datetime.now().isoformat(),
-                                "price": df.iloc[-1].get('close', 2350),
-                                "volume_profile": "Heavy at 2345-2350"
-                            }
+                            # Optionally build strategy_results using your real analysis functions here
+                            strategy_results = {}
 
                             analysis = await llm_connector.analyze_pattern(pattern_data, strategy_results)
 
@@ -506,8 +521,8 @@ async def run_integrated_dashboard():
                                 alert_message = telegram_alerts.format_trade_alert(analysis, symbol)
                                 await telegram_alerts.send_alert(alert_message)
 
-                else:
-                    st.warning("No data files found in configured directory")
+                            else:
+                                st.warning("No data files found in configured directory")
 
             except Exception as e:
                 st.error(f"Error loading data: {str(e)}")

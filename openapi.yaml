@@ -1,0 +1,288 @@
+openapi: 3.0.3
+info:
+  title: ZAnalytics Complete Trading System
+  version: "3.0.0"
+  description: |
+    Professional trading intelligence with MT5 integration, LLM analysis, and real-time data processing.
+    Endpoints deliver GPT-ready JSON for comprehensive trading analysis.
+
+servers:
+  - url: https://your-deployment-url.com
+    description: Production
+  - url: http://localhost:8000
+    description: Local Development
+
+paths:
+  /api/v1/ingest/candle:
+    post:
+      summary: Ingest and enrich market data
+      operationId: ingestCandle
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/IngestRequest'
+      responses:
+        "200":
+          description: Successful ingestion
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                  enriched_data:
+                    $ref: '#/components/schemas/EnrichedRow'
+                  message:
+                    type: string
+
+  /api/v1/data/latest/{symbol}:
+    get:
+      summary: Get latest enriched market data
+      operationId: getLatestData
+      parameters:
+        - name: symbol
+          in: path
+          required: true
+          schema:
+            type: string
+            example: XAUUSD
+        - name: timeframe
+          in: query
+          schema:
+            type: string
+            default: H1
+        - name: count
+          in: query
+          schema:
+            type: integer
+            default: 100
+      responses:
+        "200":
+          description: Latest market data
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  symbol:
+                    type: string
+                  timeframe:
+                    type: string
+                  count:
+                    type: integer
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/EnrichedRow'
+
+  /api/v1/analysis/confluence/{symbol}:
+    get:
+      summary: Get confluence analysis for trading decisions
+      operationId: analyzeConfluence
+      parameters:
+        - name: symbol
+          in: path
+          required: true
+          schema:
+            type: string
+            example: XAUUSD
+        - name: timeframe
+          in: query
+          schema:
+            type: string
+            default: H1
+      responses:
+        "200":
+          description: Confluence analysis results
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  symbol:
+                    type: string
+                  timeframe:
+                    type: string
+                  analysis:
+                    type: object
+                    properties:
+                      average_confluence:
+                        type: number
+                      high_quality_setups:
+                        type: integer
+                      spring_events:
+                        type: integer
+                      latest_confluence:
+                        type: number
+                      current_phase:
+                        type: string
+                      trade_recommendation:
+                        type: string
+                  recent_data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/EnrichedRow'
+
+  /api/v1/analyze/csv:
+    post:
+      summary: Analyze CSV market data
+      operationId: analyzeCSV
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AnalysisRequest'
+      responses:
+        "200":
+          description: CSV analysis results
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  symbol:
+                    type: string
+                  analysis_type:
+                    type: string
+                  timestamp:
+                    type: string
+                  status:
+                    type: string
+                  results:
+                    type: object
+
+  /api/v1/health:
+    get:
+      summary: System health check
+      operationId: healthCheck
+      responses:
+        "200":
+          description: System status
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                  timestamp:
+                    type: string
+                  services:
+                    type: object
+                  version:
+                    type: string
+
+components:
+  schemas:
+    RawCandle:
+      type: object
+      required: [symbol, timeframe, timestamp, open, high, low, close, volume]
+      properties:
+        symbol:
+          type: string
+          example: XAUUSD
+        timeframe:
+          type: string
+          example: H1
+        timestamp:
+          type: string
+          format: date-time
+        open:
+          type: number
+        high:
+          type: number
+        low:
+          type: number
+        close:
+          type: number
+        volume:
+          type: integer
+
+    SignalData:
+      type: object
+      properties:
+        wyckoff_phase:
+          type: string
+          example: Accumulation
+        spring_event:
+          type: boolean
+        smc_zone_type:
+          type: string
+          example: breaker
+        confluence_score:
+          type: number
+        trade_entry:
+          type: boolean
+
+    IngestRequest:
+      type: object
+      required: [candle]
+      properties:
+        candle:
+          $ref: '#/components/schemas/RawCandle'
+        signals:
+          $ref: '#/components/schemas/SignalData'
+        run_id:
+          type: string
+
+    EnrichedRow:
+      type: object
+      properties:
+        timestamp:
+          type: string
+        symbol:
+          type: string
+        timeframe:
+          type: string
+        open:
+          type: number
+        high:
+          type: number
+        low:
+          type: number
+        close:
+          type: number
+        volume:
+          type: integer
+        confluence_score:
+          type: number
+        trade_quality:
+          type: string
+          enum: [LOW, MEDIUM, HIGH]
+        wyckoff_phase:
+          type: string
+        spring_event:
+          type: boolean
+        smc_zone_type:
+          type: string
+        trade_entry:
+          type: boolean
+        run_id:
+          type: string
+        annotated:
+          type: boolean
+        review_status:
+          type: string
+
+    AnalysisRequest:
+      type: object
+      required: [symbol]
+      properties:
+        symbol:
+          type: string
+        analysis_type:
+          type: string
+          default: comprehensive
+        include_manipulation:
+          type: boolean
+          default: true
+        include_wyckoff:
+          type: boolean
+          default: true
+        include_smc:
+          type: boolean
+          default: true
