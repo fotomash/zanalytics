@@ -77,15 +77,19 @@ class AppState:
             self.analysis_cache[event_data.get('symbol', 'UNKNOWN')] = event_data
 
             # Broadcast to WebSocket clients
-            await self.broadcast_to_websockets({
+            result = await self.broadcast_to_websockets({
                 "type": "analysis_update",
                 "data": event_data,
                 "timestamp": datetime.now().isoformat()
             })
 
+            if isinstance(result, dict) and result.get("error"):
+                return result
+
             logger.info(f"Processed ZANALYTICS event for {event_data.get('symbol', 'UNKNOWN')}")
         except Exception as e:
             logger.error(f"Error processing ZANALYTICS event: {e}")
+            return {"error": str(e)}
 
     async def broadcast_to_websockets(self, message):
         """Broadcast message to all connected WebSocket clients"""
@@ -93,15 +97,20 @@ class AppState:
             return
 
         disconnected = []
-        for websocket in self.websocket_connections:
+        for websocket in list(self.websocket_connections):
             try:
                 await websocket.send_json(message)
-            except:
+            except Exception as e:
+                logger.exception("Failed to send message via WebSocket")
                 disconnected.append(websocket)
 
         # Remove disconnected clients
         for ws in disconnected:
             self.websocket_connections.remove(ws)
+
+        if disconnected and not self.websocket_connections:
+            logger.error("All WebSocket clients disconnected")
+            return {"error": "all_websockets_failed"}
 
 # Global app state
 state = AppState()
