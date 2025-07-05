@@ -45,7 +45,7 @@ formatted = llm_formatter.format(llm_context)
 
 ## File Dependencies
 
-- `zanalytics_orchestrator.py` - Imports all other components
+- `core.orchestrator.AnalysisOrchestrator` - Imports all other components
 - `zanalytics_data_pipeline.py` - Standalone data processor
 - `zanalytics_integration.py` - Uses microstructure analyzers
 - `zanalytics_signal_generator.py` - Depends on analysis format
@@ -66,7 +66,7 @@ formatted = llm_formatter.format(llm_context)
 
 1. Install all dependencies
 2. Configure for your needs
-3. Run orchestrator
+3. Run the CLI: `python -m core.orchestrator --strategy advanced_smc`
 4. Monitor dashboard
 5. Review LLM outputs
 6. Optimize based on backtest results

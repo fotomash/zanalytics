@@ -30,7 +30,7 @@ Zanalytics is a comprehensive trading system that integrates advanced market ana
 
 ## Components
 
-### 1. **Zanalytics Orchestrator** (`zanalytics_orchestrator.py`)
+### 1. **Zanalytics Orchestrator** (`core.orchestrator.AnalysisOrchestrator`)
 The master control system that coordinates all components.
 
 **Key Features:**
@@ -135,7 +135,7 @@ zanalytics/
 │   ├── ncOS_ultimate_microstructure_analyzer.py
 │   └── convert_final_enhanced_smc_ULTIMATE.py
 └── src/
-    ├── zanalytics_orchestrator.py
+    ├── core/orchestrator.py
     ├── zanalytics_data_pipeline.py
     ├── zanalytics_integration.py
     ├── zanalytics_signal_generator.py
@@ -148,16 +148,14 @@ zanalytics/
 ## Quick Start
 
 ### 1. Basic Setup
-```python
-from zanalytics_orchestrator import ZanalyticsOrchestrator
+Run a strategy using the CLI:
 
-# Initialize orchestrator
-orchestrator = ZanalyticsOrchestrator("config/orchestrator_config.json")
-
-# Run single analysis
-import asyncio
-asyncio.run(orchestrator.execute_pipeline())
+```bash
+python -m core.orchestrator --strategy advanced_smc
 ```
+
+This command invokes `AnalysisOrchestrator` and executes the
+strategy specified in your configuration.
 
 ### 2. Running the Dashboard
 ```bash

@@ -30,23 +30,15 @@ mkdir -p config data exports logs
 
 ## 3. First Run (1 minute)
 
-```python
-# test_run.py
-import asyncio
-from zanalytics_orchestrator import ZanalyticsOrchestrator
+Run the orchestrator directly from the command line using the new CLI:
 
-async def main():
-    # Initialize
-    orchestrator = ZanalyticsOrchestrator()
-
-    # Run one cycle
-    await orchestrator.execute_pipeline()
-
-    print("✓ Analysis complete! Check exports/ folder")
-
-# Run
-asyncio.run(main())
+```bash
+python -m core.orchestrator --strategy advanced_smc
 ```
+
+This launches `core.orchestrator.AnalysisOrchestrator` with the
+strategy defined in your `zsi_config.yaml` file and prints a summary
+when the run completes.
 
 ## 4. View Results
 
