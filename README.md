@@ -95,10 +95,9 @@ except ValueError as e:
 
 ## Data Pipeline
 
-`core/data_manager.DataManager` provides a single interface for retrieving OHLCV
-data. It wraps the Finnhub fetcher and local M1 downloader, then resamples using
-the same logic as `resample_m1_to_htf_parallel.py`. Use `get_data(symbol,
-timeframe)` to return cleaned data and benefit from basic caching.
+`core/data` exposes unified helpers for fetching and resampling OHLCV data.
+Use `get_market_data(symbol, timeframe)` to retrieve candles, and
+`resample_all(df)` to convert M1 bars to higher timeframes.
 
 Tick CSVs are parsed according to header profiles defined in `core/tick_header_profiles.json`.
 
