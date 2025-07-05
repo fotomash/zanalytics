@@ -141,3 +141,7 @@ Run the local engine without external API keys:
 ```
 
 The script installs minimal requirements, launches `ncos_local_engine.py` on port 8000, and verifies the `/status` endpoint.
+
+## License
+
+This project is distributed under the terms of the [ZANALYTICS EULA](LICENSE_EULA.md).
