@@ -1,15 +1,18 @@
 """Utility agent for journaling trade decisions."""
 
+from __future__ import annotations
+
+from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Any, Dict, List, Optional
 
 
+@dataclass
 class TradeJournalistAgent:
     """Maintain a structured journal of trade decisions."""
 
-    def __init__(self, context: Optional[Dict[str, Any]] = None) -> None:
-        self.context = context or {}
-        self.entries: List[Dict[str, Any]] = []
+    context: Optional[Dict[str, Any]] = None
+    entries: List[Dict[str, Any]] = field(default_factory=list)
 
     def summary(self, entry: Dict[str, Any]) -> str:
         """Return a concise string representation of a log entry."""
