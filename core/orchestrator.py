@@ -84,7 +84,7 @@ class AnalysisOrchestrator:
 
         if strategy is None:
             try:
-                from main_orchestrator import MainOrchestrator
+                from core.orchestrators.main_orchestrator import MainOrchestrator
 
                 mo = MainOrchestrator()
                 mo.run_all_agents_from_yaml()
