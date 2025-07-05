@@ -32,6 +32,9 @@ Zanalytics is a comprehensive trading system that integrates advanced market ana
 
 ### 1. **Zanalytics Orchestrator** (`core.orchestrator.AnalysisOrchestrator`)
 The master control system that coordinates all components.
+*Note:* The former `zanalytics_orchestrator.py` entry point has been removed.
+All orchestration now runs through `core/orchestrator.py`. Use
+`AnalysisOrchestrator.run()` or the CLI examples below.
 
 **Key Features:**
 - Automated pipeline execution
