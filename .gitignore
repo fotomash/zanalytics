@@ -7,3 +7,6 @@ journal/
 logs/
 data/
 cron.log
+*.zip
+*.pkl
+*.log
