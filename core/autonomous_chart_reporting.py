@@ -14,7 +14,7 @@ import json # For potential report saving
 # --- Import Dependencies ---
 # Charting function from main orchestrator
 try:
-    from copilot_orchestrator import generate_analysis_chart_json, load_strategy_profile
+    from core.copilot_orchestrator import generate_analysis_chart_json, load_strategy_profile
     CHARTING_AVAILABLE = True
 except ImportError:
     print("[ERROR][AutoChartReport] Cannot import generate_analysis_chart_json/load_strategy_profile from copilot_orchestrator.")

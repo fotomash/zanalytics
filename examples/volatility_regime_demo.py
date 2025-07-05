@@ -8,7 +8,7 @@ import numpy as np
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
-spec = importlib.util.spec_from_file_location("orch", ROOT / "advanced_smc_orchestrator.py")
+spec = importlib.util.spec_from_file_location("orch", ROOT / "core" / "advanced_smc_orchestrator.py")
 orch = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(orch)
 

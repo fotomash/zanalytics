@@ -15,7 +15,7 @@ try:
     from agent_macroanalyser import MacroAnalyzerAgent
     from agent_riskmanager import RiskManagerAgent
     from agent_tradejournalist import TradeJournalistAgent
-    from advanced_smc_orchestrator import AdvancedSMCOrchestrator
+    from core.advanced_smc_orchestrator import AdvancedSMCOrchestrator
 except ImportError as e:
     logging.warning(f"ZANALYTICS import warning: {e}")
 

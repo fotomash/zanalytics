@@ -4,8 +4,8 @@ import re
 # Configuration
 dir_root = './zanalytics_workspace'
 orchestrator_files = [
-    os.path.join(dir_root, 'advanced_smc_orchestrator.py'),
-    os.path.join(dir_root, 'copilot_orchestrator.py')
+    os.path.join(dir_root, 'core', 'advanced_smc_orchestrator.py'),
+    os.path.join(dir_root, 'core', 'copilot_orchestrator.py')
 ]
 
 # 1. Collect all .py files in the workspace
