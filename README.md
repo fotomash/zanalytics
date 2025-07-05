@@ -162,7 +162,7 @@ The CLI reads this file automatically (override with `ZSI_CONFIG_PATH`) and fall
 Run the local engine without external API keys:
 
 ```bash
-./start_local_ncos.sh
+./scripts/start_local_ncos.sh
 ```
 
 The script installs minimal requirements, launches `ncos_local_engine.py` on port 8000, and verifies the `/status` endpoint.

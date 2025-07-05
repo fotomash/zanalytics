@@ -71,5 +71,5 @@ echo ""
 # This is run in the foreground as it's typically the main interactive component
 echo "--- Starting Streamlit Dashboard ---"
 echo "You can access the dashboard at http://localhost:8501"
-echo "To stop all services, use the 'stop_services.sh' script."
+echo "To stop all services, use the 'scripts/stop_services.sh' script."
 streamlit run enhanced_dashboard.py
