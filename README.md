@@ -136,6 +136,23 @@ ZSI_CONFIG_PATH=custom.yml python -m core.orchestrator --strategy smc --symbol O
 
 The command prints a JSON summary describing each stage.
 
+### zsi_config.yaml
+
+Define available orchestrators and the default selection in `zsi_config.yaml` at the project root:
+
+```yaml
+orchestrators:
+  copilot:
+    module: core.copilot_orchestrator
+    callable: handle_prompt
+  advanced_smc:
+    module: core.advanced_smc_orchestrator
+    callable: run_advanced_smc_strategy
+default_orchestrator: copilot
+```
+
+The CLI reads this file automatically (override with `ZSI_CONFIG_PATH`) and falls back to `default_orchestrator` when `--strategy` is omitted.
+
 ## ISPTS Pipeline Example
 
 `core/ispts_pipeline.py` implements a minimal, deterministic flow fusing Wyckoff phase logic, SMC structure analysis, inducement sweep detection and microstructure gating. Load the profile in `profiles/ispts_template.yaml` and pass your data frames to `ISPTSPipeline` to reproduce the standard pipeline.
