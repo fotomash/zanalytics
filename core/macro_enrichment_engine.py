@@ -15,11 +15,10 @@ import traceback
 
 # Unified data provider
 try:
-    from core.data_manager import DataManager
-    data_manager = DataManager()
+    from core.data.client import get_market_data
 except Exception as e:
-    data_manager = None
-    print(f"[ERROR][MacroEngine] DataManager init failed: {e}")
+    get_market_data = None
+    print(f"[ERROR][MacroEngine] Market data client init failed: {e}")
 
 # Load Copilot config for asset mapping
 COPILOT_CONFIG_PATH = Path("config/copilot_config.json")
@@ -94,8 +93,8 @@ def fetch_macro_context(asset_symbol: str) -> Dict:
     """
     print(f"[INFO][MacroEngine] Fetching macro context for asset: {asset_symbol}")
     context = {"risk_state": "Neutral", "macro_data": {}}
-    if not data_manager:
-        print("[ERROR][MacroEngine] DataManager unavailable. Cannot fetch macro context.")
+    if not get_market_data:
+        print("[ERROR][MacroEngine] Market data client unavailable. Cannot fetch macro context.")
         return context
 
     asset_class = detect_asset_class(asset_symbol)
@@ -112,9 +111,12 @@ def fetch_macro_context(asset_symbol: str) -> Dict:
     for symbol in macro_symbols_to_fetch:
         print(f"[DEBUG][MacroEngine] Fetching macro symbol: {symbol}")
         try:
-            df_context = data_manager.get_data(symbol, 'd1', days_back=2)
-            if df_context.empty:
-                df_context = data_manager.get_data(symbol, 'h4', days_back=2)
+            if get_market_data:
+                df_context = get_market_data(symbol, 'd1', bars=2)
+                if df_context.empty:
+                    df_context = get_market_data(symbol, 'h4', bars=12)
+            else:
+                df_context = pd.DataFrame()
             if not df_context.empty:
                 macro_raw_data[symbol] = df_context
                 print(f"[DEBUG][MacroEngine] Successfully fetched context data for {symbol}")
@@ -143,11 +145,11 @@ if __name__ == '__main__':
     if 'FINNHUB_API_KEY' not in os.environ:
          print("WARNING: FINNHUB_API_KEY environment variable not set. Using default/dummy key.")
 
-    if data_manager:
+    if get_market_data:
         macro_info = fetch_macro_context(test_asset)
         print("\n--- Macro Context Result ---")
         print(json.dumps(macro_info, indent=2, default=str))
     else:
-        print("\nCannot run test: DataManager is unavailable.")
+        print("\nCannot run test: Market data client is unavailable.")
 
     print("\n--- Test Complete ---")
