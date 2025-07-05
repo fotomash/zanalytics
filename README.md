@@ -167,6 +167,17 @@ Run the local engine without external API keys:
 
 The script installs minimal requirements, launches `ncos_local_engine.py` on port 8000, and verifies the `/status` endpoint.
 
+### Regenerating cache files
+
+Running the Streamlit dashboard will recreate any missing `.cache/*.pkl` files automatically.
+Use the following command:
+
+```bash
+streamlit run 🏠\ Home.py
+```
+
+The application populates the cache as data is requested.
+
 ## License
 
 This project is distributed under the terms of the [ZANALYTICS EULA](LICENSE_EULA.md).
