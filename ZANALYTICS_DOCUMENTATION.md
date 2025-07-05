@@ -361,7 +361,7 @@ processor.config["max_data_points"] = 5000
 
 ## License
 
-MIT License - See LICENSE file for details
+ZANALYTICS EULA - See [LICENSE_EULA.md](LICENSE_EULA.md) for details
 
 ## Changelog
 

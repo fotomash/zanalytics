@@ -1334,7 +1334,7 @@ Collecting pyyaml==6.0 (from -r requirements.txt (line 1))
               ********************************************************************************
               Please consider removing the following classifiers in favor of a SPDX license expression:
       
-              License :: OSI Approved :: MIT License
+              License :: Proprietary :: ZANALYTICS EULA
       
               See https://packaging.python.org/en/latest/guides/writing-pyproject-toml/#license for details.
               ********************************************************************************
