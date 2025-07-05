@@ -39,7 +39,7 @@ def setup_logging():
 def check_dependencies():
     """Check if required dependencies are installed"""
     required_packages = [
-        'pandas', 'watchdog', 'asyncio', 'pathlib'
+        'pandas', 'watchdog'
     ]
 
     missing = []

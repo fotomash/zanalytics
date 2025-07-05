@@ -12,7 +12,7 @@ fi
 
 # Install required packages
 echo "📦 Installing required packages..."
-pip3 install pandas watchdog asyncio pathlib
+pip3 install pandas watchdog
 
 # Create directories
 echo "📁 Creating directories..."
