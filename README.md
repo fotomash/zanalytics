@@ -128,6 +128,12 @@ Run it from the CLI using the new strategy selector:
 python -m core.orchestrator --strategy smc --symbol OANDA:EUR_USD --json
 ```
 
+Set `ZSI_CONFIG_PATH` or use `--config` to load a different YAML:
+
+```bash
+ZSI_CONFIG_PATH=custom.yml python -m core.orchestrator --strategy smc --symbol OANDA:EUR_USD
+```
+
 The command prints a JSON summary describing each stage.
 
 ## ISPTS Pipeline Example

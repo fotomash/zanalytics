@@ -1,6 +1,7 @@
 import json
 import importlib
 import inspect
+import os
 from pathlib import Path
 from typing import Any, Dict, Callable, Awaitable
 
@@ -9,7 +10,7 @@ try:
 except Exception:  # pragma: no cover - optional dependency
     yaml = None
 
-CONFIG_PATH = Path("zsi_config.yaml")
+CONFIG_PATH = Path(os.getenv("ZSI_CONFIG_PATH", "zsi_config.yaml"))
 USER_CONTEXT_PATH = Path("data/user_context.json")
 
 
@@ -110,3 +111,57 @@ class AnalysisOrchestrator:
         context["last_result"] = result
         self._write_user_context(context)
         return result
+
+
+def main() -> None:
+    """CLI entry point for running the orchestrator."""
+    import argparse
+    import asyncio
+
+    parser = argparse.ArgumentParser(
+        description="Run Analysis Orchestrator",
+        formatter_class=argparse.ArgumentDefaultsHelpFormatter,
+    )
+    parser.add_argument(
+        "--strategy",
+        help="Name of the orchestrator strategy to run",
+    )
+    parser.add_argument(
+        "--symbol",
+        help="Trading symbol passed to the strategy",
+    )
+    parser.add_argument(
+        "--prompt",
+        help="Prompt text for copilot-style strategies",
+        default="",
+    )
+    parser.add_argument(
+        "--json",
+        action="store_true",
+        help="Print result as JSON",
+    )
+    parser.add_argument(
+        "-c",
+        "--config",
+        default=os.getenv("ZSI_CONFIG_PATH", "zsi_config.yaml"),
+        help="Path to config YAML",
+    )
+
+    args = parser.parse_args()
+
+    orch = AnalysisOrchestrator(config_path=args.config)
+    payload: Dict[str, Any] = {"orchestrator": args.strategy}
+    if args.symbol:
+        payload["args"] = {"symbol": args.symbol}
+    if args.prompt:
+        payload["prompt"] = args.prompt
+
+    result = asyncio.run(orch.run(payload))
+    if args.json:
+        print(json.dumps(result, indent=2))
+    else:
+        print(result)
+
+
+if __name__ == "__main__":  # pragma: no cover - CLI execution
+    main()
