@@ -1,29 +1,37 @@
 """Risk management utilities for evaluating volatility and spread."""
 
+from __future__ import annotations
+
+from dataclasses import dataclass, field
 from typing import Any, Dict
 
 
+@dataclass
 class RiskManagerAgent:
-    """Basic risk evaluation based on microstructure context."""
+    """Evaluate microstructure data to classify current trading risk."""
 
-    def __init__(self, context: Dict[str, Any] | None = None) -> None:
-        self.context = context or {}
+    context: Dict[str, Any] = field(default_factory=dict)
+    symbol: str = field(init=False)
+    micro_context: Any = field(init=False)
+    confidence: float = field(init=False, default=0.0)
+    spread: float | None = field(init=False, default=None)
+    ret: float | None = field(init=False, default=None)
+    tick_count: int = field(init=False, default=0)
+
+    def __post_init__(self) -> None:
         self.symbol = self.context.get("symbol", "XAUUSD")
         self.micro_context = self.context.get("micro_context", {})
         self.confidence = self.context.get("confidence", 0.0)
-        self.spread = None
-        self.ret = None
         self.tick_count = (
             len(self.micro_context) if hasattr(self.micro_context, "__len__") else 0
         )
-
         if hasattr(self.micro_context, "empty") and not self.micro_context.empty:
             last = self.micro_context.iloc[-1]
             self.spread = last.get("SPREAD")
             self.ret = last.get("RET")
 
     def evaluate_risk_profile(self) -> Dict[str, Any]:
-        """Return a simplified risk classification."""
+        """Classify risk level based on spread and tick volatility."""
         result = {
             "symbol": self.symbol,
             "risk": "medium",
