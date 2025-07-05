@@ -214,6 +214,18 @@ python run_full_stack.py --api-port 8000 --dash-port 8501
 
 The application populates the cache as data is requested.
 
+## Running Tests
+
+Install dependencies and run the unit tests from the project root:
+
+```bash
+pip install -r requirements.txt
+pytest -sv
+```
+
+`pytest` automatically enables `ZANALYTICS_TEST_MODE` via `tests/conftest.py`.
+Some integration tests are skipped unless a live API server is running.
+
 ## License
 
 This project is distributed under the terms of the [ZANALYTICS EULA](LICENSE_EULA.md).
