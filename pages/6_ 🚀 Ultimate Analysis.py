@@ -43,6 +43,7 @@ def scan_parquet_files(data_dir):
                 symbol, timeframe = m.group(1).upper(), m.group(2).upper()
             else:
                 continue
+
         files.append((symbol, timeframe, f.relative_to(data_dir)))
     return files
 
