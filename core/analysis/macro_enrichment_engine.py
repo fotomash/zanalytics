@@ -14,13 +14,16 @@ from datetime import datetime, timedelta, timezone
 import os
 import json
 import traceback
+import logging
+
+logger = logging.getLogger(__name__)
 
 # Unified data provider
 try:
     from core.data.client import get_market_data
 except Exception as e:
     get_market_data = None
-    print(f"[ERROR][MacroEngine] Market data client init failed: {e}")
+    logger.error("[MacroEngine] Market data client init failed: %s", e)
 
 # Load Copilot config for asset mapping
 COPILOT_CONFIG_PATH = Path("config/copilot_config.json")
@@ -31,7 +34,7 @@ if COPILOT_CONFIG_PATH.is_file():
             copilot_config = json.load(f)
         MACRO_ASSET_MAP = copilot_config.get("macro_context_assets", {})
     except Exception as e:
-        print(f"[ERROR][MacroEngine] Failed to load copilot config: {e}")
+        logger.error("[MacroEngine] Failed to load copilot config: %s", e)
 
 def detect_asset_class(asset_symbol: str) -> str:
     """ Basic detection of asset class based on symbol pattern. """
@@ -63,7 +66,11 @@ def detect_risk_state(macro_data: Dict[str, pd.DataFrame]) -> str:
             # Check yield trend (simple diff)
             tnx_trend = tnx_df['Close'].iloc[-1] - tnx_df['Close'].iloc[-5] if len(tnx_df) >= 5 else 0
 
-            print(f"[DEBUG][MacroEngine] Risk State Check: VIX={vix_level:.2f}, TNX Trend={tnx_trend:.3f}")
+            logger.debug(
+                "[MacroEngine] Risk State Check: VIX=%0.2f, TNX Trend=%0.3f",
+                vix_level,
+                tnx_trend,
+            )
 
             if vix_level > 25 and tnx_trend < -0.05: # High VIX, falling yields
                 risk_state = "Risk OFF"
@@ -76,10 +83,10 @@ def detect_risk_state(macro_data: Dict[str, pd.DataFrame]) -> str:
             # Add more nuanced rules here
 
     except Exception as e:
-        print(f"[ERROR][MacroEngine] Failed to detect risk state: {e}")
+        logger.error("[MacroEngine] Failed to detect risk state: %s", e)
         traceback.print_exc()
 
-    print(f"[INFO][MacroEngine] Determined Risk State: {risk_state}")
+    logger.info("[MacroEngine] Determined Risk State: %s", risk_state)
     return risk_state
 
 def fetch_macro_context(asset_symbol: str) -> Dict:
@@ -93,16 +100,20 @@ def fetch_macro_context(asset_symbol: str) -> Dict:
         Dict: Containing macro data (optional) and risk state.
               {'risk_state': 'Risk ON'/'Risk OFF'/'Neutral', 'macro_data': {'VIX': vix_val, ...}}
     """
-    print(f"[INFO][MacroEngine] Fetching macro context for asset: {asset_symbol}")
+    logger.info("[MacroEngine] Fetching macro context for asset: %s", asset_symbol)
     context = {"risk_state": "Neutral", "macro_data": {}}
     if not get_market_data:
-        print("[ERROR][MacroEngine] Market data client unavailable. Cannot fetch macro context.")
+        logger.error("[MacroEngine] Market data client unavailable. Cannot fetch macro context.")
         return context
 
     asset_class = detect_asset_class(asset_symbol)
     macro_symbols_to_fetch = MACRO_ASSET_MAP.get(asset_class, MACRO_ASSET_MAP.get("DEFAULT", []))
 
-    print(f"[DEBUG][MacroEngine] Asset class: {asset_class}, Fetching symbols: {macro_symbols_to_fetch}")
+    logger.debug(
+        "[MacroEngine] Asset class: %s, Fetching symbols: %s",
+        asset_class,
+        macro_symbols_to_fetch,
+    )
 
     macro_raw_data = {}
     # Fetch data for each macro symbol (e.g., last day's worth of H1 or D1)
@@ -111,7 +122,7 @@ def fetch_macro_context(asset_symbol: str) -> Dict:
     start_dt = end_dt - timedelta(days=2) # Fetch last 2 days for context
 
     for symbol in macro_symbols_to_fetch:
-        print(f"[DEBUG][MacroEngine] Fetching macro symbol: {symbol}")
+        logger.debug("[MacroEngine] Fetching macro symbol: %s", symbol)
         try:
             if get_market_data:
                 df_context = get_market_data(symbol, 'd1', bars=2)
@@ -121,11 +132,16 @@ def fetch_macro_context(asset_symbol: str) -> Dict:
                 df_context = pd.DataFrame()
             if not df_context.empty:
                 macro_raw_data[symbol] = df_context
-                print(f"[DEBUG][MacroEngine] Successfully fetched context data for {symbol}")
+                logger.debug(
+                    "[MacroEngine] Successfully fetched context data for %s",
+                    symbol,
+                )
             else:
-                print(f"[WARN][MacroEngine] No suitable context data found for {symbol}")
+                logger.warning(
+                    "[MacroEngine] No suitable context data found for %s", symbol
+                )
         except Exception as e:
-            print(f"[ERROR][MacroEngine] Exception fetching {symbol}: {e}")
+            logger.error("[MacroEngine] Exception fetching %s: %s", symbol, e)
             traceback.print_exc()
 
     # Analyze fetched macro data
@@ -136,22 +152,22 @@ def fetch_macro_context(asset_symbol: str) -> Dict:
         if not df.empty:
             context["macro_data"][symbol] = df['Close'].iloc[-1] # Store last closing price
 
-    print(f"[INFO][MacroEngine] Macro context fetched: {context}")
+    logger.info("[MacroEngine] Macro context fetched: %s", context)
     return context
 
 # --- Example Usage ---
 if __name__ == '__main__':
-    print("--- Testing Macro Enrichment Engine ---")
+    logger.info("--- Testing Macro Enrichment Engine ---")
     test_asset = "OANDA:XAU_USD"
     # Ensure FINNHUB_API_KEY is set as an environment variable for this test
     if 'FINNHUB_API_KEY' not in os.environ:
-         print("WARNING: FINNHUB_API_KEY environment variable not set. Using default/dummy key.")
+         logger.warning("FINNHUB_API_KEY environment variable not set. Using default/dummy key.")
 
     if get_market_data:
         macro_info = fetch_macro_context(test_asset)
-        print("\n--- Macro Context Result ---")
-        print(json.dumps(macro_info, indent=2, default=str))
+        logger.info("\n--- Macro Context Result ---")
+        logger.info(json.dumps(macro_info, indent=2, default=str))
     else:
-        print("\nCannot run test: Market data client is unavailable.")
+        logger.error("\nCannot run test: Market data client is unavailable.")
 
-    print("\n--- Test Complete ---")
+    logger.info("\n--- Test Complete ---")
