@@ -5,6 +5,8 @@ import json
 import logging
 from datetime import datetime
 from typing import Dict, Any, List, Optional
+
+from core.cache_manager import CacheManager
 from pathlib import Path
 import pandas as pd
 
@@ -36,6 +38,7 @@ class ZAnalyticsDataBridge:
         self.data_flow_manager = None
         self.smc_orchestrator = None
         self.analysis_cache = {}
+        self.cache_manager = CacheManager()
 
         # Setup logging
         logging.basicConfig(level=logging.INFO)
@@ -193,9 +196,13 @@ class ZAnalyticsDataBridge:
                     smc_result = await self._run_smc_analysis(context)
                     context["smc_analysis"] = smc_result
 
-                # Cache the analysis
-                cache_key = f"{event.symbol}_{event.timeframe}"
-                self.analysis_cache[cache_key] = context
+                # Cache the analysis using CacheManager
+                self.cache_manager.set(
+                    "ohlc_analysis",
+                    context,
+                    symbol=event.symbol,
+                    timeframe=event.timeframe,
+                )
 
                 self.logger.info(f"✅ Processed OHLC data for {event.symbol} {event.timeframe}")
 
@@ -233,9 +240,11 @@ class ZAnalyticsDataBridge:
 
     async def _generate_signals(self, event: DataFlowEvent):
         """Generate trading signals based on new analysis"""
-        cache_key = f"{event.symbol}_{event.timeframe}"
-        if cache_key in self.analysis_cache:
-            context = self.analysis_cache[cache_key]
+        # Retrieve cached analysis context
+        context = self.cache_manager.get(
+            "ohlc_analysis", event.symbol, event.timeframe
+        )
+        if context is not None:
 
             # Generate signal summary
             signal_summary = {
@@ -275,8 +284,11 @@ class ZAnalyticsDataBridge:
                     }
 
                     # Cache microstructure data
-                    cache_key = f"{event.symbol}_microstructure"
-                    self.analysis_cache[cache_key] = microstructure_metrics
+                    self.cache_manager.set(
+                        "microstructure",
+                        microstructure_metrics,
+                        symbol=event.symbol,
+                    )
 
                     self.logger.info(f"🔬 Microstructure analysis completed for {event.symbol}")
 
@@ -312,7 +324,7 @@ class ZAnalyticsDataBridge:
             "timestamp": datetime.now().isoformat(),
             "active_symbols": list(self.active_symbols),
             "active_agents": list(self.agents.keys()),
-            "analysis_cache_size": len(self.analysis_cache),
+            "analysis_cache_size": len(self.cache_manager.memory_cache),
             "data_flow_status": self.data_flow_manager.get_data_status() if self.data_flow_manager else None
         }
         return status
