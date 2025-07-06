@@ -9,6 +9,7 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
 from core import orchestrator as orch_mod
+import pandas as pd
 
 
 def test_orchestrator_dynamic_loading_and_run(tmp_path, monkeypatch):
@@ -45,3 +46,24 @@ def test_orchestrator_dynamic_loading_and_run(tmp_path, monkeypatch):
     assert user_ctx.is_file()
     saved = json.loads(user_ctx.read_text())
     assert saved["last_result"] == result
+
+
+def test_run_full_enrichment_returns_unified_bars():
+    orch = orch_mod.AnalysisOrchestrator(config_path="missing.yaml")
+
+    df = pd.DataFrame(
+        {
+            "timestamp": pd.date_range("2024-01-01", periods=3, freq="H"),
+            "open": [1.0, 2.0, 3.0],
+            "high": [1.1, 2.1, 3.1],
+            "low": [0.9, 1.9, 2.9],
+            "close": [1.05, 2.05, 3.05],
+            "volume": [10, 20, 30],
+        }
+    )
+
+    bars = orch.run_full_enrichment(df, {"pipeline": False})
+
+    assert isinstance(bars, list)
+    assert len(bars) == len(df)
+    assert all(isinstance(b, orch_mod.UnifiedAnalyticsBar) for b in bars)
