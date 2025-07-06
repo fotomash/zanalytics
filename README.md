@@ -101,6 +101,14 @@ Use `get_market_data(symbol, timeframe)` to retrieve candles, and
 
 Tick CSVs are parsed according to header profiles defined in `core/tick_header_profiles.json`.
 
+### UnifiedAnalyticsBar Schema
+
+All enriched market data is serialized through the `UnifiedAnalyticsBar` Pydantic
+model located in `core/schema.py`. This schema mirrors the internal `ZBar`
+dataclass and exposes nested trend, momentum, statistical, Wyckoff and SMC
+metrics. `ZBar` and `UnifiedAnalyticsBar` are the single source of truth for
+analytics data structures across the entire application.
+
 ### Logging
 
 Logging is configured via `config/logging.json`. Running the pipeline writes

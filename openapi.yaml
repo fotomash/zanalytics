@@ -1,17 +1,15 @@
 openapi: 3.0.3
 info:
   title: ZAnalytics Complete Trading System
-  version: "3.0.0"
-  description: |
-    Professional trading intelligence with MT5 integration, LLM analysis, and real-time data processing.
-    Endpoints deliver GPT-ready JSON for comprehensive trading analysis.
-
+  version: 3.0.0
+  description: Professional trading intelligence with MT5 integration, LLM analysis,
+    and real-time data processing. Endpoints deliver GPT-ready JSON for comprehensive
+    trading analysis.
 servers:
-  - url: https://your-deployment-url.com
-    description: Production
-  - url: http://localhost:8000
-    description: Local Development
-
+- url: https://your-deployment-url.com
+  description: Production
+- url: http://localhost:8000
+  description: Local Development
 paths:
   /api/v1/ingest/candle:
     post:
@@ -24,7 +22,7 @@ paths:
             schema:
               $ref: '#/components/schemas/IngestRequest'
       responses:
-        "200":
+        '200':
           description: Successful ingestion
           content:
             application/json:
@@ -34,33 +32,32 @@ paths:
                   status:
                     type: string
                   enriched_data:
-                    $ref: '#/components/schemas/EnrichedRow'
+                    $ref: '#/components/schemas/UnifiedAnalyticsBar'
                   message:
                     type: string
-
   /api/v1/data/latest/{symbol}:
     get:
       summary: Get latest enriched market data
       operationId: getLatestData
       parameters:
-        - name: symbol
-          in: path
-          required: true
-          schema:
-            type: string
-            example: XAUUSD
-        - name: timeframe
-          in: query
-          schema:
-            type: string
-            default: H1
-        - name: count
-          in: query
-          schema:
-            type: integer
-            default: 100
+      - name: symbol
+        in: path
+        required: true
+        schema:
+          type: string
+          example: XAUUSD
+      - name: timeframe
+        in: query
+        schema:
+          type: string
+          default: H1
+      - name: count
+        in: query
+        schema:
+          type: integer
+          default: 100
       responses:
-        "200":
+        '200':
           description: Latest market data
           content:
             application/json:
@@ -76,26 +73,25 @@ paths:
                   data:
                     type: array
                     items:
-                      $ref: '#/components/schemas/EnrichedRow'
-
+                      $ref: '#/components/schemas/UnifiedAnalyticsBar'
   /api/v1/analysis/confluence/{symbol}:
     get:
       summary: Get confluence analysis for trading decisions
       operationId: analyzeConfluence
       parameters:
-        - name: symbol
-          in: path
-          required: true
-          schema:
-            type: string
-            example: XAUUSD
-        - name: timeframe
-          in: query
-          schema:
-            type: string
-            default: H1
+      - name: symbol
+        in: path
+        required: true
+        schema:
+          type: string
+          example: XAUUSD
+      - name: timeframe
+        in: query
+        schema:
+          type: string
+          default: H1
       responses:
-        "200":
+        '200':
           description: Confluence analysis results
           content:
             application/json:
@@ -124,8 +120,7 @@ paths:
                   recent_data:
                     type: array
                     items:
-                      $ref: '#/components/schemas/EnrichedRow'
-
+                      $ref: '#/components/schemas/UnifiedAnalyticsBar'
   /api/v1/analyze/csv:
     post:
       summary: Analyze CSV market data
@@ -137,7 +132,7 @@ paths:
             schema:
               $ref: '#/components/schemas/AnalysisRequest'
       responses:
-        "200":
+        '200':
           description: CSV analysis results
           content:
             application/json:
@@ -154,13 +149,12 @@ paths:
                     type: string
                   results:
                     type: object
-
   /api/v1/health:
     get:
       summary: System health check
       operationId: healthCheck
       responses:
-        "200":
+        '200':
           description: System status
           content:
             application/json:
@@ -175,12 +169,19 @@ paths:
                     type: object
                   version:
                     type: string
-
 components:
   schemas:
     RawCandle:
       type: object
-      required: [symbol, timeframe, timestamp, open, high, low, close, volume]
+      required:
+      - symbol
+      - timeframe
+      - timestamp
+      - open
+      - high
+      - low
+      - close
+      - volume
       properties:
         symbol:
           type: string
@@ -201,7 +202,6 @@ components:
           type: number
         volume:
           type: integer
-
     SignalData:
       type: object
       properties:
@@ -217,10 +217,10 @@ components:
           type: number
         trade_entry:
           type: boolean
-
     IngestRequest:
       type: object
-      required: [candle]
+      required:
+      - candle
       properties:
         candle:
           $ref: '#/components/schemas/RawCandle'
@@ -228,49 +228,196 @@ components:
           $ref: '#/components/schemas/SignalData'
         run_id:
           type: string
-
-    EnrichedRow:
+    UnifiedAnalyticsBar:
+      title: UnifiedAnalyticsBar
+      description: Standardized analytics object for a single bar.
       type: object
       properties:
         timestamp:
+          title: Timestamp
           type: string
-        symbol:
-          type: string
-        timeframe:
-          type: string
+          format: date-time
         open:
+          title: Open
           type: number
         high:
+          title: High
           type: number
         low:
+          title: Low
           type: number
         close:
+          title: Close
           type: number
         volume:
-          type: integer
-        confluence_score:
+          title: Volume
           type: number
-        trade_quality:
-          type: string
-          enum: [LOW, MEDIUM, HIGH]
-        wyckoff_phase:
-          type: string
-        spring_event:
+        bar_delta:
+          title: Bar Delta
+          type: integer
+        poc_price:
+          title: Poc Price
+          type: number
+        poi_price:
+          title: Poi Price
+          type: number
+        bid_volume_total:
+          title: Bid Volume Total
+          type: integer
+        ask_volume_total:
+          title: Ask Volume Total
+          type: integer
+        trend:
+          $ref: '#/components/schemas/TrendMetrics'
+        momentum:
+          $ref: '#/components/schemas/MomentumMetrics'
+        statistical:
+          $ref: '#/components/schemas/StatisticalMetrics'
+        wyckoff:
+          $ref: '#/components/schemas/WyckoffMetrics'
+        smc:
+          $ref: '#/components/schemas/SMCMetrics'
+      required:
+      - timestamp
+      - open
+      - high
+      - low
+      - close
+      - volume
+    TrendMetrics:
+      title: TrendMetrics
+      description: Basic trend indicators.
+      type: object
+      properties:
+        sma_20:
+          title: Sma 20
+          type: number
+        sma_50:
+          title: Sma 50
+          type: number
+        sma_200:
+          title: Sma 200
+          type: number
+        ema_20:
+          title: Ema 20
+          type: number
+        ema_50:
+          title: Ema 50
+          type: number
+    MomentumMetrics:
+      title: MomentumMetrics
+      description: Momentum oscillator metrics.
+      type: object
+      properties:
+        rsi:
+          title: Rsi
+          type: number
+        macd:
+          title: Macd
+          type: number
+        macd_signal:
+          title: Macd Signal
+          type: number
+        macd_diff:
+          title: Macd Diff
+          type: number
+    StatisticalMetrics:
+      title: StatisticalMetrics
+      description: General statistical indicators.
+      type: object
+      properties:
+        atr:
+          title: Atr
+          type: number
+        bb_upper:
+          title: Bb Upper
+          type: number
+        bb_middle:
+          title: Bb Middle
+          type: number
+        bb_lower:
+          title: Bb Lower
+          type: number
+        bb_width:
+          title: Bb Width
+          type: number
+    WyckoffMetrics:
+      title: WyckoffMetrics
+      description: Micro Wyckoff analytics.
+      type: object
+      properties:
+        accumulation:
+          title: Accumulation
           type: boolean
-        smc_zone_type:
-          type: string
-        trade_entry:
+        distribution:
+          title: Distribution
           type: boolean
-        run_id:
-          type: string
-        annotated:
+        spring:
+          title: Spring
           type: boolean
-        review_status:
-          type: string
-
+        upthrust:
+          title: Upthrust
+          type: boolean
+        effort:
+          title: Effort
+          type: number
+        result:
+          title: Result
+          type: number
+        no_demand:
+          title: No Demand
+          type: boolean
+        no_supply:
+          title: No Supply
+          type: boolean
+        spread:
+          title: Spread
+          type: number
+        spread_ma:
+          title: Spread Ma
+          type: number
+        volume_ma:
+          title: Volume Ma
+          type: number
+        vs_ratio:
+          title: Vs Ratio
+          type: number
+        vs_ratio_ma:
+          title: Vs Ratio Ma
+          type: number
+    SMCMetrics:
+      title: SMCMetrics
+      description: Smart Money Concepts features.
+      type: object
+      properties:
+        order_block_bull:
+          title: Order Block Bull
+          type: boolean
+        order_block_bear:
+          title: Order Block Bear
+          type: boolean
+        fvg_bull:
+          title: Fvg Bull
+          type: boolean
+        fvg_bear:
+          title: Fvg Bear
+          type: boolean
+        liquidity_high:
+          title: Liquidity High
+          type: number
+        liquidity_low:
+          title: Liquidity Low
+          type: number
+        bos_bull:
+          title: Bos Bull
+          type: boolean
+        bos_bear:
+          title: Bos Bear
+          type: boolean
     AnalysisRequest:
       type: object
-      required: [symbol]
+      required:
+      - symbol
       properties:
         symbol:
           type: string
