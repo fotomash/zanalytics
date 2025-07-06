@@ -751,7 +751,7 @@ def main():
             sel_rel_path = next(p for s, tf, p in file_tuples
                                 if s == selected_symbol and tf == selected_tf)
 
-            bars_to_use = st.slider("Last N bars to analyse", 20, 1000, 500, 1)
+            bars_to_use = st.slider("Last N bars to analyse", 20, 1000, 140, 1)
 
         # Parquet data loading
         df, error = load_parquet_data(Path(DATA_DIR) / sel_rel_path)

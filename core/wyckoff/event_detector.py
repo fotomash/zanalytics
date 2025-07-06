@@ -221,3 +221,23 @@ def find_initial_wyckoff_events(ohlcv: List[ZBar], config: Optional[Dict[str, An
     return events
 
 
+
+
+# --- Unified Wyckoff Event Detector Wrapper ---
+from typing import Optional, Dict, Any, List
+
+class WyckoffEventDetector:
+    """
+    Wrapper class for Wyckoff event detection.
+    Provides a unified interface for detecting events on a sequence of ZBar objects.
+    """
+    def __init__(self, *args, **kwargs):
+        # Capture any configuration parameters like volume_threshold, manipulation_sensitivity, phase_min_bars
+        self.config = kwargs
+
+    def detect_events(self, ohlcv: List[ZBar]) -> List[tuple]:
+        """
+        Detect events on the given list of ZBar objects.
+        Returns a list of (index, event_label) tuples.
+        """
+        return find_initial_wyckoff_events(ohlcv, self.config)
