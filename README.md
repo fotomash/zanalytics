@@ -170,6 +170,14 @@ Old modules `advanced_smc_orchestrator.py`, `copilot_orchestrator.py` and
 compatibility and now emit a `DeprecationWarning`. Their main entry points
 have moved under `core/strategies/`.
 
+## ZAnalytics Master Orchestrator
+
+The file `zanalytics_orchestrator.py` implements a more extensive workflow
+engine used for large scale experiments. It loads `orchestrator_config.yaml`
+to define component modules and schedules, then coordinates tasks with an
+async scheduler and a data store. This advanced orchestrator is optional and
+does not replace the simpler `AnalysisOrchestrator` found in `core/`.
+
 ## ISPTS Pipeline Example
 
 `core/ispts_pipeline.py` implements a minimal, deterministic flow fusing Wyckoff phase logic, SMC structure analysis, inducement sweep detection and microstructure gating. Load the profile in `profiles/ispts_template.yaml` and pass your data frames to `ISPTSPipeline` to reproduce the standard pipeline.
