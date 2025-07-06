@@ -11,6 +11,7 @@ class RiskManagerAgent:
         self.symbol = self.context.get("symbol", "XAUUSD")
         self.micro_context = self.context.get("micro_context", {})
         self.confidence = self.context.get("confidence", 0.0)
+        self.maturity_score = self.context.get("maturity_score")
         self.spread = None
         self.ret = None
         self.tick_count = (
@@ -22,8 +23,8 @@ class RiskManagerAgent:
             self.spread = last.get("SPREAD")
             self.ret = last.get("RET")
 
-    def evaluate_risk_profile(self) -> Dict[str, Any]:
-        """Return a simplified risk classification."""
+    def evaluate_risk_profile(self, config: Dict[str, Any] | None = None) -> Dict[str, Any]:
+        """Return a simplified risk classification and risk percent."""
         result = {
             "symbol": self.symbol,
             "risk": "medium",
@@ -53,6 +54,17 @@ class RiskManagerAgent:
             if result["risk"] != "high":
                 result["risk"] = "low"
             result["reason"] += "Low volatility zone. "
+
+        if config:
+            base_pct = float(config.get("base_risk_pct", 1.0))
+            tiers: Dict[str, float] = config.get("score_risk_tiers", {})
+            recommended = base_pct
+            if self.maturity_score is not None and tiers:
+                for th, pct in sorted(((float(k), v) for k, v in tiers.items()), reverse=True):
+                    if self.maturity_score >= th:
+                        recommended = pct
+                        break
+            result["recommended_risk_pct"] = recommended
 
         return result
 
