@@ -239,3 +239,5 @@ The application populates the cache as data is requested.
 ## License
 
 This project is distributed under the terms of the [ZANALYTICS EULA](LICENSE_EULA.md).
+
+For a high-level overview of the finalized platform, see [docs/FINAL_SUMMARY.md](docs/FINAL_SUMMARY.md).
