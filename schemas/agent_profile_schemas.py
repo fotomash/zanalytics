@@ -53,6 +53,10 @@ except ImportError:
         verbosity: str = "detailed"
         enable_zbar_format: bool = True
         log_directory: Optional[str] = None
+        confluence_path: List[str] = Field(
+            default_factory=list,
+            description="Ordered list of validated setup steps for a trade",
+        )
 
         class Config:
             extra = "forbid"
@@ -295,4 +299,5 @@ journaling:
   verbosity: "all_stages"
   enable_zbar_format: true
   log_directory: "/var/log/zanalytics_agents/XF_DemoAgent_001/"
+  confluence_path: []
 """
