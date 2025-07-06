@@ -153,4 +153,4 @@ redis-cli BGSAVE
 For additional details see [ZANALYTICS_DOCUMENTATION.md](ZANALYTICS_DOCUMENTATION.md).
 
 ### Proactive Scheduling
-A new `SchedulingAgent` module activates strategy agents according to their YAML-defined time windows. This enables fully automated routines like the London Kill Zone workflow without manual prompts.
+A new `SchedulingAgent` module activates strategy agents according to their YAML-defined time windows. This enables fully automated routines like the London Kill Zone workflow without manual prompts. See [Organic Intelligence Loop](organic_intelligence_loop.md) for details on the command schema and autonomous workflow.
