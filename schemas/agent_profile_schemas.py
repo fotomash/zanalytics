@@ -46,7 +46,13 @@ except ImportError:
             extra = "forbid"  # From StructureValidatorConfig
     class StructureValidatorConfig(BaseModuleConfig): swing_engine_config: SwingEngineSubConfig = Field(default_factory=SwingEngineSubConfig)
     class FVGLocatorConfig(BaseModuleConfig): pass
-    class RiskManagerConfig(BaseModuleConfig): pass
+    class RiskTier(BaseModel):
+        threshold: float = Field(..., ge=0.0, le=1.0)
+        risk_pct: float = Field(..., ge=0.0, le=100.0)
+
+    class RiskManagerConfig(BaseModuleConfig):
+        base_risk_pct: float = Field(default=1.0, ge=0.0, le=100.0)
+        score_risk_tiers: List[RiskTier] = Field(default_factory=list)
     class ConfluenceStackerConfig(BaseModuleConfig): pass
     class ExecutorConfig(BaseModuleConfig): default_order_type: str = "MARKET"; simulation_mode: bool = True
     class JournalingConfig(BaseModel):
