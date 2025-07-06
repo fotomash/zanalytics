@@ -1,0 +1,44 @@
+{
+  "confluence_path_schema": {
+    "version": "2.0",
+    "description": "Enhanced schema for tracking confluence sequences",
+    "path_structure": {
+      "trade_id": "string",
+      "timestamp": "datetime",
+      "symbol": "string",
+      "timeframe": "string",
+      "confluence_path": {
+        "type": "array",
+        "items": {
+          "event": "string",
+          "timestamp": "datetime",
+          "validation_score": "float",
+          "tick_volume": "integer",
+          "metadata": "object"
+        }
+      },
+      "final_maturity_score": "float",
+      "path_signature": "string",
+      "outcome": {
+        "executed": "boolean",
+        "pnl": "float",
+        "r_multiple": "float",
+        "max_drawdown": "float"
+      }
+    },
+    "standard_events": [
+      "HTF_BIAS_CONFIRMED",
+      "LIQUIDITY_IDENTIFIED",
+      "SWEEP_DETECTED",
+      "SWEEP_VALIDATED",
+      "BOS_DETECTED",
+      "BOS_CONFIRMED",
+      "FVG_IDENTIFIED",
+      "FVG_ENTRY_VALID",
+      "MITIGATION_DETECTED",
+      "VOLUME_SPIKE",
+      "MIDAS_CURVE_TOUCH",
+      "KILLZONE_ACTIVE"
+    ]
+  }
+}

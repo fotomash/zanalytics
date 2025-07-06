@@ -1,0 +1,40 @@
+adaptive_risk_config:
+  description: Maturity score based adaptive risk management
+  overrides:
+    killzone_multiplier: 1.2
+    max_daily_risk: 2.0
+    news_event_reduction: 0.5
+  position_sizing:
+    base_capital: 100000
+    correlation_adjustment: true
+    max_positions: 3
+    volatility_adjustment: true
+  risk_curves:
+    aggressive:
+      base: 2
+      curve_type: exponential
+      max_risk: 2.0
+      min_maturity: 0.6
+      scaling_factor: 0.8
+    conservative:
+      curve_type: stepped
+      levels:
+      - maturity_max: 1.0
+        maturity_min: 0.85
+        risk_percent: 1.0
+      - maturity_max: 0.85
+        maturity_min: 0.7
+        risk_percent: 0.5
+      - maturity_max: 0.7
+        maturity_min: 0.5
+        risk_percent: 0.25
+      - maturity_max: 0.5
+        maturity_min: 0.0
+        risk_percent: 0.0
+    moderate:
+      curve_type: linear
+      max_maturity: 0.9
+      max_risk: 1.5
+      min_maturity: 0.5
+      min_risk: 0.25
+  version: '1.0'

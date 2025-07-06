@@ -1,0 +1,34 @@
+{
+  "phase": 5,
+  "name": "Intelligence Evolution",
+  "version": "1.0.0",
+  "description": "Enhanced intelligence features for ZANFLOW v12",
+  "components": {
+    "confluence_path_tracker": {
+      "description": "Formalizes and tracks confluence event sequences",
+      "files": [
+        "core/confluence/path_tracker.py",
+        "schemas/confluence_path_schema.json"
+      ]
+    },
+    "adaptive_risk_manager": {
+      "description": "Dynamically adjusts position sizing based on maturity scores",
+      "files": [
+        "core/risk/adaptive_risk_manager.py",
+        "configs/adaptive_risk_config.yaml"
+      ]
+    },
+    "meta_agent": {
+      "description": "Learning and optimization agent for continuous improvement",
+      "files": [
+        "core/meta_agent/optimization_engine.py",
+        "configs/meta_agent_config.yaml"
+      ]
+    }
+  },
+  "integration_points": {
+    "zbar_journal": "Enhanced with confluence path logging",
+    "risk_manager": "Extended with adaptive sizing logic",
+    "scheduler": "New weekly meta-agent tasks"
+  }
+}

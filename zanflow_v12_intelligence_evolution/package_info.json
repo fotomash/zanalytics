@@ -1,0 +1,37 @@
+{
+  "package": "ZANFLOW v12 Intelligence Evolution",
+  "version": "1.0.0",
+  "phase": 5,
+  "created": "2025-07-06T03:31:59.705924",
+  "components": {
+    "confluence_path_tracker": {
+      "file": "core/confluence/path_tracker.py",
+      "description": "Tracks and analyzes trading event sequences"
+    },
+    "adaptive_risk_manager": {
+      "file": "core/risk/adaptive_risk_manager.py",
+      "description": "Dynamic position sizing based on maturity scores"
+    },
+    "meta_agent": {
+      "file": "core/meta_agent/optimization_engine.py",
+      "description": "Learning system for continuous improvement"
+    },
+    "integration": {
+      "file": "core/intelligence_integration.py",
+      "description": "Central integration with ZANFLOW v12"
+    }
+  },
+  "configurations": [
+    "configs/adaptive_risk_config.yaml",
+    "configs/meta_agent_config.yaml",
+    "schemas/confluence_path_schema.json"
+  ],
+  "documentation": [
+    "README.md",
+    "IMPLEMENTATION_SUMMARY.md"
+  ],
+  "integration": {
+    "script": "integrate.py",
+    "usage": "python integrate.py /path/to/zanflow"
+  }
+}

@@ -1,0 +1,47 @@
+meta_agent_config:
+  analysis_modules:
+    confluence_path_analyzer:
+      confidence_interval: 0.95
+      enabled: true
+      min_samples: 20
+      output: confluence_performance_report
+    maturity_correlation_analyzer:
+      correlation_methods:
+      - pearson
+      - spearman
+      - kendall
+      enabled: true
+      output: maturity_correlation_report
+      time_decay_analysis: true
+    rejection_analyzer:
+      enabled: true
+      opportunity_cost_calculation: true
+      output: rejection_effectiveness_report
+      track_false_negatives: true
+    risk_optimizer:
+      backtest_periods: 4
+      enabled: true
+      optimization_method: kelly_criterion
+      output: optimal_risk_parameters
+  description: Configuration for the learning and optimization meta-agent
+  optimization_targets:
+    constraints:
+      max_drawdown: 0.15
+      min_trades_per_week: 5
+      min_win_rate: 0.45
+    primary: sharpe_ratio
+    secondary:
+    - win_rate
+    - profit_factor
+    - max_drawdown
+  output_actions:
+    backup_current_configs: true
+    generate_reports: true
+    send_notifications: true
+    update_agent_configs: false
+  schedule:
+    day: sunday
+    frequency: weekly
+    time: '18:00'
+    timezone: UTC
+  version: '1.0'
