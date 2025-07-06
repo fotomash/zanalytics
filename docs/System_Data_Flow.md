@@ -1,7 +1,7 @@
 # ZAnalytics System Data Flow
 
 ## Overview
-This document illustrates how data flows through the ZAnalytics system from a user request to the final response.
+This document illustrates how data flows through the ZAnalytics system from user request to final response.
 
 ## Architecture Diagram
 
@@ -94,9 +94,16 @@ class AnalysisResult:
 ## Monitoring
 Key metrics include processing time, queue depth and error rates.
 
+## Security Considerations
+- Input validation in every layer.
+- OAuth2 authentication (Phase 4.3).
+- Rate limiting in the API layer.
+- Centralised data access via the `DataManager`.
+
 ## Extending the System
 Add a new engine, data source or API endpoint by updating the relevant configuration files and modules. The orchestration layer automatically integrates these components.
 
 ## Troubleshooting
-- **No data returned:** verify `data_manifest.yml` paths and file existence.
-- **Timeouts:** check orchestrator queue depth or increase API timeout settings.
+- **No data returned:** verify `data_manifest.yml` paths and file existence. Check `DataManager` logs.
+- **Timeout errors:** increase the API timeout, check orchestrator queue depth and verify engine performance.
+- **Connection errors:** verify the API URL in the dashboard configuration, ensure all services are running and review firewall settings.

@@ -2,8 +2,12 @@ import json
 import importlib
 import inspect
 import os
+import time
 from pathlib import Path
-from typing import Any, Dict, Callable, Awaitable, List
+from dataclasses import dataclass, field
+from datetime import datetime
+from typing import Any, Dict, Callable, Awaitable, List, Optional
+import asyncio
 import pandas as pd
 
 from .schema import UnifiedAnalyticsBar
@@ -15,6 +19,31 @@ except Exception:  # pragma: no cover - optional dependency
 
 CONFIG_PATH = Path(os.getenv("ZSI_CONFIG_PATH", "zsi_config.yaml"))
 USER_CONTEXT_PATH = Path("data/user_context.json")
+
+
+@dataclass
+class AnalysisRequest:
+    """Simple request object used by the async orchestrator."""
+
+    request_id: str
+    symbol: str
+    timeframe: str
+    analysis_type: str
+    parameters: Dict[str, Any] = field(default_factory=dict)
+
+
+@dataclass
+class AnalysisResult:
+    """Result produced by :class:`AnalysisOrchestrator`."""
+
+    request_id: str
+    symbol: str
+    timeframe: str
+    analysis_type: str
+    result_data: Dict[str, Any] = field(default_factory=dict)
+    timestamp: datetime = field(default_factory=datetime.utcnow)
+    success: bool = True
+    error: Optional[str] = None
 
 
 def get_orchestrator(config_path: str | None = None) -> "AnalysisOrchestrator":
@@ -30,6 +59,23 @@ class AnalysisOrchestrator:
         self.config: Dict[str, Any] = self._load_config()
         self.strategies: Dict[str, Callable[..., Any]] = {}
         self.load_modules()
+
+        # Async orchestration state
+        self.is_running: bool = False
+        self.request_queue: "asyncio.Queue[AnalysisRequest]" = asyncio.Queue()
+        self._results: Dict[str, AnalysisResult] = {}
+        self._tasks: Dict[str, asyncio.Task] = {}
+
+    async def start(self) -> None:
+        """Mark the orchestrator as running."""
+        self.is_running = True
+
+    async def stop(self) -> None:
+        """Stop the orchestrator and cancel pending tasks."""
+        self.is_running = False
+        for task in list(self._tasks.values()):
+            task.cancel()
+        self._tasks.clear()
 
     def _load_config(self) -> Dict[str, Any]:
         if self.config_path.is_file() and yaml:
@@ -80,6 +126,44 @@ class AnalysisOrchestrator:
                 self.strategies[name] = getattr(module, attr_name)
             except Exception:
                 self.strategies[name] = None
+
+    # ------------------------------------------------------------------
+    # Async request handling helpers
+    # ------------------------------------------------------------------
+
+    async def _handle_request(self, request: AnalysisRequest) -> None:
+        """Internal task wrapper to process a request and store the result."""
+        result = await self._process_request(request)
+        self._results[request.request_id] = result
+
+    def submit_request(self, request: AnalysisRequest) -> str:
+        """Submit a request for asynchronous processing."""
+        task = asyncio.create_task(self._handle_request(request))
+        self._tasks[request.request_id] = task
+        return request.request_id
+
+    def get_result(self, request_id: str, timeout: float = 5.0) -> Optional[AnalysisResult]:
+        """Return result for a request, waiting up to ``timeout`` seconds."""
+        start = time.time()
+        while time.time() - start < timeout:
+            if request_id in self._results:
+                return self._results.pop(request_id)
+            time.sleep(0.05)
+        return None
+
+    def get_engine_status(self) -> Dict[str, Any]:
+        """Return simple engine status information."""
+        return {name: (func is not None) for name, func in self.strategies.items()}
+
+    async def _process_request(self, request: AnalysisRequest) -> AnalysisResult:
+        """Default processing implementation returning an empty result."""
+        return AnalysisResult(
+            request_id=request.request_id,
+            symbol=request.symbol,
+            timeframe=request.timeframe,
+            analysis_type=request.analysis_type,
+            result_data={},
+        )
 
     def select_strategy(self, orchestrator_name: str) -> Callable[..., Any] | None:
         return self.strategies.get(orchestrator_name)
