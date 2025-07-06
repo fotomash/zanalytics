@@ -165,18 +165,14 @@ orchestrators:
 
 The orchestrator falls back to `default_orchestrator` when `--strategy` is omitted.
 
-Old modules `advanced_smc_orchestrator.py`, `copilot_orchestrator.py` and
-`icc_orchestrator.py` remain in the repository only for backwards
-compatibility and now emit a `DeprecationWarning`. Their main entry points
-have moved under `core/strategies/`.
+Legacy files like `advanced_smc_orchestrator.py`, `copilot_orchestrator.py` and
+`icc_orchestrator.py` have been removed. Use the implementations under
+`core/strategies/` with `AnalysisOrchestrator` instead.
 
 ## ZAnalytics Master Orchestrator
 
-The file `zanalytics_orchestrator.py` implements a more extensive workflow
-engine used for large scale experiments. It loads `orchestrator_config.yaml`
-to define component modules and schedules, then coordinates tasks with an
-async scheduler and a data store. This advanced orchestrator is optional and
-does not replace the simpler `AnalysisOrchestrator` found in `core/`.
+`zanalytics_orchestrator.py` has been deprecated and removed. The advanced
+workflow engine lives in `core/orchestrator.py` and can be invoked via the CLI.
 
 ## ISPTS Pipeline Example
 

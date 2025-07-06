@@ -9,6 +9,7 @@ import json
 from typing import Dict, List, Tuple, Optional
 import warnings
 warnings.filterwarnings('ignore')
+from core.data.manager import get_data_manager
 
 # Page configuration
 st.set_page_config(
@@ -51,6 +52,7 @@ class TradingDashboard:
         self.data_dir = "./data"
         self.pairs = self.get_available_pairs()
         self.timeframes = ['1m', '5m', '15m', '30m', '1h', '4h', '1d']
+        self.dm = get_data_manager()
 
     def get_available_pairs(self):
         """Get list of available trading pairs from data directory"""
@@ -62,15 +64,15 @@ class TradingDashboard:
         return sorted(pairs) if pairs else ['XAUUSD']
 
     def load_data(self, pair: str, timeframe: str) -> pd.DataFrame:
-        """Load data for specific pair and timeframe"""
-        file_path = os.path.join(self.data_dir, pair, f"{pair}_{timeframe}_bars.csv")
-
-        if not os.path.exists(file_path):
-            st.error(f"Data file not found: {file_path}")
-            return pd.DataFrame()
+        """Load data for specific pair and timeframe using DataManager."""
 
         try:
-            df = pd.read_csv(file_path)
+            df = self.dm.get_data(
+                data_type="ohlc_data",
+                symbol=pair,
+                timeframe=timeframe,
+                format="csv",
+            )
             if 'timestamp' in df.columns:
                 df['timestamp'] = pd.to_datetime(df['timestamp'])
                 df.set_index('timestamp', inplace=True)

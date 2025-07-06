@@ -17,7 +17,7 @@ try:
     from agent_macroanalyser import MacroAnalyzerAgent
     from agent_riskmanager import RiskManagerAgent
     from agent_tradejournalist import TradeJournalistAgent
-    from core.advanced_smc_orchestrator import AdvancedSMCOrchestrator
+    from core.orchestrator import AnalysisOrchestrator
 except ImportError as e:
     logging.warning(f"ZANALYTICS import warning: {e}")
 
@@ -91,7 +91,7 @@ class ZAnalyticsDataBridge:
 
             # Initialize SMC orchestrator if enabled
             if self.config.get("agents", {}).get("smc_orchestrator", {}).get("active", False):
-                self.smc_orchestrator = AdvancedSMCOrchestrator()
+                self.smc_orchestrator = AnalysisOrchestrator()
                 self.logger.info("SMC Orchestrator initialized")
 
         except Exception as e:
