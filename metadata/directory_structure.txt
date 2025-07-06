@@ -1,0 +1,35 @@
+
+/var/data/zanalytics/
+├── parquet/
+│   ├── tick/
+│   │   ├── XAUUSD/
+│   │   ├── EURUSD/
+│   │   ├── GBPUSD/
+│   │   └── BTCUSD/
+│   ├── ohlc/
+│   │   ├── 1m/
+│   │   ├── 5m/
+│   │   ├── 15m/
+│   │   ├── 1h/
+│   │   ├── 4h/
+│   │   └── 1d/
+│   └── indicators/
+│       ├── rsi/
+│       ├── macd/
+│       └── bollinger/
+├── csv/
+│   ├── tick/
+│   │   ├── XAUUSD/
+│   │   ├── EURUSD/
+│   │   ├── GBPUSD/
+│   │   └── BTCUSD/
+│   └── ohlc/
+│       ├── 1m/
+│       ├── 5m/
+│       ├── 15m/
+│       ├── 1h/
+│       ├── 4h/
+│       └── 1d/
+└── metadata/
+    ├── schemas/
+    └── quality/
