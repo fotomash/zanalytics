@@ -80,6 +80,21 @@ phase_detection_config:
   max_lookback: 40
 ```
 
+### Adaptive Risk Tiers
+
+`RiskManagerAgent` can adjust position risk based on the predictive `maturity_score`.
+Define score thresholds and corresponding risk percentages under `risk_manager`:
+
+```yaml
+risk_manager:
+  base_risk_pct: 1.0
+  score_risk_tiers:
+    0.8: 0.5  # maturity_score >= 0.8 → risk 0.5%
+    0.6: 1.0  # maturity_score >= 0.6 → risk 1%
+    0.4: 1.5
+```
+
+
 ## 📈 Risk Calculation Example
 
 ```python
