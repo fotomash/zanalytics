@@ -64,3 +64,6 @@ llm_analysis = results['llm_analysis']
 print(f"Confluence Score: {llm_analysis['confluence_score']}%")
 print(f"Recommendation: {llm_analysis['recommendation']}")
 ```
+
+## Automated Strategy Scheduling
+The `SchedulingAgent` reads YAML strategy manifests and triggers specialized agents at predefined times. For example, `knowledge/strategies/London_Killzone_SMC.yml` schedules the `LondonKillzoneAgent` every minute between 06:00 and 09:00 UTC. When triggered, the agent executes its workflow and emits structured commands like `LOG_JOURNAL_ENTRY`.
