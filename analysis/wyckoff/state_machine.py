@@ -17,7 +17,7 @@ try:
     # If ZBar is in a central models.py
     # from zanzibar.data_management.models import ZBar, MarketOrderData
     # For now, assuming it's accessible from where event_detector defines it
-    from zanzibar.analysis.wyckoff.event_detector import ZBar, MarketOrderData
+    from .event_detector import ZBar, MarketOrderData
 except ImportError: # pragma: no cover
     # Fallback placeholder if imports fail during isolated development/testing
     from dataclasses import dataclass, field
@@ -189,19 +189,63 @@ class WyckoffStateMachine:
         
         elif event_type == "Spring" and self.schematic_type == "Accumulation":
             # Spring often redefines the support or marks the absolute low of the TR for Phase C.
-            # The 'support' might be the low of the break_bar (index-1) or recovery_bar (index)
-            # For simplicity, let's use the recovery bar's low if it's lower than existing support,
-            # or the break bar's low if that's the true extreme.
-            # This needs careful consideration of the spring definition.
-            # Let's assume the event_detector gives the recovery bar index for "Spring".
-            break_bar_low = self.zbars_context[index-1].low
+            break_bar_low = self.zbars_context[index - 1].low
             if self.trading_range["support"] is None or break_bar_low < self.trading_range["support"]:
-                 # self.trading_range["support"] = break_bar_low # The actual penetration
-                 pass # Support is the original SC/ST low that was broken
-            self.last_significant_low_idx = index # The spring recovery is a new significant point
-            log.info(f"Context Update: Spring at {index}. Original Support {self.trading_range.get('support', 'N/A')} tested. Break low: {break_bar_low:.4f}")
+                # Keep original SC/ST low as support; just log penetration
+                pass
+            self.last_significant_low_idx = index
+            log.info(
+                f"Context Update: Spring at {index}. Original Support {self.trading_range.get('support', 'N/A')} tested. Break low: {break_bar_low:.4f}"
+            )
 
-        # TODO: Add context updates for ST_dist, UT, UTAD, LPS, LPSY, SOS, SOW, BU, Test
+        elif event_type == "ST_dist" and self.schematic_type == "Distribution":
+            if self.trading_range["resistance"] is not None:
+                self.last_significant_high_idx = index
+                log.info(
+                    f"Context Update: ST_dist at {index} confirms TR.Resistance {self.trading_range['resistance']:.4f}"
+                )
+
+        elif event_type in ("UT", "UT_Weak") and self.schematic_type == "Distribution":
+            self.last_significant_high_idx = index
+            log.info(
+                f"Context Update: {event_type} at {index} above TR.Resistance {self.trading_range.get('resistance')}"
+            )
+
+        elif event_type in ("UTAD", "Test_UTAD") and self.schematic_type == "Distribution":
+            self.last_significant_high_idx = index
+            log.info(f"Context Update: {event_type} at {index} potentially marking Phase C high")
+
+        elif event_type == "LPS" and self.schematic_type == "Accumulation":
+            self.last_significant_low_idx = index
+            log.info(f"Context Update: LPS at {index} inside TR")
+
+        elif event_type == "LPSY" and self.schematic_type == "Distribution":
+            self.last_significant_high_idx = index
+            log.info(f"Context Update: LPSY at {index} inside TR")
+
+        elif event_type == "SOS" and self.schematic_type == "Accumulation":
+            if self.trading_range.get("resistance") is not None and self.zbars_context[index].high > self.trading_range["resistance"]:
+                self.trading_range["resistance"] = self.zbars_context[index].high
+            self.last_significant_high_idx = index
+            log.info(
+                f"Context Update: SOS at {index}. Breakout above TR.Resistance {self.trading_range.get('resistance')}"
+            )
+
+        elif event_type == "SOW" and self.schematic_type == "Distribution":
+            if self.trading_range.get("support") is not None and self.zbars_context[index].low < self.trading_range["support"]:
+                self.trading_range["support"] = self.zbars_context[index].low
+            self.last_significant_low_idx = index
+            log.info(
+                f"Context Update: SOW at {index}. Break below TR.Support {self.trading_range.get('support')}"
+            )
+
+        elif event_type == "BU" and self.schematic_type == "Accumulation":
+            self.last_significant_low_idx = index
+            log.info(f"Context Update: BU at {index} retesting breakout")
+
+        elif event_type == "Test":
+            self.last_significant_low_idx = index
+            log.info(f"Context Update: Test at {index}")
 
     def process_event(self, event_type: str, index: int, zbars: List[ZBar]):
         """
@@ -234,7 +278,8 @@ class WyckoffStateMachine:
         if self.current_phase == WyckoffPhase.UNKNOWN:
             if event_type == "SC" and self.schematic_type == "Accumulation": next_phase_candidate = WyckoffPhase.ACCUMULATION_A
             elif event_type == "PS" and self.schematic_type == "Accumulation": next_phase_candidate = WyckoffPhase.ACCUMULATION_A
-            # TODO: Add PSY, BC for Distribution_A
+            elif event_type in ("PSY", "BC") and self.schematic_type == "Distribution":
+                next_phase_candidate = WyckoffPhase.DISTRIBUTION_A
 
         elif self.current_phase == WyckoffPhase.ACCUMULATION_A:
             if event_type == "AR_acc" and self.schematic_type == "Accumulation":

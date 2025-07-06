@@ -18,7 +18,7 @@ from pydantic import BaseModel
 import uvicorn
 
 # Import our modules
-from config_helper import config
+from config_helper from config import orchestrator_config
 from custom_gpt_router import gpt_router
 from redis_server import redis_manager
 

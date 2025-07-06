@@ -13,11 +13,11 @@ echo "[STEP 1] Fetching latest M1 data..."
 
 # Step 2: Resample M1 to higher timeframes
 echo "[STEP 2] Resampling M1 to HTF datasets..."
-./resample_today.sh
+./scripts/resample_today.sh
 
 # Step 3: Analyze today (optional: prepare journal, log setup)
 echo "[STEP 3] Launching today's analysis & objectives..."
-./analyze_today.sh
+./scripts/analyze_today.sh
 
 # Completion message
 echo "[MASTER LAUNCH COMPLETE] Zanzibar v5.1 Daily Boot Completed at $(date)" >> logs/master_launch_log.txt

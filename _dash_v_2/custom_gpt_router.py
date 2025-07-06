@@ -11,7 +11,7 @@ from typing import Dict, List, Optional, Any
 from datetime import datetime
 from dataclasses import dataclass
 import openai
-from config_helper import config
+from config_helper from config import orchestrator_config
 
 @dataclass
 class AnalysisPrompt:

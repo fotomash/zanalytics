@@ -1,0 +1,31 @@
+strategy_name: Example London Breakout
+description: Example strategy using the Interactive Command Center
+status: testing
+timeframes:
+  - H1
+  - M30
+entry_conditions:
+  primary:
+    - london_session_breakout
+    - trend_confirmation
+  confirmations:
+    - volume_spike
+    - momentum_positive
+exit_conditions:
+  take_profit:
+    type: atr
+    value: 2.5
+  stop_loss:
+    type: atr
+    value: 1.0
+risk_management:
+  position_size: 0.02
+  max_positions: 2
+  max_daily_loss: 5.0
+  max_drawdown: 10.0
+parameters:
+  london_start_hour: 8
+  london_end_hour: 9
+  breakout_threshold: 10
+  atr_period: 14
+  volume_multiplier: 1.5

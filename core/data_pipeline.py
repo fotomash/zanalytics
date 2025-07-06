@@ -28,7 +28,8 @@ import traceback  # For detailed error logging
 from pathlib import Path  # Added Path for robust directory handling
 
 # Unified data access layer
-from core.data_manager import DataManager
+from core.data.client import get_market_data
+from core.data.resampling import resample_all
 
 # Local imports (massive_macro_fetcher is optional)
 try:
@@ -83,8 +84,7 @@ class DataPipeline:
         self.ohlcv_data_dir.mkdir(parents=True, exist_ok=True)
         self.macro_data_dir.mkdir(parents=True, exist_ok=True) # Ensure macro dir exists
 
-        # Data manager handles fetching and resampling
-        self.data_manager = DataManager(m1_dir=str(self.m1_data_dir))
+        # Market data client used for fetching
 
     # --------------------------------------
     # 1. Fetch intraday pairs (M1) - Using new fetcher
@@ -95,7 +95,7 @@ class DataPipeline:
         successful_fetches = 0
         for symbol in self.symbols_m1:
             try:
-                df = self.data_manager.get_data(symbol, 'm1', days_back=self.m1_fetch_days)
+                df = get_market_data(symbol, 'm1', bars=self.m1_fetch_days * 1440)
                 if not df.empty:
                     successful_fetches += 1
                     safe_symbol = symbol.replace(':', '_').replace('/', '_')
@@ -146,10 +146,20 @@ class DataPipeline:
         """Resamples M1 data found in tick_data/m1/ to HTFs using resample_m1_to_htf."""
         _log(f"Resampling all M1 datasets found in {self.m1_data_dir} -> HTF...")
         try:
-            self.data_manager.resample_csv_directory(
-                m1_dir=str(self.m1_data_dir),
-                output_dir=str(self.ohlcv_data_dir)
-            )
+            for csv_file in self.m1_data_dir.glob('*.csv'):
+                df = pd.read_csv(csv_file)
+                if 'timestamp' not in df.columns:
+                    continue
+                df['timestamp'] = pd.to_datetime(df['timestamp'])
+                df.set_index('timestamp', inplace=True)
+                aggregated = resample_all(df)
+                symbol_name = csv_file.stem.replace('_m1', '').replace('_M1', '')
+                for tf_key, df_tf in aggregated.items():
+                    if df_tf.empty:
+                        continue
+                    save_path = Path(self.ohlcv_data_dir) / f"{symbol_name}_{tf_key.upper()}.csv"
+                    save_path.parent.mkdir(parents=True, exist_ok=True)
+                    df_tf.to_csv(save_path)
             _log("HTF resampling complete.")
         except Exception as e:
             _log(f"Error during HTF resampling: {e}", level="error")

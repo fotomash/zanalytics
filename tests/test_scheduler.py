@@ -1,28 +1,31 @@
+import sys
 import os
-os.environ["ZANALYTICS_TEST_MODE"] = "1"
+from pathlib import Path
+import json
+import yaml
+import subprocess
 
-import schedule
+ROOT = Path(__file__).resolve().parents[1]
 
-from zanalytics_orchestrator import Scheduler, Task
 
-class DummyExecutor:
-    async def execute_task(self, task):
-        return {"status": "success"}
+def test_orchestrator_cli(tmp_path):
+    # create dummy orchestrator module
+    mod = tmp_path / "dummy_mod.py"
+    mod.write_text("def dummy(prompt):\n    return {'echo': prompt}\n")
 
-class DummyWorkflowEngine:
-    def __init__(self):
-        self.executor = DummyExecutor()
+    cfg = {
+        "orchestrators": {
+            "dummy": {"module": mod.stem, "callable": "dummy"}
+        },
+        "default_orchestrator": "dummy",
+    }
+    cfg_file = tmp_path / "zsi_config.yaml"
+    cfg_file.write_text(yaml.safe_dump(cfg))
 
-def test_weekly_task_registered():
-    schedule.clear()
-    scheduler = Scheduler(DummyWorkflowEngine())
-    task = Task(
-        name="weekly_task",
-        module="mod",
-        method="method",
-        params={},
-        schedule="weekly",
-    )
-    scheduler.schedule_task(task)
-    assert "weekly_task" in scheduler.scheduled_tasks
-    assert any(job.unit == "weeks" for job in schedule.jobs)
+    cmd = [sys.executable, "-m", "core.orchestrator", "--strategy", "dummy", "--prompt", "hi", "-c", str(cfg_file), "--json"]
+    env = dict(os.environ)
+    env["PYTHONPATH"] = os.pathsep.join([str(tmp_path), env.get("PYTHONPATH", "")])
+    result = subprocess.run(cmd, capture_output=True, text=True, cwd=ROOT, env=env)
+    assert result.returncode == 0
+    out = json.loads(result.stdout)
+    assert out == {"echo": "hi"}

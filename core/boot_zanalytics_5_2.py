@@ -12,7 +12,7 @@ When you receive a zanalytics_<version>.zip, initialize with:
 
 🚀 PRE-BOOT VALIDATION
 0. Confirm main orchestrator exists:
-    test -f main_orchestrator.py || echo "ERROR: main_orchestrator.py missing"
+    test -f core/orchestrators/main_orchestrator.py || echo "ERROR: main_orchestrator.py missing"
 1. Ensure orchestrator imports:
     from runtime.copilot_orchestrator import CopilotOrchestrator
     from runtime.advanced_smc_orchestrator import AdvancedSMCOrchestrator
@@ -20,7 +20,7 @@ When you receive a zanalytics_<version>.zip, initialize with:
 
 🚀 BOOT PHASES
 1. Load Core Configuration: trait_engine.merge_config()
-2. Initialize & Resample Market Data: M1 CSVs → tick_data/m1/ → resample to H1/H4 using resample_m1_to_htf_parallel.py
+2. Initialize & Resample Market Data: M1 CSVs → tick_data/m1/ → resample via core.data.resampling.resample_all
 3. Inject Macro & Sentiment: Output → journal/sentiment_snapshot.json
 4. Activate Scalping Engine via core/scalp_filters.py, detect_micro_wyckoff_phase(), validation_scalp_signal()
 5. Dynamic Core Imports via pkgutil + importlib
@@ -69,7 +69,7 @@ Initialized with:
 
 ▶️ RUN
 From terminal:
-    python main_orchestrator.py --variant Inv --symbol XAUUSD
+    python core/orchestrators/main_orchestrator.py --variant Inv --symbol XAUUSD
 
 From notebook:
     main(variant="Inv", symbol="XAUUSD", wyckoff=True, smc=True)

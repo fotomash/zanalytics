@@ -13,6 +13,7 @@ This bundle is your **modular trading logic engine**. It’s structured for use 
 - `/profiles/*.yaml` – Modular agents with composable logic.
 - `/schemas/agent_profile.schema.yaml` – JSON schema for validation.
 - `runner.py` – Minimal YAML loader to validate logic integration.
+- `/exports/` – Sample analysis JSON files watched by `DataFlowManager`.
 
 ## 🧠 GPT & LLM Integration Instructions
 
@@ -79,6 +80,21 @@ phase_detection_config:
   max_lookback: 40
 ```
 
+### Adaptive Risk Tiers
+
+`RiskManagerAgent` can adjust position risk based on the predictive `maturity_score`.
+Define score thresholds and corresponding risk percentages under `risk_manager`:
+
+```yaml
+risk_manager:
+  base_risk_pct: 1.0
+  score_risk_tiers:
+    0.8: 0.5  # maturity_score >= 0.8 → risk 0.5%
+    0.6: 1.0  # maturity_score >= 0.6 → risk 1%
+    0.4: 1.5
+```
+
+
 ## 📈 Risk Calculation Example
 
 ```python
@@ -94,10 +110,19 @@ except ValueError as e:
 
 ## Data Pipeline
 
-`core/data_manager.DataManager` provides a single interface for retrieving OHLCV
-data. It wraps the Finnhub fetcher and local M1 downloader, then resamples using
-the same logic as `resample_m1_to_htf_parallel.py`. Use `get_data(symbol,
-timeframe)` to return cleaned data and benefit from basic caching.
+`core/data` exposes unified helpers for fetching and resampling OHLCV data.
+Use `get_market_data(symbol, timeframe)` to retrieve candles, and
+`resample_all(df)` to convert M1 bars to higher timeframes.
+
+Tick CSVs are parsed according to header profiles defined in `core/tick_header_profiles.json`.
+
+### UnifiedAnalyticsBar Schema
+
+All enriched market data is serialized through the `UnifiedAnalyticsBar` Pydantic
+model located in `core/schema.py`. This schema mirrors the internal `ZBar`
+dataclass and exposes nested trend, momentum, statistical, Wyckoff and SMC
+metrics. `ZBar` and `UnifiedAnalyticsBar` are the single source of truth for
+analytics data structures across the entire application.
 
 ### Logging
 
@@ -114,19 +139,55 @@ pipeline.run_full()
 
 ## Integrated Context–Catalyst Orchestrator
 
-`core/icc_orchestrator.py` coordinates trading logic across three layers:
+`core/orchestrator.py` exposes the `AnalysisOrchestrator` class which coordinates trading logic across three layers:
 
 1. **Strategic** – runs Wyckoff regime detection and selects a playbook.
 2. **Operational** – executes a Context → Catalyst → Confirmation → Execution sequence.
 3. **Technical** – fetches data via `DataManager` and broadcasts events on a simple message bus.
 
-Run it from the CLI:
+Run it from the CLI using the strategy selector. Any extra flags are passed
+directly to the chosen strategy:
 
 ```bash
-python -m core.icc_orchestrator --symbol OANDA:EUR_USD --json
+python -m core.orchestrator --strategy advanced_smc --symbol OANDA:EUR_USD --json
+```
+
+Set `ZSI_CONFIG_PATH` or supply `--config` to load a different YAML file:
+
+```bash
+python -m core.orchestrator --strategy advanced_smc -c custom.yml --symbol OANDA:EUR_USD
 ```
 
 The command prints a JSON summary describing each stage.
+
+### zsi_config.yaml
+
+Define available orchestrators and the default selection in `zsi_config.yaml` at the project root. The CLI reads this file automatically and you can provide a different path via `--config` or the `ZSI_CONFIG_PATH` environment variable:
+
+```yaml
+default_orchestrator: copilot
+orchestrators:
+  copilot:
+    module: core.strategies.copilot
+    callable: handle_prompt
+  advanced_smc:
+    module: core.strategies.advanced_smc
+    callable: run_advanced_smc_strategy
+  icc:
+    module: core.strategies.icc
+    callable: run
+```
+
+The orchestrator falls back to `default_orchestrator` when `--strategy` is omitted.
+
+Legacy files like `advanced_smc_orchestrator.py`, `copilot_orchestrator.py` and
+`icc_orchestrator.py` have been removed. Use the implementations under
+`core/strategies/` with `AnalysisOrchestrator` instead.
+
+## ZAnalytics Master Orchestrator
+
+`zanalytics_orchestrator.py` has been deprecated and removed. The advanced
+workflow engine lives in `core/orchestrator.py` and can be invoked via the CLI.
 
 ## ISPTS Pipeline Example
 
@@ -137,7 +198,57 @@ The command prints a JSON summary describing each stage.
 Run the local engine without external API keys:
 
 ```bash
-./start_local_ncos.sh
+./scripts/start_local_ncos.sh
 ```
 
 The script installs minimal requirements, launches `ncos_local_engine.py` on port 8000, and verifies the `/status` endpoint.
+
+### Configuration File
+
+JSON is the canonical format for runtime settings. All monitoring utilities load
+`zanalytics_config.json` from the project root. Keep this file alongside the
+codebase when running scripts from the `_connector` folder or the root directory.
+
+### API Service
+
+Run `zanalytics_api_service.py` to expose a REST API with optional WebSocket streaming:
+
+```bash
+python zanalytics_api_service.py
+```
+
+Endpoints like `/status` and `/analysis/summary/{symbol}` will be available on port `5010`.
+
+### Redis Configuration
+
+The API caches analysis results and agent decisions in Redis. Configure the host and port via environment variables before starting the service:
+
+```bash
+export REDIS_HOST=localhost
+export REDIS_PORT=6379
+```
+
+These values default to `localhost:6379` if unset and are loaded by `config_helper.RedisConfig`.
+
+### Regenerating cache files
+
+Running the Streamlit dashboard will recreate any missing `.cache/*.pkl` files automatically.
+Use the following command:
+
+```bash
+streamlit run "🏠 Home.py"
+```
+
+To spin up both the API and dashboard together you can run:
+
+```bash
+python run_full_stack.py --api-port 8000 --dash-port 8501
+```
+
+The application populates the cache as data is requested.
+
+## License
+
+This project is distributed under the terms of the [ZANALYTICS EULA](LICENSE_EULA.md).
+
+For a high-level overview of the finalized platform, see [docs/FINAL_SUMMARY.md](docs/FINAL_SUMMARY.md).

@@ -5,6 +5,7 @@
 - /journal/daily_objectives/ structure ready
 - /prompts/ with ZANZIBAR_V5.1_INIT_PROMPT.md
 - Live FX conversion for non-USD accounts via `get_live_fx_rate`
+- Safer array parsing in `ComprehensiveJSONProcessor`
 
 ❌ Missing (NOT included in this patch):
 - config/strategy_profiles.json

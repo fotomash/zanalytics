@@ -7,6 +7,7 @@ Ensures all components are properly configured before starting
 import os
 import sys
 import json
+import yaml
 from pathlib import Path
 
 def check_requirements():
@@ -16,12 +17,11 @@ def check_requirements():
         'zanalytics_integration.py',
         'zanalytics_signal_generator.py',
         'zanalytics_llm_formatter.py',
-        'dashboard/app.py',
+        '🏠 Home.py',
         'zanalytics_backtester.py',
         'zanalytics_advanced_analytics.py',
         'zanalytics_market_monitor.py',
-        'zanalytics_llm_framework.py',
-        'zanalytics_integrated_orchestrator.py'
+        'zanalytics_llm_framework.py'
     ]
 
     missing_files = []
@@ -54,8 +54,8 @@ def create_default_configs():
         "enable_llm_analysis": True
     }
 
-    with open(config_dir / "orchestrator_config.json", 'w') as f:
-        json.dump(orchestrator_config, f, indent=2)
+    with open(config_dir / "orchestrator_config.yaml", 'w') as f:
+        yaml.safe_dump(orchestrator_config, f)
 
     print("Created default configuration files")
 
@@ -70,13 +70,13 @@ def main():
         sys.exit(1)
 
     # Create configs if needed
-    if not Path("config/orchestrator_config.json").exists():
+    if not Path("config/orchestrator_config.yaml").exists():
         create_default_configs()
 
     print("\nAll checks passed! You can now run:")
-    print("  python zanalytics_integrated_orchestrator.py")
+    print("  python -m core.orchestrator")
     print("\nFor the dashboard, run in a separate terminal:")
-    print("  streamlit run dashboard/app.py")
+    print("  streamlit run 🏠 Home.py")
     print("\nTo run specific components:")
     print("  python zanalytics_market_monitor.py  # For real-time monitoring")
     print("  python zanalytics_backtester.py      # For backtesting")

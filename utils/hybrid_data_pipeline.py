@@ -9,6 +9,7 @@ from dataclasses import dataclass
 import pyarrow.parquet as pq
 import pyarrow as pa
 from concurrent.futures import ThreadPoolExecutor
+from core.data.manager import get_data_manager
 
 @dataclass
 class DataConfig:
@@ -27,8 +28,9 @@ class HybridDataPipeline:
     def __init__(self, config: DataConfig):
         self.config = config
         self.executor = ThreadPoolExecutor(max_workers=4)
+        self.dm = get_data_manager()
 
-        # Create directories
+        # Create directories for local fallback
         Path(config.raw_data_path).mkdir(parents=True, exist_ok=True)
         Path(config.enriched_data_path).mkdir(parents=True, exist_ok=True)
 
@@ -47,10 +49,14 @@ class HybridDataPipeline:
             'spread_bps': (tick_data['ask'] - tick_data['bid']) / tick_data['bid'] * 10000
         }
 
-        # Store raw data
-        await self._append_to_parquet(
-            f"{self.config.raw_data_path}/{symbol}_ticks_{datetime.now().date()}.parquet",
-            tick_data
+        # Store raw data via DataManager
+        df_raw = pd.DataFrame([tick_data])
+        self.dm.save_data(
+            df=df_raw,
+            data_type="tick_data",
+            symbol=symbol,
+            date=datetime.now(),
+            format="parquet",
         )
 
         # If real-time enrichment is enabled, do minimal enrichment
@@ -229,58 +235,24 @@ class HybridDataPipeline:
 
         return prices.rolling(window=100).apply(trend_strength)
 
-    async def _append_to_parquet(self, filepath: str, data: Dict):
-        """Append data to parquet file efficiently"""
-        df_new = pd.DataFrame([data])
-
-        if Path(filepath).exists():
-            # Read existing data
-            df_existing = pd.read_parquet(filepath)
-            # Append new data
-            df_combined = pd.concat([df_existing, df_new], ignore_index=True)
-            # Write back
-            df_combined.to_parquet(filepath, index=False)
-        else:
-            # Create new file
-            df_new.to_parquet(filepath, index=False)
 
     async def _load_raw_data(
-        self, 
-        symbol: str, 
+        self,
+        symbol: str,
         start_time: Optional[datetime] = None,
-        end_time: Optional[datetime] = None
+        end_time: Optional[datetime] = None,
     ) -> pd.DataFrame:
-        """Load raw data from parquet files"""
-        pattern = f"{self.config.raw_data_path}/{symbol}_*.parquet"
-        files = list(Path(self.config.raw_data_path).glob(f"{symbol}_*.parquet"))
+        """Load raw tick data via :class:`DataManager`."""
 
-        if not files:
-            return pd.DataFrame()
+        df = self.dm.get_data(
+            data_type="tick_data",
+            symbol=symbol,
+            start_date=start_time,
+            end_date=end_time,
+            format="parquet",
+        )
 
-        # Load all relevant files
-        dfs = []
-        for file in files:
-            df = pd.read_parquet(file)
-            if 'timestamp' in df.columns:
-                df['timestamp'] = pd.to_datetime(df['timestamp'])
-
-                # Filter by time range if specified
-                if start_time and df['timestamp'].max() < start_time:
-                    continue
-                if end_time and df['timestamp'].min() > end_time:
-                    continue
-
-                if start_time:
-                    df = df[df['timestamp'] >= start_time]
-                if end_time:
-                    df = df[df['timestamp'] <= end_time]
-
-            dfs.append(df)
-
-        if not dfs:
-            return pd.DataFrame()
-
-        return pd.concat(dfs, ignore_index=True).sort_values('timestamp')
+        return df
 
     def _is_enrichment_fresh(self, df: pd.DataFrame, max_age_minutes: int = 5) -> bool:
         """Check if enrichment is fresh enough"""
@@ -317,11 +289,16 @@ class HybridDataPipeline:
         # Add metadata
         enriched_df['enriched_at'] = datetime.now()
 
-        # Save enriched data
-        output_file = f"{self.config.enriched_data_path}/{symbol}_{enrichment_level}.parquet"
-        enriched_df.to_parquet(output_file, index=False)
+        # Save enriched data via DataManager
+        self.dm.save_data(
+            df=enriched_df,
+            data_type="tick_data",
+            symbol=symbol,
+            date=datetime.now(),
+            format="parquet",
+        )
 
-        print(f"Batch enrichment complete. Saved to {output_file}")
+        print("Batch enrichment complete.")
         print(f"Processed {len(enriched_df)} records")
 
 # Example usage function

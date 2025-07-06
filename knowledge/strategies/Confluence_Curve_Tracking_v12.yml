@@ -1,0 +1,34 @@
+strategy_id: "Confluence_Curve_Tracking_v12"
+strategy_name: "Confluence Curve Tracking & Signal Decay"
+description: "Offline analysis of maturity score curves to refine scoring parameters."
+agent_module: "modules.offline_analysis.agent"
+agent_class: "OfflineAnalysisAgent"
+
+schedule:
+  trigger_type: "time_based"
+  timezone: "UTC"
+  trigger_window:
+    start: "00:00"
+    end: "23:59"
+  frequency:
+    unit: "hours"
+    value: 1
+
+workflow:
+  - step: 1
+    description: "Load ZBAR logs"
+    analysis_functions:
+      - "offline_analysis.load_zbar_logs"
+
+  - step: 2
+    description: "Compute Confluence Curves"
+    analysis_functions:
+      - "offline_analysis.compute_confluence_curves"
+
+  - step: 3
+    description: "Output Optimization Hints"
+    action_type: "LOG_JOURNAL_ENTRY"
+    payload:
+      type: "SystemNote"
+      source: "Offline_Analysis_Agent"
+      content: "Confluence curves analysed."

@@ -23,13 +23,18 @@ except ImportError:
 
 # --- Import Marker Enrichment Engine --- ### MODIFICATION START ###
 try:
-    # Using the user-provided scaffold name
-    from .marker_enrichment_engine import add_all_indicators
+    from core.analysis.marker_enrichment_engine import add_all_indicators
     ENRICHMENT_ENGINE_LOADED = True
-    print("[INFO][IngestionEngine] Successfully imported 'add_all_indicators' from marker_enrichment_engine.")
+    print(
+        "[INFO][IngestionEngine] Successfully imported 'add_all_indicators' from core.analysis.marker_enrichment_engine."
+    )
 except ImportError:
-    print("[WARN][IngestionEngine] marker_enrichment_engine.py not found or failed to import 'add_all_indicators'. Enrichment step will be skipped.")
-    def add_all_indicators(df, **kwargs): print("Warning: add_all_indicators not loaded."); return df # Dummy pass-through
+    print(
+        "[WARN][IngestionEngine] core.analysis.marker_enrichment_engine not found or failed to import 'add_all_indicators'. Enrichment step will be skipped."
+    )
+    def add_all_indicators(df, **kwargs):
+        print("Warning: add_all_indicators not loaded.")
+        return df  # Dummy pass-through
     ENRICHMENT_ENGINE_LOADED = False
 # ### MODIFICATION END ###
 

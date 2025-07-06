@@ -22,10 +22,10 @@ import pandas as pd
 if str(Path(__file__).resolve().parent.parent) not in sys.path:
     sys.path.append(str(Path(__file__).resolve().parent.parent))
 
-# Import orchestrator lazily to avoid heavy imports when not running tests
+# Import strategy lazily to avoid heavy imports when not running tests
 try:
-    from advanced_smc_orchestrator import run_advanced_smc_strategy
-except Exception:  # pragma: no cover - orchestrator may not be present
+    from core.strategies.advanced_smc import run_advanced_smc_strategy
+except Exception:  # pragma: no cover - strategy may not be present
     run_advanced_smc_strategy = None
 
 

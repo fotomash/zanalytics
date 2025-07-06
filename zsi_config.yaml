@@ -1,0 +1,11 @@
+default_orchestrator: copilot
+orchestrators:
+  copilot:
+    module: core.strategies.copilot
+    callable: handle_prompt
+  advanced_smc:
+    module: core.strategies.advanced_smc
+    callable: run_advanced_smc_strategy
+  icc:
+    module: core.strategies.icc
+    callable: run

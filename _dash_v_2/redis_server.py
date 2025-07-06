@@ -10,7 +10,7 @@ import logging
 from typing import Dict, List, Optional, Any, Union
 from datetime import datetime, timedelta
 from dataclasses import dataclass, asdict
-from config_helper import config
+from config_helper from config import orchestrator_config
 
 @dataclass
 class CacheStats:

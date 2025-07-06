@@ -1,0 +1,62 @@
+strategy_id: "LondonKillzone_SMC_v1"
+strategy_name: "London Kill Zone SMC Entry Model"
+description: "Identifies high-probability entries during the London session by targeting sweeps of Asian session liquidity, followed by an SMC confirmation."
+agent_module: "core.agents.london_killzone_agent"
+agent_class: "LondonKillzoneAgent"
+
+schedule:
+  trigger_type: "time_based"
+  timezone: "UTC"
+  utc_time_window:
+    start: "06:00"
+    end: "09:00"
+  frequency:
+    unit: "minutes"
+    value: 1
+
+workflow:
+  - step: 1
+    description: "Identify Asian Session Range"
+    pre_condition: "Current time is within the scheduled kill zone window."
+    timeframe: "H1"
+    analysis_functions:
+      - "liquidity.identify_session_high_low"
+    params:
+      session: "Asia"
+
+  - step: 2
+    description: "Detect Liquidity Sweep"
+    pre_condition: "Asian session range is identified."
+    timeframe: "M15"
+    analysis_functions:
+      - "liquidity.detect_sweep_of_level"
+    params:
+      level_to_watch: "asia_high_or_low"
+
+  - step: 3
+    description: "Confirm with Market Structure Shift"
+    pre_condition: "A liquidity sweep has been confirmed."
+    timeframe: "M5"
+    analysis_functions:
+      - "market_structure.confirm_structure_break"
+
+  - step: 4
+    description: "Refine Entry with MIDAS Curve"
+    pre_condition: "Market structure has shifted."
+    timeframe: "M1"
+    analysis_functions:
+      - "indicators.get_midas_curve_location"
+      - "market_structure.find_entry_fvg"
+
+  - step: 5
+    description: "Final Action: Log Trade Idea"
+    pre_condition: "A valid entry has been found near the MIDAS curve."
+    action_type: "LOG_JOURNAL_ENTRY"
+    payload:
+      type: "TradeIdea"
+      source: "LondonKillzone_Agent"
+      content: "High-probability {trade_direction} trade identified on {symbol} based on London Kill Zone strategy."
+      metadata:
+        entry_price: "{entry_fvg_price}"
+        stop_loss: "{stop_loss_price}"
+        strategy: "LondonKillzone_SMC_v1"

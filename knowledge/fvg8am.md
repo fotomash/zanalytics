@@ -56,7 +56,7 @@ For the first FVG only:
 
 ## 🛠️ Interoperability Notes
 
-- Use this module alongside: `entry_executor_smc.py`, `copilot_orchestrator.py`, `scalp_filters.py`.
+- Use this module alongside: `entry_executor_smc.py`, `core/orchestrator.AnalysisOrchestrator`, `scalp_filters.py`.
 - Align logic with `zan_flow_1/2/3.md`, `v10.md`, and `Institutional Order Flow Strategy.md`.
 - FVG detection influences **entry POIs** and **journal tagging** in orchestrator logic.
 

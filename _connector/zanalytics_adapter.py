@@ -5,6 +5,8 @@ import json
 import logging
 from datetime import datetime
 from typing import Dict, Any, List, Optional
+
+from core.cache_manager import CacheManager
 from pathlib import Path
 import pandas as pd
 
@@ -15,7 +17,7 @@ try:
     from agent_macroanalyser import MacroAnalyzerAgent
     from agent_riskmanager import RiskManagerAgent
     from agent_tradejournalist import TradeJournalistAgent
-    from advanced_smc_orchestrator import AdvancedSMCOrchestrator
+    from core.orchestrator import AnalysisOrchestrator
 except ImportError as e:
     logging.warning(f"ZANALYTICS import warning: {e}")
 
@@ -27,13 +29,16 @@ class ZAnalyticsDataBridge:
     Makes your app 'aware' of incoming data and triggers appropriate analysis
     """
 
-    def __init__(self, config_path: str = "zanalytics_config.json"):
+    def __init__(self, config_path: str = None):
+        if config_path is None:
+            config_path = Path(__file__).resolve().parent.parent / "zanalytics_config.json"
         self.config = self._load_config(config_path)
         self.agents = {}
         self.active_symbols = set()
         self.data_flow_manager = None
         self.smc_orchestrator = None
         self.analysis_cache = {}
+        self.cache_manager = CacheManager()
 
         # Setup logging
         logging.basicConfig(level=logging.INFO)
@@ -86,7 +91,7 @@ class ZAnalyticsDataBridge:
 
             # Initialize SMC orchestrator if enabled
             if self.config.get("agents", {}).get("smc_orchestrator", {}).get("active", False):
-                self.smc_orchestrator = AdvancedSMCOrchestrator()
+                self.smc_orchestrator = AnalysisOrchestrator()
                 self.logger.info("SMC Orchestrator initialized")
 
         except Exception as e:
@@ -191,9 +196,13 @@ class ZAnalyticsDataBridge:
                     smc_result = await self._run_smc_analysis(context)
                     context["smc_analysis"] = smc_result
 
-                # Cache the analysis
-                cache_key = f"{event.symbol}_{event.timeframe}"
-                self.analysis_cache[cache_key] = context
+                # Cache the analysis using CacheManager
+                self.cache_manager.set(
+                    "ohlc_analysis",
+                    context,
+                    symbol=event.symbol,
+                    timeframe=event.timeframe,
+                )
 
                 self.logger.info(f"✅ Processed OHLC data for {event.symbol} {event.timeframe}")
 
@@ -231,9 +240,11 @@ class ZAnalyticsDataBridge:
 
     async def _generate_signals(self, event: DataFlowEvent):
         """Generate trading signals based on new analysis"""
-        cache_key = f"{event.symbol}_{event.timeframe}"
-        if cache_key in self.analysis_cache:
-            context = self.analysis_cache[cache_key]
+        # Retrieve cached analysis context
+        context = self.cache_manager.get(
+            "ohlc_analysis", event.symbol, event.timeframe
+        )
+        if context is not None:
 
             # Generate signal summary
             signal_summary = {
@@ -273,8 +284,11 @@ class ZAnalyticsDataBridge:
                     }
 
                     # Cache microstructure data
-                    cache_key = f"{event.symbol}_microstructure"
-                    self.analysis_cache[cache_key] = microstructure_metrics
+                    self.cache_manager.set(
+                        "microstructure",
+                        microstructure_metrics,
+                        symbol=event.symbol,
+                    )
 
                     self.logger.info(f"🔬 Microstructure analysis completed for {event.symbol}")
 
@@ -310,7 +324,7 @@ class ZAnalyticsDataBridge:
             "timestamp": datetime.now().isoformat(),
             "active_symbols": list(self.active_symbols),
             "active_agents": list(self.agents.keys()),
-            "analysis_cache_size": len(self.analysis_cache),
+            "analysis_cache_size": len(self.cache_manager.memory_cache),
             "data_flow_status": self.data_flow_manager.get_data_status() if self.data_flow_manager else None
         }
         return status

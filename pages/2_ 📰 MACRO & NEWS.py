@@ -87,11 +87,22 @@ def ensure_cache_dir():
 ensure_cache_dir()
 
 # Initialize OpenAI client
-try:
-    client = OpenAI(api_key=st.secrets["openai_API"])
-except:
-    st.error("Please set your OpenAI API key in secrets.toml")
+# --- OpenAI key bootstrap (safe) -------------------------------------------
+import os
+
+# Support both naming conventions for OpenAI API key
+api_key = st.secrets.get("OPENAI_API_KEY") or st.secrets.get("openai_API")
+if api_key:
+    try:
+        client = OpenAI(api_key=api_key)
+        st.sidebar.success("✅ OpenAI key loaded")
+    except Exception as e:
+        st.sidebar.warning(f"⚠️ Failed to init OpenAI client: {e}")
+        client = None
+else:
+    st.sidebar.warning("⚠️ OPENAI_API_KEY not found – OpenAI features disabled.")
     client = None
+# ---------------------------------------------------------------------------
 
 # --- VISUAL STYLING ---
 # Remove or comment out any previous or conflicting image background code that sets `.stApp`'s background or image.
@@ -1743,7 +1754,7 @@ Market snapshot (core assets):
 Only include risk situations and actionable warnings relevant for today's session. Respond in concise bullet points, and only if there is real risk.'''
                 # Use the Market Summary GPT or fallback to default if unavailable
                 response = client.chat.completions.create(
-                    model="g-5wVuKfpEt-stocks-crypto-options-forex-market-summary",
+                    model="zanalytics_midas",
                     messages=[{"role": "user", "content": prompt}],
                     temperature=0.3,
                     max_tokens=800

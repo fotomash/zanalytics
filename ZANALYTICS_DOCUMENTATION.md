@@ -30,8 +30,11 @@ Zanalytics is a comprehensive trading system that integrates advanced market ana
 
 ## Components
 
-### 1. **Zanalytics Orchestrator** (`zanalytics_orchestrator.py`)
+### 1. **Zanalytics Orchestrator** (`core.orchestrator.AnalysisOrchestrator`)
 The master control system that coordinates all components.
+*Note:* The former `zanalytics_orchestrator.py` entry point has been removed.
+All orchestration now runs through `core/orchestrator.py`. Use
+`AnalysisOrchestrator.run()` or the CLI examples below.
 
 **Key Features:**
 - Automated pipeline execution
@@ -84,7 +87,7 @@ Comprehensive backtesting with multiple engines.
 - Custom strategy testing
 - Walk-forward analysis
 
-### 7. **Dashboard** (`dashboard/app.py`)
+### 7. **Dashboard** (`🏠 Home.py`)
 Interactive Streamlit dashboard for visualization.
 
 **Features:**
@@ -119,7 +122,7 @@ pip install backtrader vectorbt streamlit plotly loguru
 ```
 zanalytics/
 ├── config/
-│   ├── orchestrator_config.json
+│   ├── orchestrator_config.yaml
 │   ├── pipeline_config.json
 │   ├── signal_config.json
 │   └── backtest_config.json
@@ -135,33 +138,31 @@ zanalytics/
 │   ├── ncOS_ultimate_microstructure_analyzer.py
 │   └── convert_final_enhanced_smc_ULTIMATE.py
 └── src/
-    ├── zanalytics_orchestrator.py
+    ├── core/orchestrator.py
     ├── zanalytics_data_pipeline.py
     ├── zanalytics_integration.py
     ├── zanalytics_signal_generator.py
     ├── zanalytics_llm_formatter.py
     ├── zanalytics_backtester.py
     ├── zanalytics_backtest_analyzer.py
-    └── dashboard/app.py
+     └── 🏠 Home.py
 ```
 
 ## Quick Start
 
 ### 1. Basic Setup
-```python
-from zanalytics_orchestrator import ZanalyticsOrchestrator
+Run a strategy using the CLI:
 
-# Initialize orchestrator
-orchestrator = ZanalyticsOrchestrator("config/orchestrator_config.json")
-
-# Run single analysis
-import asyncio
-asyncio.run(orchestrator.execute_pipeline())
+```bash
+python -m core.orchestrator --strategy advanced_smc
 ```
+
+This command invokes `AnalysisOrchestrator` and executes the
+strategy specified in your configuration.
 
 ### 2. Running the Dashboard
 ```bash
-streamlit run dashboard/app.py
+streamlit run "🏠 Home.py"
 ```
 
 ### 3. Generating LLM-Ready Data
@@ -242,7 +243,7 @@ signals = generator.generate_signals(
 
 ### Exchange Connections
 ```python
-# Configure in orchestrator_config.json
+# Configure in orchestrator_config.yaml
 {
   "exchange": {
     "name": "binance",
@@ -260,6 +261,30 @@ orchestrator.config["webhooks"] = {
   "telegram": "https://api.telegram.org/bot..."
 }
 ```
+
+## Dashboard Data Flow
+
+Analysis results are produced by the orchestrator once a workflow finishes. The
+`update_dashboard` task forwards those results to the API, which then
+broadcasts them to all connected dashboards. The Streamlit app polls the REST
+endpoints and listens on the WebSocket for real‑time updates.
+
+```
+┌──────────────┐     REST / WS     ┌──────────────┐     WebSocket/HTTP    ┌──────────────┐
+│ Orchestrator │ ───────────────▶ │    API       │ ───────────────▶ │  Streamlit   │
+└──────────────┘                   │  Service    │                   │  Dashboard   │
+                                  └──────────────┘                   └──────────────┘
+```
+
+### Local Deployment Notes
+
+- `ZAN_API_URL` – Dashboard uses this to locate the API service (defaults to
+  `http://localhost:8000`).
+- `REDIS_HOST`/`REDIS_PORT` – Configure Redis caching for the API (defaults to
+  `localhost:6379`).
+- `FASTAPI_HOST`/`FASTAPI_PORT` – Set the bind address for the API service.
+- `ZSI_CONFIG_PATH` – Path to the orchestrator configuration YAML.
+
 
 ## Advanced Features
 
@@ -361,7 +386,7 @@ processor.config["max_data_points"] = 5000
 
 ## License
 
-MIT License - See LICENSE file for details
+ZANALYTICS EULA - See [LICENSE_EULA.md](LICENSE_EULA.md) for details
 
 ## Changelog
 

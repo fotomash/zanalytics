@@ -4,13 +4,23 @@
 
 1. Install requirements:
    ```bash
-   pip install -r requirements_dashboard.txt
+   pip install -r requirements.txt
    ```
 
 2. Run the dashboard:
    ```bash
    streamlit run tick_manipulation_dashboard.py
    ```
+
+3. Or launch the entire stack:
+   ```bash
+   python run_full_stack.py --ngrok
+   ```
+
+### Configuration
+
+Set the `ZAN_API_URL` environment variable if your API is not running on
+`http://localhost:8000`.
 
 ## Features
 

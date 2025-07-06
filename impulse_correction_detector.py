@@ -92,6 +92,7 @@ def detect_impulse_correction_phase(
     ema_slope_threshold = config.get('ema_slope_threshold', 0.0001) # Needs tuning based on asset/TF
     correction_rsi_low, correction_rsi_high = config.get('correction_rsi_threshold', (40, 60))
     lookback_candles = config.get('lookback_candles', 20)
+    time_decay_minutes = config.get('time_decay_minutes', 10)
 
     # --- Data Preparation ---
     try:
@@ -153,11 +154,22 @@ def detect_impulse_correction_phase(
                 if htf_bias in ['Bearish', 'Unknown']: is_impulsive = True
 
         # 3. Structure Break Check (Requires structure_data)
-        # TODO: Check if the recent move broke a significant swing high/low from structure_data
-        # Example: Check if last_candle['High'] > last_weak_high from structure_data
-        # if structure_data and recent_break_occurred:
-        #     impulse_reasons.append("Recent structure break (BOS/CHoCH)")
-        #     is_impulsive = True
+        if structure_data and isinstance(structure_data.get('structure_points'), list):
+            weak_high = None
+            weak_low = None
+            for p in reversed(structure_data['structure_points']):
+                if weak_high is None and p.get('type') == 'Weak High':
+                    weak_high = p.get('price')
+                if weak_low is None and p.get('type') == 'Weak Low':
+                    weak_low = p.get('price')
+                if weak_high is not None and weak_low is not None:
+                    break
+            if weak_high is not None and last_candle['High'] > weak_high and htf_bias in ['Bullish', 'Unknown']:
+                impulse_reasons.append('Broke Weak High')
+                is_impulsive = True
+            if weak_low is not None and last_candle['Low'] < weak_low and htf_bias in ['Bearish', 'Unknown']:
+                impulse_reasons.append('Broke Weak Low')
+                is_impulsive = True
 
         # --- Correction Checks ---
         is_corrective = False
@@ -180,21 +192,43 @@ def detect_impulse_correction_phase(
                  elif htf_bias == 'Bearish' and current_price > dp_info['midpoint']:
                      correction_reasons.append("Price in Premium zone")
                      is_corrective = True
-        # TODO: Add check if price is inside a known HTF POI range
+
+        if structure_data:
+            poi_info = structure_data.get('mitigated_htf_poi') or structure_data.get('htf_poi')
+            if isinstance(poi_info, dict) and 'range' in poi_info:
+                poi_low, poi_high = min(poi_info['range']), max(poi_info['range'])
+                current_price = last_candle['Close']
+                if poi_low <= current_price <= poi_high:
+                    correction_reasons.append("Price inside HTF POI range")
+                    is_corrective = True
 
         # 3. RSI indicating consolidation/ranging
         last_rsi = last_candle[f'rsi_{rsi_period}']
         if not pd.isna(last_rsi) and correction_rsi_low <= last_rsi <= correction_rsi_high:
              correction_reasons.append(f"RSI ({last_rsi:.1f}) between {correction_rsi_low}-{correction_rsi_high}")
              is_corrective = True
-        # TODO: Add RSI divergence check? Requires more historical data/logic.
+
+        if prev_candle is not None:
+            prev_rsi = prev_candle[f'rsi_{rsi_period}']
+            if (
+                last_candle['Close'] > prev_candle['Close'] and last_rsi < prev_rsi
+            ):
+                correction_reasons.append('Bearish RSI divergence')
+                is_corrective = True
+            elif (
+                last_candle['Close'] < prev_candle['Close'] and last_rsi > prev_rsi
+            ):
+                correction_reasons.append('Bullish RSI divergence')
+                is_corrective = True
 
         # 4. Time Decay (Simple Placeholder)
-        # TODO: Implement time decay logic (e.g., track time since last impulse peak/trough)
-        # time_since_last_impulse = ...
-        # if time_since_last_impulse > pd.Timedelta(minutes=10):
-        #     correction_reasons.append("Time decay since last impulse")
-        #     is_corrective = True
+        strong_body_mask = analysis_data['body_ratio'] >= impulse_body_ratio
+        if strong_body_mask.any():
+            last_impulse_time = analysis_data[strong_body_mask].index[-1]
+            time_since_last_impulse = analysis_data.index[-1] - last_impulse_time
+            if time_since_last_impulse > pd.Timedelta(minutes=time_decay_minutes):
+                correction_reasons.append("Time decay since last impulse")
+                is_corrective = True
 
 
         # --- Determine Final Phase ---

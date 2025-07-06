@@ -2,6 +2,7 @@ import streamlit as st
 import pandas as pd
 import numpy as np
 import json
+import ast
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 from pathlib import Path
@@ -19,6 +20,20 @@ session_state = {
 
 class ComprehensiveJSONProcessor:
     """Process comprehensive JSON files with proper error handling"""
+
+    @staticmethod
+    def _safe_array(value: str) -> Optional[list]:
+        """Safely parse numeric arrays from string values."""
+        try:
+            parsed = json.loads(value.replace('nan', 'null'))
+        except json.JSONDecodeError:
+            try:
+                parsed = ast.literal_eval(value)
+            except (ValueError, SyntaxError):
+                return None
+        if isinstance(parsed, list):
+            return [np.nan if v is None else v for v in parsed]
+        return None
     
     @staticmethod
     def scan_symbol_files(symbol: str) -> Dict[str, Path]:
@@ -81,10 +96,11 @@ class ComprehensiveJSONProcessor:
                             if isinstance(value, str) and value.startswith('['):
                                 # Parse the string representation of array
                                 try:
-                                    arr = eval(value.replace('nan', 'np.nan'))
-                                    data_length = len(arr)
-                                    break
-                                except:
+                                    arr = ComprehensiveJSONProcessor._safe_array(value)
+                                    if arr is not None:
+                                        data_length = len(arr)
+                                        break
+                                except Exception:
                                     pass
                         
                         if data_length > 0:
@@ -107,12 +123,12 @@ class ComprehensiveJSONProcessor:
                             # Parse all indicators
                             for key, value in indicators.items():
                                 if isinstance(value, str) and value.startswith('['):
-                                    try:
-                                        arr = eval(value.replace('nan', 'np.nan'))
-                                        if len(arr) == data_length:
-                                            df_data[key] = arr
-                                    except:
-                                        pass
+                                try:
+                                    arr = ComprehensiveJSONProcessor._safe_array(value)
+                                    if arr is not None and len(arr) == data_length:
+                                        df_data[key] = arr
+                                except Exception:
+                                    pass
                             
                             if df_data:
                                 df = pd.DataFrame(df_data)

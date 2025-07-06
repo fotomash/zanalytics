@@ -14,7 +14,7 @@ try:
     from agent_macroanalyser import MacroAnalyzerAgent
     from agent_riskmanager import RiskManagerAgent
     from agent_tradejournalist import TradeJournalistAgent
-    from advanced_smc_orchestrator import AdvancedSMCOrchestrator
+    from core.orchestrator import AnalysisOrchestrator
 except ImportError as e:
     logging.warning(f"ZANALYTICS import warning: {e}")
 
@@ -26,7 +26,9 @@ class ZAnalyticsDataBridge:
     Makes your app 'aware' of incoming data and triggers appropriate analysis
     """
 
-    def __init__(self, config_path: str = "zanalytics_config.json"):
+    def __init__(self, config_path: str = None):
+        if config_path is None:
+            config_path = Path(__file__).resolve().parent / "zanalytics_config.json"
         self.config = self._load_config(config_path)
         self.agents = {}
         self.active_symbols = set()
@@ -85,7 +87,7 @@ class ZAnalyticsDataBridge:
 
             # Initialize SMC orchestrator if enabled
             if self.config.get("agents", {}).get("smc_orchestrator", {}).get("active", False):
-                self.smc_orchestrator = AdvancedSMCOrchestrator()
+                self.smc_orchestrator = AnalysisOrchestrator()
                 self.logger.info("SMC Orchestrator initialized")
 
         except Exception as e:

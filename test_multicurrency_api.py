@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
-"""
-ZANFLOW Multi-Currency API Test Script
-Tests all endpoints for 6 currency pairs
-"""
+"""Integration API test script (skipped during unit tests)."""
+
+import pytest
+
+pytest.skip("Requires running API server", allow_module_level=True)
 
 import requests
 import json

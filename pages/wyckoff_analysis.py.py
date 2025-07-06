@@ -5,9 +5,10 @@ import pandas as pd
 import plotly.graph_objects as go
 from datetime import datetime
 import asyncio
+from dashboard.config import get_api_url
 
 # Configuration
-API_BASE_URL = st.secrets.get("API_BASE_URL", "http://localhost:8000")
+API_BASE_URL = st.secrets.get("API_BASE_URL", get_api_url())
 
 def render_page():
     """Render the unified Wyckoff analysis page"""

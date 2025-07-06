@@ -30,7 +30,7 @@ You are launching the **ZANALYTICS Session Intelligence Engine** — a multi-pha
 - Feeds into: `context_overall_bias`
 
 #### 4. Run Full Analysis Pipeline
-- Call: `copilot_orchestrator.run_full_analysis() → advanced_smc_orchestrator.run_strategy()`
+- Call: `AnalysisOrchestrator.run()`
 - Detect:
   - High-confidence POIs
   - Liquidity sweeps

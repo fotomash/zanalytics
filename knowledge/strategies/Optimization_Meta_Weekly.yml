@@ -1,0 +1,21 @@
+strategy_id: "Optimization_Meta_Weekly"
+strategy_name: "Optimization Meta Agent"
+description: "Generates optimization reports from journal logs."
+agent_module: "agents.optimization_meta"
+agent_class: "OptimizationMetaAgent"
+
+schedule:
+  trigger_type: "time_based"
+  timezone: "UTC"
+  trigger_window:
+    start: "00:00"
+    end: "23:59"
+  frequency:
+    unit: "days"
+    value: 7
+
+workflow:
+  - step: 1
+    description: "Run optimization meta agent"
+    analysis_functions:
+      - "optimization_meta.run"

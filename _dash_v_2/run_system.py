@@ -8,7 +8,7 @@ import subprocess
 import sys
 import time
 import logging
-from config_helper import config
+from config_helper from config import orchestrator_config
 
 def start_redis():
     """Start Redis server"""

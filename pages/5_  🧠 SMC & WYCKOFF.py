@@ -1,4 +1,42 @@
+
 import streamlit as st
+
+# ==== Unified Chart Styling Constants ====
+CHART_THEME = "plotly_dark"
+CANDLE_UP_COLOR = "lime"
+CANDLE_DOWN_COLOR = "red"
+FVG_BULL_COLOR = "rgba(0,255,0,0.13)"
+FVG_BEAR_COLOR = "rgba(255,0,0,0.13)"
+WYCKOFF_ACCUM_COLOR = "rgba(0,90,255,0.08)"
+WYCKOFF_MARKUP_COLOR = "rgba(0,200,70,0.08)"
+WYCKOFF_DIST_COLOR = "rgba(255,160,0,0.08)"
+WYCKOFF_MARKDOWN_COLOR = "rgba(220,40,40,0.08)"
+CHART_BG_COLOR = "rgba(0,0,0,0.02)"
+CHART_FONT_COLOR = "white"
+CHART_MARGIN = dict(l=20, r=20, t=40, b=20)
+# Helper to apply to any Plotly fig
+def apply_dashboard_style(fig, title=None, height=460):
+    fig.update_layout(
+        template=CHART_THEME,
+        height=height,
+        autosize=True,
+        paper_bgcolor=CHART_BG_COLOR,
+        plot_bgcolor=CHART_BG_COLOR,
+        font=dict(color=CHART_FONT_COLOR),
+        margin=CHART_MARGIN,
+        showlegend=False,
+    )
+    if title is not None:
+        fig.update_layout(
+            title={
+                "text": title,
+                "y": 0.93,
+                "x": 0.5,
+                "xanchor": "center",
+                "yanchor": "top"
+            }
+        )
+    return fig
 
 st.set_page_config(
     page_title="Zanflow Analytics Dashboard",
@@ -292,7 +330,7 @@ class QRTQuantumAnalyzer(QuantumMicrostructureAnalyzer):
         return patterns
 
     def create_qrt_dashboard(self, df: pd.DataFrame, selected_file: str):
-        """Create QRT-level professional dashboard with upgraded black/3D visual style"""
+        """Create QRT-level professional dashboard with unified styling constants."""
         import base64
         import streamlit as st
         import plotly.graph_objects as go
@@ -303,12 +341,10 @@ class QRTQuantumAnalyzer(QuantumMicrostructureAnalyzer):
         liquidity = self.detect_liquidity_patterns(df)
         footprint = self.calculate_orderflow_footprint(df)
         signals = self.generate_qrt_signals(df, wyckoff, liquidity)
-        # Only show the styled QRT Trading Signal headline (remove any dashboard header here)
         st.markdown(
             f"<h2>QRT Trading Signal: <span style='color:#FFD700'>{signals.get('signal', 'N/A').upper()}</span></h2>",
             unsafe_allow_html=True
         )
-        # Metrics row, wrapped in markdown for dark background effect
         col1, col2, col3, col4 = st.columns(4)
         with col1:
             st.markdown(
@@ -336,7 +372,9 @@ class QRTQuantumAnalyzer(QuantumMicrostructureAnalyzer):
             st.markdown("</div>", unsafe_allow_html=True)
 
         # Chart
-        fig = make_subplots(rows=2, cols=1, shared_xaxes=True, vertical_spacing=0.03, row_heights=[0.7, 0.3])
+        fig = make_subplots(
+            rows=2, cols=1, shared_xaxes=True, vertical_spacing=0.03, row_heights=[0.7, 0.3]
+        )
         fig.add_trace(go.Candlestick(
             x=df['timestamp'],
             open=df['open'],
@@ -344,8 +382,8 @@ class QRTQuantumAnalyzer(QuantumMicrostructureAnalyzer):
             low=df['low'],
             close=df['close'],
             name="Price",
-            increasing_line_color='limegreen',
-            decreasing_line_color='crimson',
+            increasing_line_color=CANDLE_UP_COLOR,
+            decreasing_line_color=CANDLE_DOWN_COLOR,
             line_width=1.5
         ), row=1, col=1)
         # Cumulative Delta (as line)
@@ -370,20 +408,8 @@ class QRTQuantumAnalyzer(QuantumMicrostructureAnalyzer):
             ), row=2, col=1)
         else:
             st.warning("⚠️ No usable volume column found in data.")
-        # Layout: Black/3D style
-        fig.update_layout(
-            height=600,
-            showlegend=False,
-            paper_bgcolor="black",
-            plot_bgcolor="black",
-            font=dict(color="white"),
-            xaxis=dict(gridcolor="gray", zeroline=False, showline=False, color="white"),
-            yaxis=dict(gridcolor="gray", zeroline=False, showline=False, color="white"),
-            xaxis2=dict(gridcolor="gray", zeroline=False, showline=False, color="white"),
-            yaxis2=dict(gridcolor="gray", zeroline=False, showline=False, color="white"),
-            margin=dict(l=0, r=0, t=30, b=30),
-            legend=dict(font=dict(color="white"))
-        )
+        # Apply unified chart style
+        fig = apply_dashboard_style(fig, title="QRT Dashboard", height=600)
         st.plotly_chart(fig, use_container_width=True)
         # Wyckoff Patterns
         with st.expander("🔬 Wyckoff Pattern Detection"):
@@ -398,7 +424,6 @@ class QRTQuantumAnalyzer(QuantumMicrostructureAnalyzer):
         with st.expander("🧠 QRT Trading Signal"):
             st.success(f"**QRT Trading Signal:** {signals.get('signal', 'N/A').upper()}")
             st.json(signals)
-        # End QRT Dashboard
 
     def generate_qrt_signals(self, df: pd.DataFrame, wyckoff: Dict, liquidity: Dict) -> Dict:
         """Generate QRT-level trading signals"""
@@ -532,6 +557,14 @@ if img_base64:
     </style>
     """
     st.markdown(background_style, unsafe_allow_html=True)
+    # PATCH: Panel transparency to match Home.py (alpha 0.025)
+    st.markdown("""
+    <style>
+    .main .block-container {
+        background-color: rgba(0,0,0,0.025) !important;
+    }
+    </style>
+    """, unsafe_allow_html=True)
 
 # Initialize session state
 if 'df_to_use' not in st.session_state:
@@ -577,6 +610,12 @@ with st.sidebar:
             # -- PATCH: Robust cleaning for 1-minute chart data --
             if 'timestamp' in df.columns:
                 df['timestamp'] = pd.to_datetime(df['timestamp'], errors='coerce')
+                # --- FIX: handle numeric epoch timestamps (seconds vs milliseconds) ---
+                if pd.api.types.is_numeric_dtype(df['timestamp']):
+                    # If max value looks like milliseconds (> 1e12) treat as 'ms', else 's'
+                    ts_max = df['timestamp'].max()
+                    unit = 'ms' if ts_max > 1_000_000_000_000 else 's'
+                    df['timestamp'] = pd.to_datetime(df['timestamp'], unit=unit, errors='coerce')
             elif 'datetime' in df.columns:
                 df['timestamp'] = pd.to_datetime(df['datetime'], errors='coerce')
             elif 'date' in df.columns:
@@ -637,7 +676,12 @@ with st.sidebar:
                 st.dataframe(df[['timestamp', 'open', 'high', 'low', 'close']].tail(30))
 
             max_bars = len(df)
-            bars_to_use = st.slider("Last N Bars", min_value=20, max_value=max_bars, value=min(500, max_bars))
+            bars_to_use = st.slider(
+                "Last N Bars",
+                min_value=20,
+                max_value=max_bars,
+                value=150  # always default to 150 bars
+            )
             if st.button("📥 Load Data", type="primary"):
                 st.session_state.df_to_use = df.tail(bars_to_use)
                 st.session_state.analysis_results = {}
@@ -734,6 +778,7 @@ if st.session_state.df_to_use is not None:
             st.metric("24h Low", f"${low_24h:.5f}")
             st.markdown("</div>", unsafe_allow_html=True)
 
+        # --- All chart overlays and hot areas MUST use unified color constants and style (see top of file) ---
         chart_builder = ChartBuilder()
         fig = chart_builder.create_main_chart(
             tf_data,
@@ -742,17 +787,9 @@ if st.session_state.df_to_use is not None:
             show_volume=show_volume,
             analysis_results=st.session_state.analysis_results
         )
-        # --- PATCH: Apply black/3D style to chart_builder chart if not already set ---
-        if hasattr(fig, "update_layout"):
-            fig.update_layout(
-                paper_bgcolor="black",
-                plot_bgcolor="black",
-                font=dict(color="white"),
-                xaxis=dict(gridcolor="gray", zeroline=False, showline=False, color="white"),
-                yaxis=dict(gridcolor="gray", zeroline=False, showline=False, color="white"),
-                margin=dict(l=0, r=0, t=30, b=30),
-                legend=dict(font=dict(color="white"))
-            )
+        # Apply unified chart style
+        fig = apply_dashboard_style(fig, title="Main Chart")
+        # NOTE: ChartBuilder/AnalysisPanel overlays must use unified color constants (FVG_BULL_COLOR, etc.) and the same vrect style.
         st.plotly_chart(fig, use_container_width=True)
 
         if st.session_state.analysis_results:
@@ -761,6 +798,7 @@ if st.session_state.df_to_use is not None:
 
     with tab2:
         st.header("Market Structure Analysis")
+        # NOTE: Any chart overlays for SMC/Wyckoff zones must use the unified style/colors as per constants above.
         tf_data = st.session_state.df_to_use
         col1, col2 = st.columns(2)
         with col1:

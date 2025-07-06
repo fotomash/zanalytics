@@ -1,0 +1,54 @@
+strategy_id: "SMC_Structural_Flip_v12"
+strategy_name: "SMC Structural Flip & POI Confirmation"
+description: "Detects HTF bias flip and confirms a lower-timeframe POI before entry."
+agent_module: "modules.smc_flip.agent"
+agent_class: "SMCFlipAgent"
+
+schedule:
+  trigger_type: "time_based"
+  timezone: "UTC"
+  trigger_window:
+    start: "00:00"
+    end: "23:59"
+  frequency:
+    unit: "minutes"
+    value: 5
+
+workflow:
+  - step: 1
+    description: "Determine HTF Bias"
+    timeframe: "H4"
+    analysis_functions:
+      - "market_structure.define_htf_bias"
+
+  - step: 2
+    description: "Detect Structure Break"
+    timeframe: "M30"
+    analysis_functions:
+      - "market_structure.confirm_structure_break"
+
+  - step: 3
+    description: "Validate POI"
+    timeframe: "M15"
+    analysis_functions:
+      - "poi_identifier.validate_poi"
+    params:
+      freshness: "fresh"
+      mitigation_percent: 50
+
+  - step: 4
+    description: "Monitor Retracement"
+    timeframe: "M5"
+    analysis_functions:
+      - "market_structure.monitor_retracement"
+
+  - step: 5
+    description: "Confirm LTF Entry"
+    timeframe: "M1"
+    analysis_functions:
+      - "entry_logic.confirm_ltf_entry"
+    action_type: "LOG_JOURNAL_ENTRY"
+    payload:
+      type: "TradeIdea"
+      source: "SMCFlip_Agent"
+      content: "SMC Structural Flip setup logged."

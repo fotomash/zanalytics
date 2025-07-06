@@ -3,12 +3,12 @@ import os
 import argparse
 import sys
 from datetime import datetime
+import asyncio
 from trait_engine import merge_config
 from core.intermarket_sentiment import snapshot_sentiment
-from copilot_orchestrator import run_full_analysis
+from core.orchestrator import AnalysisOrchestrator
 
 # Additional modules from zanalytics package
-from advanced_smc_orchestrator import AdvancedSMCOrchestrator
 from liquidity_vwap_detector import detect_liquidity_sweeps
 from optimizer_loop import run_optimizer_loop
 from feedback_analysis_engine import analyze_feedback
@@ -75,18 +75,22 @@ def inject_sentiment(output_path, macro_version):
 
 
 def run_analysis(multi_tf, sentiment, output_dir, macro_version):
-    smc = AdvancedSMCOrchestrator(multi_tf, sentiment['context_overall_bias'])
-    result_smc = smc.run()
+    orch = AnalysisOrchestrator()
 
     sweeps = detect_liquidity_sweeps(multi_tf)
-    poi_scores = predict_poi_quality(result_smc['pois'])
+    poi_scores = predict_poi_quality({})
 
-    result_full = run_full_analysis(
-        data=multi_tf,
-        sentiment_context=sentiment.get('context_overall_bias'),
-        sweeps=sweeps,
-        poi_scores=poi_scores
-    )
+    payload = {
+        "orchestrator": "advanced_smc",
+        "args": {
+            "all_tf_data": multi_tf,
+            "strategy_variant": "default",
+            "target_timestamp": datetime.utcnow(),
+            "symbol": list(multi_tf.keys())[0] if multi_tf else "XAUUSD",
+        },
+    }
+
+    result_full = asyncio.run(orch.run(payload))
 
     result_full['run_meta'] = {
         'timestamp': datetime.utcnow().isoformat(),

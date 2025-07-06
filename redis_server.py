@@ -10,7 +10,7 @@ import logging
 from typing import Dict, List, Optional, Any, Union
 from datetime import datetime, timedelta
 from dataclasses import dataclass, asdict
-from config_helper import config
+from config_helper from config import orchestrator_config
 
 @dataclass
 class CacheStats:
@@ -35,6 +35,9 @@ class TradingRedisManager:
         self.SYMBOL_PREFIX = "symbol:"
         self.SESSION_PREFIX = "session:"
         self.STATS_PREFIX = "stats:"
+
+        # Keys for agent decisions and latest analysis
+        self.AGENT_DECISIONS_KEY = f"{self.STATS_PREFIX}agent_decisions"
         
     def store_analysis_result(self, symbol: str, analysis_type: str, data: Dict, ttl: int = 3600) -> bool:
         """Store analysis result with automatic expiration"""
@@ -159,6 +162,47 @@ class TradingRedisManager:
             self.logger.error(f"Failed to get symbol data: {e}")
         
         return symbol_data
+
+    def store_latest_analysis(self, symbol: str, data: Dict, ttl: int = 3600) -> bool:
+        """Store the latest analysis snapshot for quick access"""
+        key = f"{self.ANALYSIS_PREFIX}{symbol}:latest"
+        try:
+            self.redis_client.setex(key, ttl, json.dumps(data, default=str))
+            self._update_symbol_index(symbol, key)
+            return True
+        except Exception as e:
+            self.logger.error(f"Failed to store latest analysis: {e}")
+            return False
+
+    def get_latest_analysis(self, symbol: str) -> Optional[Dict]:
+        """Retrieve the latest analysis snapshot"""
+        key = f"{self.ANALYSIS_PREFIX}{symbol}:latest"
+        try:
+            result = self.redis_client.get(key)
+            if result:
+                return json.loads(result)
+        except Exception as e:
+            self.logger.error(f"Failed to get latest analysis: {e}")
+        return None
+
+    def store_agent_decision(self, decision: Dict, max_records: int = 100) -> bool:
+        """Persist an agent decision and maintain a rolling window"""
+        try:
+            self.redis_client.lpush(self.AGENT_DECISIONS_KEY, json.dumps(decision, default=str))
+            self.redis_client.ltrim(self.AGENT_DECISIONS_KEY, 0, max_records - 1)
+            return True
+        except Exception as e:
+            self.logger.error(f"Failed to store agent decision: {e}")
+            return False
+
+    def get_recent_agent_decisions(self, count: int = 50) -> List[Dict]:
+        """Fetch recent agent decisions"""
+        try:
+            raw = self.redis_client.lrange(self.AGENT_DECISIONS_KEY, 0, count - 1)
+            return [json.loads(item) for item in raw]
+        except Exception as e:
+            self.logger.error(f"Failed to get agent decisions: {e}")
+            return []
     
     def _update_symbol_index(self, symbol: str, key: str):
         """Update symbol index for efficient lookups"""
