@@ -11,7 +11,6 @@ from datetime import datetime
 from typing import List, Dict, Any, Optional, Tuple
 from dataclasses import dataclass, field
 from collections import defaultdict
-import numpy as np
 
 
 @dataclass

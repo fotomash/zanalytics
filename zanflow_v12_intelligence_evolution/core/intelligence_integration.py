@@ -4,9 +4,8 @@ Intelligence Evolution Integration Module
 Integrates the enhanced intelligence features into the existing ZANFLOW v12 system.
 """
 
-import json
 import yaml
-from typing import Dict, Any, Optional
+from typing import Dict, Any
 from datetime import datetime
 import logging
 
