@@ -1,0 +1,31 @@
+# Fix for run.py import checking
+
+# Find this section in your run.py:
+required_packages = {
+    'streamlit': 'streamlit',
+    'flask': 'flask',
+    'flask-cors': 'flask-cors',
+    'pandas': 'pandas',
+    'numpy': 'numpy',
+    'plotly': 'plotly',
+    'pyyaml': 'pyyaml',        # ← WRONG
+    'requests': 'requests',
+    'scikit-learn': 'scikit-learn',  # ← WRONG
+    'matplotlib': 'matplotlib',
+    'seaborn': 'seaborn'
+}
+
+# Replace with:
+required_packages = {
+    'streamlit': 'streamlit',
+    'flask': 'flask',
+    'flask_cors': 'flask-cors',  # ← Fixed: underscore not dash
+    'pandas': 'pandas',
+    'numpy': 'numpy',
+    'plotly': 'plotly',
+    'yaml': 'pyyaml',            # ← Fixed: import yaml, package pyyaml
+    'requests': 'requests',
+    'sklearn': 'scikit-learn',   # ← Fixed: import sklearn, package scikit-learn
+    'matplotlib': 'matplotlib',
+    'seaborn': 'seaborn'
+}
