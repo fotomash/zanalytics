@@ -1,0 +1,43 @@
+{
+  "title": "Zanalytics Command Schema",
+  "description": "Standardized schema for all LLM and agent commands",
+  "type": "object",
+  "required": ["request_id", "action_type", "payload"],
+  "properties": {
+    "request_id": {
+      "type": "string",
+      "description": "Unique identifier for tracking"
+    },
+    "action_type": {
+      "type": "string",
+      "enum": [
+        "LOG_JOURNAL_ENTRY",
+        "UPDATE_DASHBOARD_STATE",
+        "TRIGGER_AGENT_ANALYSIS",
+        "NOTIFY_USER",
+        "EXECUTE_TRADE_IDEA",
+        "UPDATE_MARKET_CONTEXT",
+        "SCHEDULE_FOLLOWUP",
+        "ARCHIVE_ANALYSIS"
+      ],
+      "description": "The action flag that determines routing"
+    },
+    "payload": {
+      "type": "object",
+      "description": "Action-specific data"
+    },
+    "human_readable_summary": {
+      "type": "string",
+      "description": "Human-friendly description for logging"
+    },
+    "metadata": {
+      "type": "object",
+      "properties": {
+        "timestamp": {"type": "string"},
+        "source": {"type": "string"},
+        "priority": {"type": "string", "enum": ["low", "medium", "high", "critical"]},
+        "ttl": {"type": "integer", "description": "Time to live in seconds"}
+      }
+    }
+  }
+}

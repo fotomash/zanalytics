@@ -1,0 +1,163 @@
+strategy_id: "LondonKillzone_SMC_v1"
+strategy_name: "London Kill Zone SMC Entry Model"
+description: "Identifies high-probability entries during the London session by targeting sweeps of Asian session liquidity, followed by an SMC confirmation."
+author: "Zanalytics Strategy Engine"
+version: "1.0.0"
+enabled: true
+
+risk_params:
+  max_risk_per_trade: 0.01
+  max_daily_trades: 3
+  allowed_pairs: ["EURUSD", "GBPUSD", "XAUUSD", "USDJPY"]
+
+schedule:
+  trigger_type: "time_based"
+  utc_time_window:
+    start: "06:00"
+    end: "09:00"
+  frequency: "every_1_minute"
+  days: ["monday", "tuesday", "wednesday", "thursday", "friday"]
+
+pre_conditions:
+  - check: "market_open"
+    description: "Ensure forex market is open"
+  - check: "no_high_impact_news"
+    description: "No high-impact news in next 30 minutes"
+    params:
+      lookback_minutes: -30
+      lookahead_minutes: 30
+      min_impact: "high"
+
+workflow:
+  - step: 1
+    name: "identify_asian_range"
+    description: "Identify Asian Session Range"
+    pre_condition: "Current time is within the scheduled kill zone window."
+    timeframe: "H1"
+    analysis_functions:
+      - "liquidity.identify_session_high_low"
+    params:
+      session: "Asia"
+      lookback_hours: 8
+    outputs:
+      - "asia_high"
+      - "asia_low"
+      - "asia_range_size"
+
+  - step: 2
+    name: "detect_liquidity_sweep"
+    description: "Detect Liquidity Sweep"
+    pre_condition: "Asian session range is identified and range > 20 pips."
+    timeframe: "M15"
+    analysis_functions:
+      - "liquidity.detect_sweep_of_level"
+      - "volume.analyze_sweep_volume"
+    params:
+      levels_to_watch: ["asia_high", "asia_low"]
+      min_sweep_distance: 5
+      volume_threshold: 1.5
+    outputs:
+      - "sweep_detected"
+      - "sweep_direction"
+      - "sweep_level"
+
+  - step: 3
+    name: "confirm_market_structure"
+    description: "Confirm with Market Structure Shift"
+    pre_condition: "A liquidity sweep has been confirmed."
+    timeframe: "M5"
+    analysis_functions:
+      - "market_structure.confirm_structure_break"
+      - "market_structure.identify_order_flow_shift"
+    params:
+      confirmation_type: ["BOS", "CHOCH"]
+      min_structure_break: 10
+    outputs:
+      - "structure_confirmed"
+      - "bias_direction"
+      - "structure_break_level"
+
+  - step: 4
+    name: "refine_entry_zone"
+    description: "Refine Entry with MIDAS Curve and Order Blocks"
+    pre_condition: "Market structure has shifted."
+    timeframe: "M1"
+    analysis_functions:
+      - "indicators.get_midas_curve_location"
+      - "market_structure.find_entry_fvg"
+      - "market_structure.identify_order_blocks"
+    params:
+      midas_period: 20
+      fvg_min_size: 3
+      order_block_lookback: 50
+    outputs:
+      - "entry_zone_high"
+      - "entry_zone_low"
+      - "midas_level"
+      - "optimal_entry"
+
+  - step: 5
+    name: "calculate_trade_parameters"
+    description: "Calculate precise entry, stop loss, and targets"
+    pre_condition: "Valid entry zone identified."
+    analysis_functions:
+      - "risk_management.calculate_position_size"
+      - "risk_management.calculate_stop_loss"
+      - "risk_management.calculate_take_profits"
+    params:
+      stop_type: "structure_based"
+      rr_ratios: [1.5, 2.5, 4.0]
+    outputs:
+      - "entry_price"
+      - "stop_loss"
+      - "take_profit_1"
+      - "take_profit_2"
+      - "take_profit_3"
+      - "position_size"
+
+  - step: 6
+    name: "execute_trade_idea"
+    description: "Final Action: Log Trade Idea and Notify"
+    pre_condition: "All trade parameters calculated and validated."
+    action_type: "LOG_JOURNAL_ENTRY"
+    secondary_actions:
+      - "UPDATE_DASHBOARD_STATE"
+      - "NOTIFY_USER"
+    payload_template:
+      type: "TradeIdea"
+      source: "LondonKillzone_Agent"
+      content: "High-probability {trade_direction} trade identified on {symbol} based on London Kill Zone strategy."
+      trade_setup:
+        symbol: "{symbol}"
+        direction: "{trade_direction}"
+        entry_price: "{entry_price}"
+        stop_loss: "{stop_loss}"
+        take_profits: ["{take_profit_1}", "{take_profit_2}", "{take_profit_3}"]
+        position_size: "{position_size}"
+        risk_amount: "{risk_amount}"
+        strategy_version: "LondonKillzone_SMC_v1"
+      analysis_context:
+        asian_range: "{asia_range_size}"
+        sweep_type: "{sweep_direction}"
+        structure_shift: "{structure_type}"
+        entry_quality_score: "{quality_score}"
+      charts_to_highlight:
+        - timeframe: "H1"
+          annotations: ["asian_high", "asian_low"]
+        - timeframe: "M5"
+          annotations: ["structure_break", "entry_zone"]
+
+post_execution:
+  monitor_duration: 240
+  track_metrics:
+    - "price_action_vs_levels"
+    - "entry_zone_respect"
+    - "target_progress"
+  exit_conditions:
+    - condition: "stop_loss_hit"
+      action: "ARCHIVE_ANALYSIS"
+    - condition: "all_targets_hit"
+      action: "LOG_JOURNAL_ENTRY"
+      payload:
+        type: "TradeResult"
+        result: "full_success"
