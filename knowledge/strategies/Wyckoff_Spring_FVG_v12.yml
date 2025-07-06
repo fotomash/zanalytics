@@ -1,0 +1,48 @@
+strategy_id: "Wyckoff_Spring_FVG_v12"
+strategy_name: "Wyckoff Spring/UTAD Reversal"
+description: "Captures reversals with tick-level confirmation and FVG retest."
+agent_module: "modules.wyckoff_reversal.agent"
+agent_class: "WyckoffReversalAgent"
+
+schedule:
+  trigger_type: "time_based"
+  timezone: "UTC"
+  trigger_window:
+    start: "00:00"
+    end: "23:59"
+  frequency:
+    unit: "minutes"
+    value: 5
+
+workflow:
+  - step: 1
+    description: "Identify Spring or UTAD"
+    timeframe: "M15"
+    analysis_functions:
+      - "wyckoff.detect_spring_or_utad"
+
+  - step: 2
+    description: "Validate Tick Sweep & Volume"
+    timeframe: "M1"
+    analysis_functions:
+      - "tick_processor.validate_volume_sweep"
+
+  - step: 3
+    description: "Confirm BOS"
+    timeframe: "M5"
+    analysis_functions:
+      - "market_structure.confirm_bos"
+
+  - step: 4
+    description: "Identify Untapped FVG"
+    timeframe: "M5"
+    analysis_functions:
+      - "poi_identifier.find_fresh_fvg"
+
+  - step: 5
+    description: "Execute on Retest"
+    action_type: "LOG_JOURNAL_ENTRY"
+    payload:
+      type: "TradeIdea"
+      source: "Wyckoff_Reversal_Agent"
+      content: "Wyckoff reversal setup logged."
