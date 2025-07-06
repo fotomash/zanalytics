@@ -1,4 +1,5 @@
 # Basic settings
+redis_url: redis://localhost:6379/0
 symbols:
   - BTC/USD
   - ETH/USD

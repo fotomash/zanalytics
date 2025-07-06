@@ -26,7 +26,8 @@ class TradingRedisManager:
     """Enhanced Redis manager for trading analytics"""
     
     def __init__(self):
-        self.redis_client = config.get_redis_client()
+        redis_url = orchestrator_config.get("redis_url", "redis://localhost:6379/0")
+        self.redis_client = redis.Redis.from_url(redis_url)
         self.logger = logging.getLogger(__name__)
         
         # Cache key prefixes

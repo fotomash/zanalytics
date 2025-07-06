@@ -1,0 +1,26 @@
+{
+  "data_pipeline": {
+    "refresh_interval": 60,
+    "data_path": "./data",
+    "timeframes": [
+      "1M",
+      "5M",
+      "15M",
+      "1H",
+      "4H"
+    ]
+  },
+  "api_server": {
+    "websocket_port": 8765,
+    "rest_port": 8080,
+    "host": "localhost"
+  },
+  "dashboard": {
+    "port": 8050,
+    "debug": true
+  },
+  "trading": {
+    "paper_trading": true,
+    "risk_per_trade": 0.02
+  }
+}
