@@ -1,0 +1,8 @@
+from marker_enrichment_engine import add_all_indicators
+
+# --- 2b. Enrich OHLCV with indicators ---
+print("\nStep 2b: Enriching with SMC/Mentfx/Wyckoff/Markers...")
+for tf, df in ohlcv_data_dict.items():
+    enriched_df = add_all_indicators(df, timeframe=tf)
+    ohlcv_data_dict[tf] = enriched_df
+print("Step 2b COMPLETE: Enrichment done.")
