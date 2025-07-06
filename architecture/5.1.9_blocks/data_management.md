@@ -34,3 +34,5 @@ This directory is planned to house modules related to the definition of core dat
 ## **Migration Note**
 
 Currently, the ZBar and MarketOrderData dataclasses are defined within zanzibar/analysis/wyckoff/event\_detector.py. A planned refactoring step is to move these core model definitions to zanzibar/data\_management/models.py to better reflect their system-wide importance and decouple them from a specific analysis module.
+
+The `UnifiedAnalyticsBar` Pydantic model in `core/schema.py` exposes a JSON-friendly view of each `ZBar`. Keep these structures synchronized—they are the canonical analytics schema for both internal engines and API consumers.
