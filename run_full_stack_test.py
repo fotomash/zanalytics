@@ -68,11 +68,11 @@ def main():
     except ImportError: detect_wyckoff_phases_and_events = None; print("WARN: Wyckoff Detector not found.")
     try: from liquidity_sweep_detector import tag_liquidity_sweeps
     except ImportError: tag_liquidity_sweeps = None; print("WARN: Liquidity Sweep Detector not found.")
-    # Import charting function from orchestrator
+    # Optional charting utilities
     try:
-        from core.copilot_orchestrator import generate_analysis_chart_json
-        from core.orchestrator_utils import load_strategy_profile
-        print("Charting import successful")
+        from core.strategies.utils import load_strategy_profile
+        generate_analysis_chart_json = None
+        print("Strategy profile import successful")
     except ImportError as import_err:
         generate_analysis_chart_json = None
         load_strategy_profile = None
