@@ -10,11 +10,9 @@ import yaml
 import pandas as pd
 import numpy as np
 from datetime import datetime, timedelta
-from typing import Dict, Any, List, Tuple, Optional
+from typing import Dict, Any, List
 from dataclasses import dataclass
 from collections import defaultdict
-import scipy.stats as stats
-from sklearn.metrics import matthews_corrcoef
 import logging
 
 

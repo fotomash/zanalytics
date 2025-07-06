@@ -5,14 +5,13 @@ Test framework for Organic Intelligence components
 import pytest
 import asyncio
 import json
-from datetime import datetime
-from unittest.mock import Mock, patch, AsyncMock
+from unittest.mock import Mock, patch
 import redis
 
 from core.dispatcher.action_dispatcher import ActionDispatcher
 from core.agents.scheduling_agent import SchedulingAgent
 from core.agents.london_killzone_agent import LondonKillzoneAgent
-from core.command_processor import CommandProcessor, OrganicIntelligenceOrchestrator
+from core.command_processor import CommandProcessor
 
 
 class TestActionDispatcher:

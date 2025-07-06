@@ -9,7 +9,6 @@ Usage:
 '''
 
 import os
-import json
 import yaml
 import shutil
 from datetime import datetime
