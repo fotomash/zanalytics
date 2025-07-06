@@ -33,15 +33,22 @@ class SchedulingAgent:
         strategy_id = manifest.get("strategy_id", "unknown_strategy")
         schedule_cfg = manifest["schedule"]
         try:
-            agent_module = importlib.import_module(manifest['agent_module'])
-            agent_class = getattr(agent_module, manifest['agent_class'])
+            agent_module = importlib.import_module(manifest["agent_module"])
+            agent_class = getattr(agent_module, manifest["agent_class"])
 
-            start = datetime.strptime(schedule_cfg['trigger_window']['start'], '%H:%M')
-            end = datetime.strptime(schedule_cfg['trigger_window']['end'], '%H:%M')
+            window = (
+                schedule_cfg.get("utc_time_window")
+                or schedule_cfg.get("trigger_window")
+            )
+            if not window:
+                raise ValueError("Schedule is missing a time window definition")
+            start = datetime.strptime(window["start"], "%H:%M")
+            end = datetime.strptime(window["end"], "%H:%M")
+            minutes = schedule_cfg.get("frequency", {}).get("value", 1)
             trigger = CronTrigger(
                 hour=f"{start.hour}-{end.hour}",
-                minute=f"*/{schedule_cfg['frequency']['value']}",
-                timezone=schedule_cfg['timezone']
+                minute=f"*/{minutes}",
+                timezone=schedule_cfg.get("timezone", "UTC"),
             )
             self.scheduler.add_job(
                 self.run_agent_mission,
