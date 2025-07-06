@@ -139,6 +139,13 @@ class AnalysisOrchestrator:
 
         return bars
 
+    def run_full_enrichment(
+        self, df: pd.DataFrame, analyses: Dict[str, Any] | None = None
+    ) -> List[UnifiedAnalyticsBar]:
+        """Alias for :meth:`analyze_dataframe` for compatibility."""
+
+        return self.analyze_dataframe(df, analyses)
+
 
 def main() -> None:
     """CLI entry point for running the orchestrator."""
