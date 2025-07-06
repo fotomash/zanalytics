@@ -17,6 +17,11 @@ CONFIG_PATH = Path(os.getenv("ZSI_CONFIG_PATH", "zsi_config.yaml"))
 USER_CONTEXT_PATH = Path("data/user_context.json")
 
 
+def get_orchestrator(config_path: str | None = None) -> "AnalysisOrchestrator":
+    """Convenience factory returning a configured orchestrator instance."""
+    return AnalysisOrchestrator(config_path=config_path)
+
+
 class AnalysisOrchestrator:
     """Load config, dynamically import orchestrator modules and execute them."""
 
