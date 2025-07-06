@@ -13,6 +13,7 @@ nav:
   - Persistence & Memory: persistence.md
   - Security: security.md
   - Deployment: deployment.md
+  - Organic Intelligence Loop: organic_intelligence_loop.md
 theme:
   name: material
   logo: images/logo.png
