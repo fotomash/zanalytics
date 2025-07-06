@@ -25,6 +25,7 @@ class TradeJournalistAgent:
         macro_result: Optional[Dict[str, Any]] = None,
         risk_result: Optional[Dict[str, Any]] = None,
         semantic_result: Optional[Dict[str, Any]] = None,
+        confluence_path: Optional[List[str]] = None,
     ) -> Dict[str, Any]:
         """Record a decision event and return the stored entry."""
         entry: Dict[str, Any] = {
@@ -47,6 +48,7 @@ class TradeJournalistAgent:
             "semantic_bias": (
                 semantic_result.get("macro_bias") if semantic_result else None
             ),
+            "confluence_path": confluence_path or [],
             "notes": [],
         }
         entry["summary"] = self.summary(entry)
