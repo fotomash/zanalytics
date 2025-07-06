@@ -1,0 +1,19 @@
+strategy_id: "LondonKillzone_SMC_v1"
+strategy_name: "London Kill Zone SMC Entry Model"
+description: "Identifies high-probability entries by targeting Asian session liquidity sweeps during the London open."
+agent_module: "core.agents.london_killzone_agent"
+agent_class: "LondonKillzoneAgent"
+
+schedule:
+  trigger_type: "time_based"
+  timezone: "Europe/London"
+  trigger_window:
+    start: "07:00"
+    end: "09:00"
+  frequency:
+    unit: "minutes"
+    value: 1
+
+workflow:
+  - step: 1
+    description: "Identify Asian Session High/Low"
