@@ -21,8 +21,44 @@ import re
 import base64
 warnings.filterwarnings('ignore')
 
+import requests
+import time
+
+# --- Parquet scanning helper ---
 # --- Parquet scanning helper ---
 def scan_parquet_files(data_dir):
+class LiveDataConnector:
+    def __init__(self, api_url="http://mm20.local:8080"):
+        self.api_url = api_url
+        self._test_connection()
+
+    def _test_connection(self):
+        try:
+            response = requests.get(f"{self.api_url}/symbols", timeout=2)
+            if response.status_code == 200:
+                st.sidebar.success("✅ Connected to mm20.local")
+            else:
+                st.sidebar.warning("⚠️ API connected but returned error")
+        except Exception:
+            st.sidebar.error("❌ Cannot connect to mm20.local:8080")
+
+    def get_symbols(self):
+        try:
+            response = requests.get(f"{self.api_url}/symbols")
+            if response.status_code == 200:
+                return response.json()
+        except Exception:
+            pass
+        return []
+
+    def get_live_data(self, symbol):
+        try:
+            response = requests.get(f"{self.api_url}/data/{symbol}")
+            if response.status_code == 200:
+                return response.json()
+        except Exception:
+            pass
+        return None
     """Scan directory for Parquet files, returning (symbol, timeframe, rel_path) with folder or filename fallback."""
     files = []
     for f in Path(data_dir).rglob("*.parquet"):
@@ -61,6 +97,7 @@ class UltimateZANFLOWDashboard:
         # Store latest .txt and .json insights per pair
         self.latest_txt_reports = {}
         self.latest_json_insights = {}
+        self.live_connector = LiveDataConnector("http://mm20.local:8080")
 
     def load_all_data(self):
         """Load all processed data silently"""
@@ -258,6 +295,17 @@ button[kind="secondary"] {
         # Chart options
         st.sidebar.markdown("### 📈 Chart Settings")
         st.session_state['chart_theme'] = st.sidebar.selectbox("Chart Theme", ["plotly_dark", "plotly_white", "ggplot2"])
+
+        st.sidebar.markdown("---")
+        st.sidebar.markdown("### 🔴 Live Data")
+        auto_refresh = st.sidebar.checkbox("Auto-refresh (5s)", value=False)
+        refresh_now = st.sidebar.button("🔄 Refresh Now")
+
+        if auto_refresh:
+            time.sleep(5)
+            st.rerun()
+        elif refresh_now:
+            st.rerun()
 
     def display_market_overview(self):
         """Display comprehensive market overview"""
@@ -470,7 +518,7 @@ button[kind="secondary"] {
         self.display_market_status(df_display, pair)
 
         # Main price chart with comprehensive overlays
-        self.create_ultimate_price_chart(df_display, pair, timeframe)
+        self.create_live_price_chart(df_display, pair, timeframe, self.live_connector)
 
         # Analysis sections based on user selection
         if st.session_state.get('show_microstructure', True):
@@ -1439,3 +1487,174 @@ def main():
 
 if __name__ == "__main__":
     main()
+
+    def create_live_price_chart(self, df, pair, timeframe, live_connector):
+        """
+        Enhanced price chart with live bid/ask, spread, volume and RSI markers.
+        Falls back to the static chart if live data is unavailable.
+        """
+        live_data = live_connector.get_live_data(pair)
+        if live_data is None:
+            self.create_ultimate_price_chart(df, pair, timeframe)
+            return
+
+        # Live values with sensible fall‑backs
+        live_price = live_data.get("price", df["close"].iloc[-1])
+        live_bid   = live_data.get("bid",   live_price)
+        live_ask   = live_data.get("ask",   live_price)
+        live_vol   = live_data.get("volume", 0)
+        live_rsi   = live_data.get("rsi",   None)
+        spread_val = live_ask - live_bid
+
+        fig = make_subplots(
+            rows=4, cols=1,
+            subplot_titles=[
+                f"{pair} {timeframe} – Live Price Action",
+                "Volume Profile (incl. live)",
+                "Momentum Oscillators",
+                "Market Structure"
+            ],
+            vertical_spacing=0.05,
+            row_heights=[0.5, 0.2, 0.15, 0.15],
+            shared_xaxes=True
+        )
+
+        # Historical candlesticks
+        fig.add_trace(
+            go.Candlestick(
+                x=df.index,
+                open=df["open"], high=df["high"],
+                low=df["low"], close=df["close"],
+                name="Historical",
+                increasing_line_color="limegreen",
+                decreasing_line_color="crimson",
+                increasing_line_width=2.5,
+                decreasing_line_width=2.5
+            ),
+            row=1, col=1
+        )
+
+        # Live price dotted line
+        fig.add_hline(
+            y=live_price,
+            line=dict(color="yellow", width=2, dash="dot"),
+            annotation_text=f"Live: {live_price:.5f}",
+            annotation_position="top left",
+            row=1, col=1
+        )
+
+        # Bid / Ask markers
+        latest_ts = df.index[-1]
+        fig.add_trace(
+            go.Scatter(
+                x=[latest_ts], y=[live_bid],
+                mode="markers",
+                marker_symbol="triangle-up",
+                marker_size=14,
+                marker_color="green",
+                name="Bid"
+            ),
+            row=1, col=1
+        )
+        fig.add_trace(
+            go.Scatter(
+                x=[latest_ts], y=[live_ask],
+                mode="markers",
+                marker_symbol="triangle-down",
+                marker_size=14,
+                marker_color="red",
+                name="Ask"
+            ),
+            row=1, col=1
+        )
+
+        # Spread annotation
+        fig.add_annotation(
+            x=latest_ts, y=(live_bid + live_ask) / 2,
+            text=f"Spread: {spread_val:.5f}",
+            showarrow=False,
+            font=dict(color="yellow"),
+            bgcolor="black",
+            bordercolor="yellow",
+            borderwidth=1,
+            row=1, col=1
+        )
+
+        # Historical volume bars
+        if "volume" in df.columns:
+            hist_colors = ["green" if c >= o else "red" for c, o in zip(df["close"], df["open"])]
+            fig.add_trace(
+                go.Bar(
+                    x=df.index,
+                    y=df["volume"],
+                    marker_color=hist_colors,
+                    opacity=0.7,
+                    name="Hist Vol"
+                ),
+                row=2, col=1
+            )
+
+        # Live volume bar
+        fig.add_trace(
+            go.Bar(
+                x=[latest_ts + timedelta(seconds=1)],
+                y=[live_vol],
+                marker_color="yellow",
+                opacity=0.9,
+                name="Live Vol"
+            ),
+            row=2, col=1
+        )
+
+        # RSI series (+ live marker)
+        if "rsi_14" in df.columns:
+            fig.add_trace(
+                go.Scatter(
+                    x=df.index, y=df["rsi_14"],
+                    mode="lines",
+                    line=dict(color="purple", width=2.2),
+                    name="RSI 14"
+                ),
+                row=3, col=1
+            )
+            if live_rsi is not None:
+                fig.add_trace(
+                    go.Scatter(
+                        x=[latest_ts + timedelta(seconds=1)], y=[live_rsi],
+                        mode="markers",
+                        marker=dict(color="yellow", size=10, symbol="circle"),
+                        name="Live RSI"
+                    ),
+                    row=3, col=1
+                )
+
+        # Re‑use existing overlay helpers
+        self.add_smc_overlays(fig, df, row=1)
+        self.add_wyckoff_overlays(fig, df, row=1)
+
+        # Styling
+        fig.update_layout(
+            paper_bgcolor="rgba(0,0,0,1)",
+            plot_bgcolor="rgba(10,15,35,1)",
+            font=dict(color="white"),
+            xaxis=dict(gridcolor="rgba(255,255,255,0.10)", zeroline=False, showline=False, color="white"),
+            yaxis=dict(gridcolor="rgba(255,255,255,0.10)", zeroline=False, showline=False, color="white"),
+            margin=dict(l=0, r=0, t=30, b=30),
+            legend=dict(font=dict(color="white")),
+            xaxis_rangeslider_visible=False,
+            showlegend=False,
+            height=500
+        )
+
+        st.plotly_chart(fig, use_container_width=True)
+
+        # Live metrics row
+        col1, col2, col3, col4, col5, col6 = st.columns(6)
+        col1.metric("Bid", f"{live_bid:.5f}")
+        col2.metric("Ask", f"{live_ask:.5f}")
+        col3.metric("Spread", f"{spread_val:.5f}")
+        trend = "🟢 BULL" if live_bid > df["ema_21"].iloc[-1] else "🔴 BEAR"
+        col4.metric("Trend", trend)
+        vol_per_min = live_vol if timeframe.endswith("M") else live_vol / int(timeframe[:-1])
+        col5.metric("Vol/min", f"{vol_per_min:.0f}")
+        col6.metric("Last Update", datetime.now().strftime("%H:%M:%S"))
