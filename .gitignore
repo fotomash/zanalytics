@@ -11,3 +11,4 @@ cron.log
 *.log
 *.zip
 .DS_Store
+/utils/out
