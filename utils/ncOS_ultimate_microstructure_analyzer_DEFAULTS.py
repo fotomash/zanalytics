@@ -1777,6 +1777,10 @@ class UltimateDataProcessor:
                         for t, d in data_by_timeframe.items()
                     }
 
+                # Ensure indexes are JSON‑serializable (convert Timestamps → ISO strings)
+                for _tf, _df in data_by_timeframe.items():
+                    if isinstance(_df.index, pd.DatetimeIndex):
+                        _df.index = _df.index.map(lambda ts: ts.isoformat())
                 # ---------------- Persist results conditionally ----------------
                 if parquet_root or json_root:
                     try:
@@ -2023,6 +2027,23 @@ class UltimateDataProcessor:
             logger.warning(f"Error in advanced analytics: {e}")
 
         return analytics
+
+    def _calculate_fibonacci_levels(self, data: np.ndarray) -> Dict[str, float]:
+        """Standard Fibonacci retracement levels between min and max price."""
+        if data.size == 0:
+            return {}
+        max_price = float(np.max(data))
+        min_price = float(np.min(data))
+        diff = max_price - min_price
+        return {
+            '0.0%':  max_price,
+            '23.6%': max_price - 0.236 * diff,
+            '38.2%': max_price - 0.382 * diff,
+            '50.0%': max_price - 0.500 * diff,
+            '61.8%': max_price - 0.618 * diff,
+            '78.6%': max_price - 0.786 * diff,
+            '100%':  min_price
+        }
 
     def _calculate_fractal_dimension(self, data: np.ndarray) -> float:
         """Calculate fractal dimension using box counting method"""
