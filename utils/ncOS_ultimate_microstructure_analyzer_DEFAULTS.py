@@ -1820,33 +1820,23 @@ class UltimateDataProcessor:
             return {'error': str(e), 'file_path': file_path}
 
     async def _load_data(self, file_path: str) -> Optional[pd.DataFrame]:
-        """Load data from CSV and JSON files"""
         try:
             if file_path.endswith('.csv'):
-                # Try different separators, propagate KeyboardInterrupt
-                for sep in ['\t', ',', ';']:
-                    try:
-                        df = pd.read_csv(file_path, sep=sep)
-                        if len(df.columns) > 1:  # Successfully parsed
-                            # Attempt to parse timestamp as well
-                            if 'timestamp' in df.columns:
-                                try:
-                                    df['timestamp'] = pd.to_datetime(
-                                        df['timestamp'],
-                                        format='%Y.%m.%d %H:%M:%S',
-                                        errors='coerce'
-                                    )
-                                    df.set_index('timestamp', inplace=True)
-                                except Exception:
-                                    # fallback: parse without format string
-                                    df['timestamp'] = pd.to_datetime(df['timestamp'], errors='coerce')
-                                    df.set_index('timestamp', inplace=True)
-                            return df
-                    except KeyboardInterrupt:
-                        raise
-                    except Exception:
-                        continue
-                return None
+                # Try comma separator first
+                df = pd.read_csv(file_path, sep=',')
+                # If 'time' column exists, parse as MT5 timestamp
+                if 'time' in df.columns:
+                    # Remove any spaces from 'time'
+                    df['time'] = df['time'].astype(str).str.strip()
+                    # MT5 exports time as '%Y.%m.%d %H:%M:%S'
+                    df['timestamp'] = pd.to_datetime(df['time'], format='%Y.%m.%d %H:%M:%S', errors='coerce')
+                    df.drop(columns=['time'], inplace=True)
+                    df.set_index('timestamp', inplace=True)
+                # Also handle cases where 'timestamp' is already the column
+                elif 'timestamp' in df.columns:
+                    df['timestamp'] = pd.to_datetime(df['timestamp'], errors='coerce')
+                    df.set_index('timestamp', inplace=True)
+                return df
 
             elif file_path.endswith('.json'):
                 with open(file_path, 'r') as f:

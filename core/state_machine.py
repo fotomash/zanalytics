@@ -18,7 +18,7 @@ try:
     # If ZBar is in a central models.py
     # from zanzibar.data_management.models import ZBar, MarketOrderData
     # For now, assuming it's accessible from where event_detector defines it
-    from analysis.wyckoff.event_detector import ZBar, MarketOrderData
+    from zanzibar.analysis.wyckoff.event_detector import ZBar, MarketOrderData
 except ImportError: # pragma: no cover
     # Fallback placeholder if imports fail during isolated development/testing
     from dataclasses import dataclass, field
