@@ -151,6 +151,7 @@ class AnalysisConfig:
     save_detailed_reports: bool = True
     export_excel: bool = True
     export_csv: bool = True
+    csv_dir: str = './out/csv'          # path for CSV exports
     export_parquet: bool = True          # enable/disable parquet export
     export_json: bool = False            # disable bulky JSON export by default
     output_dir: str = './out'            # override default output directory
@@ -1728,6 +1729,8 @@ class UltimateDataProcessor:
                                 if getattr(self.config, 'export_parquet', True) else None)
                 json_root    = (os.path.join(base_output_dir, 'json')
                                 if getattr(self.config, 'export_json', False) else None)
+                csv_root     = (os.path.join(base_output_dir, 'csv')
+                                if getattr(self.config, 'export_csv', True) else None)
 
                 # ---------------- Assemble per‑time‑frame DataFrames ----------------
                 full_results = {tf: df}   # always include the native TF
@@ -1789,7 +1792,7 @@ class UltimateDataProcessor:
                             data_by_timeframe,
                             parquet_root,
                             json_root,
-                            self.config.csv_dir
+                            csv_root
                         )
                         logger.info(f"Saved parquet/JSON for symbol: {symbol} "
                                     f"({' | '.join(data_by_timeframe.keys())})")
