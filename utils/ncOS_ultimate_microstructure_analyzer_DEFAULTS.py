@@ -2270,7 +2270,11 @@ def save_results_to_parquet_and_json(symbol, data_by_timeframe,
         # Prepare DataFrame for export, preserving timestamp as column
         df_export = df
         if isinstance(df_export.index, pd.DatetimeIndex):
-            df_export = df_export.reset_index().rename(columns={'index':'timestamp'})
+            # Reset index to column; first column is the timestamp
+            df_export = df_export.reset_index()
+            timestamp_col = df_export.columns[0]
+            # Rename the first column to 'timestamp'
+            df_export = df_export.rename(columns={timestamp_col: 'timestamp'})
         # Ensure 'timestamp' column is first
         if 'timestamp' in df_export.columns:
             cols = list(df_export.columns)
