@@ -2267,18 +2267,30 @@ def save_results_to_parquet_and_json(symbol, data_by_timeframe,
     comprehensive_json = {}
 
     for tf, df in data_by_timeframe.items():
-        # Always create a 'timestamp' column for export
-        if isinstance(df.index, pd.DatetimeIndex):
-            df_export = df.copy()
+        df_export = df.copy()
+        # Try to ensure timestamp is always filled
+        if isinstance(df_export.index, pd.DatetimeIndex):
             df_export['timestamp'] = df_export.index
-            # Place 'timestamp' as the first column
-            cols = list(df_export.columns)
-            cols.insert(0, cols.pop(cols.index('timestamp')))
-            df_export = df_export[cols]
+        elif 'timestamp' in df_export.columns:
+            df_export['timestamp'] = pd.to_datetime(df_export['timestamp'], errors='coerce')
         else:
-            df_export = df.copy()
-            if 'timestamp' not in df_export.columns:
-                df_export.insert(0, 'timestamp', pd.NaT)
+            # Try to auto-detect time column by name
+            time_col = None
+            for col in df_export.columns:
+                if col.lower().startswith('time') or col.lower().startswith('date'):
+                    time_col = col
+                    break
+            if time_col:
+                df_export['timestamp'] = pd.to_datetime(df_export[time_col], errors='coerce')
+            else:
+                import warnings
+                warnings.warn(f"No datetime index or time column found for {symbol} {tf}. Filling NaT.")
+                df_export['timestamp'] = pd.NaT
+
+        # Place 'timestamp' first
+        cols = list(df_export.columns)
+        cols.insert(0, cols.pop(cols.index('timestamp')))
+        df_export = df_export[cols]
 
         # CSV export
         if symbol_csv_dir:
