@@ -1785,19 +1785,30 @@ class UltimateDataProcessor:
                     if isinstance(_df.index, pd.DatetimeIndex):
                         _df.index = _df.index.map(lambda ts: ts.isoformat())
                 # ---------------- Persist results conditionally ----------------
-                if parquet_root or json_root:
+                if parquet_root or json_root or csv_root:
+                    # Replace any None with empty string so os.path.join never sees NoneType
+                    pr = parquet_root or ''
+                    jr = json_root or ''
+                    cr = csv_root or ''
                     try:
                         save_results_to_parquet_and_json(
                             symbol,
                             data_by_timeframe,
-                            parquet_root,
-                            json_root,
-                            csv_root
+                            pr,
+                            jr,
+                            cr
                         )
-                        logger.info(f"Saved parquet/JSON for symbol: {symbol} "
-                                    f"({' | '.join(data_by_timeframe.keys())})")
+                        logger.info(
+                            "Saved outputs for %s → parquet:%s json:%s csv:%s "
+                            "(%s)",
+                            symbol,
+                            bool(pr),
+                            bool(jr),
+                            bool(cr),
+                            " | ".join(data_by_timeframe.keys())
+                        )
                     except Exception as e:
-                        logger.error(f"Error saving parquet/JSON for {symbol}: {e}")
+                        logger.error("Error saving outputs for %s: %s", symbol, e)
             except Exception as e:
                 logger.error(f"Error saving parquet/JSON for {symbol}: {e}")
 
@@ -2294,7 +2305,7 @@ def save_results_to_parquet_and_json(symbol, data_by_timeframe, parquet_root='./
         }
         table = table.replace_schema_metadata({b"ncos_meta": json.dumps(meta).encode()})
         pq.write_table(table, parquet_file, compression="snappy")
-        
+
         comprehensive_json[tf] = df.to_dict(orient='records')
 
     json_file_path = os.path.join(json_root, f"{symbol}_comprehensive.json")
@@ -2334,7 +2345,26 @@ async def main():
     parser.add_argument('--timeframes_parquet', type=str, default=None, help='Comma-separated list of timeframes to export (e.g., M1,M5)')
     parser.add_argument('--max_candles', type=int, default=60, help='Max number of candles to export per timeframe (default: 60)')
 
+    parser.add_argument('--dry_save_test', action='store_true',
+                        help='Run a dry test to verify output directories are writable and exit')
+
     args = parser.parse_args()
+
+    # Dry save‑test: create the output dirs and exit
+    if args.dry_save_test:
+        test_dirs = [
+            Path(args.output_dir) / sub
+            for sub in ('parquet', 'json', 'csv')
+        ]
+        for d in test_dirs:
+            try:
+                d.mkdir(parents=True, exist_ok=True)
+                (d / '.write_test').touch(exist_ok=True)
+            except Exception as e:
+                logger.error("❌ Cannot write to %s: %s", d, e)
+                sys.exit(1)
+        logger.info("✅ All output directories are writable. Exiting (dry_save_test).")
+        return
 
     # Create configuration with ALL FEATURES ENABLED BY DEFAULT
     config = AnalysisConfig(
