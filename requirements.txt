@@ -154,7 +154,6 @@ toml==0.10.2
 tornado==6.5.1
 tqdm==4.67.1
 traitlets==5.14.3
-twelvedata
 typing_extensions==4.14.0
 tzdata==2025.2
 tzlocal==5.3.1

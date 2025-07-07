@@ -4,7 +4,8 @@ import logging.config
 from pathlib import Path
 
 
-def setup_logging(config_path: str = "config/logging.json", default_level: int = logging.INFO) -> None:
+def setup_logging(config_path: str = "config/logging.json",
+                  default_level: int = logging.INFO) -> None:
     """Setup logging configuration from JSON file."""
     path = Path(config_path)
     if path.is_file():

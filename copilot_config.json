@@ -1,0 +1,23 @@
+{
+  "autonomous_mode_enabled": true,
+  "confidence_threshold": 0.75,
+  "auto_generate_charts": true,
+  "auto_generate_reports": true,
+  "default_analysis_timeframes": ["D1", "H4", "H1", "M15", "M5"],
+  "macro_context_assets": {
+    "DEFAULT": ["^VIX", "DX-Y.NYB", "^TNX"],
+    "FX": ["^VIX", "DX-Y.NYB", "^TNX"],
+    "CRYPTO": ["^VIX", "DX-Y.NYB", "BTC-USD", "ETH-USD"],
+    "INDICES": ["^VIX", "^TNX", "DX-Y.NYB"],
+    "COMMODITIES": ["DX-Y.NYB", "^TNX"]
+  },
+  "indicator_config": {
+      "ema_periods": [9, 21, 48, 200],
+      "macd_params": {"fast": 12, "slow": 26, "signal": 9},
+      "rsi_period": 14,
+      "sar_params": {"accel": 0.02, "max_accel": 0.2},
+      "atr_period": 14,
+      "bb_params": {"period": 20, "stddev": 2.0},
+      "stoch_params": {"fastk": 14, "slowk": 3, "slowd": 3}
+  }
+}

@@ -1,0 +1,9 @@
+{
+  "tick_window": 5,
+  "min_drift_pips": 1.0,
+  "max_spread": 1.8,
+  "min_rr_threshold": 1.8,
+  "enable_microstructure_filter": true,
+  "log_rejections": true,
+  "journal_path": "journal/micro_rejections.md"
+}

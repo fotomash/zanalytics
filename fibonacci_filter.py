@@ -6,7 +6,7 @@
 import math
 import inspect  # For logging helper
 import logging
-from core.exceptions import InvalidSignalError
+from .exceptions import InvalidSignalError
 
 logger = logging.getLogger(__name__)
 
@@ -164,6 +164,15 @@ def apply_fibonacci_filter(swing_range_data, poi_data, htf_bias, parameters=None
         log_info(f"Outcome: POI INVALID. {filter_reason}")
 
     log_info("--- Fibonacci Filter Complete ---")
+
+    # Optional: push summary to Telegram
+    try:
+        from telegram_alert_engine import send_simple_summary_alert
+        summary = f"[FIB FILTER] TF={range_tf} | POI={poi_check_price:.5f} | Bias={htf_bias} | Result={'✅ VALID' if is_valid_poi else '❌ INVALID'}"
+        send_simple_summary_alert(summary)
+    except Exception as e:
+        log_info(f"[TELEGRAM] Failed to send alert: {e}")
+
     return {'is_valid_poi': is_valid_poi, 'filter_reason': filter_reason}
 
 

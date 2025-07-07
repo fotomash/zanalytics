@@ -1,0 +1,114 @@
+{
+  "version": "1.0.0",
+  "dataSources": {
+    "creditRatings": {
+      "enabled": true,
+      "provider": "Moody",
+      "endpoint": "https://api.moodys.com/ratings",
+      "refreshInterval": "24h"
+    },
+    "bondYields": {
+      "enabled": true,
+      "tenors": ["2yr", "5yr", "10yr", "30yr"],
+      "provider": "FRED",
+      "endpoint": "https://api.stlouisfed.org/fred/series/observations",
+      "refreshInterval": "1h"
+    },
+    "equityBreadth": {
+      "enabled": true,
+      "metrics": ["%above200MA", "newHighs", "newLows"],
+      "provider": "Quandl",
+      "endpoint": "https://www.quandl.com/api/v3/datasets/NYSE/ADVDEC.json",
+      "refreshInterval": "4h"
+    },
+    "economicReleases": {
+      "enabled": true,
+      "items": [
+        {"name": "PMI",          "source": "Markit", "schedule": "first_business_day:09:00"},
+        {"name": "NonFarmPayrolls","source": "BLS",   "schedule": "first_friday:13:30"},
+        {"name": "CPI",          "source": "BLS",   "schedule": "mid_month:13:30"},
+        {"name": "RetailSales",  "source": "Census","schedule": "mid_month:14:30"}
+      ]
+    },
+    "centralBankGuidance": {
+      "enabled": true,
+      "banks": ["Fed", "ECB", "BoE", "RBA"],
+      "rssFeeds": {
+        "Fed": "https://www.federalreserve.gov/feeds/press_all.xml",
+        "ECB": "https://www.ecb.europa.eu/rss/press.rss"
+      },
+      "refreshInterval": "on_event"
+    },
+    "crossAssetFlows": {
+      "enabled": true,
+      "description": "FX reserve shifts, commodity fund flows",
+      "endpoint": "https://api.example.com/flows",
+      "refreshInterval": "6h"
+    }
+  },
+  "indicators": {
+    "trend": {
+      "movingAverage": {
+        "type": "SMA",
+        "periods": [10, 50, 200]
+      },
+      "curveSteepness": {
+        "tenors": ["2yr","10yr"],
+        "calcWindow": 20
+      }
+    },
+    "momentum": {
+      "PMI_diff_vs_expectation": {
+        "weight": 1,
+        "tolerance": 0.05
+      },
+      "yields_diff": {
+        "tenors": ["10yr","2yr"],
+        "calcWindow": 10
+      }
+    },
+    "volatility": {
+      "VIX": {"enabled": true, "maPeriod": 20},
+      "bondVol": {"enabled": true, "source": "CBOE"}
+    },
+    "breadth": {
+      "percentAbove200MA": {"enabled": true, "universe": "SPX"},
+      "newHighsNewLows": {"enabled": true, "universe": "SPX"}
+    }
+  },
+  "scoring": {
+    "scoreMap": {
+      "strongBull": 2,
+      "bull": 1,
+      "neutral": 0,
+      "bear": -1,
+      "strongBear": -2
+    },
+    "weights": {
+      "trend": 0.35,
+      "momentum": 0.2,
+      "volatility": 0.25,
+      "breadth": 0.2
+    },
+    "aggregationMethod": "weightedSum"
+  },
+  "biasAssignment": {
+    "strongBullThreshold": 1.0,
+    "bullThreshold": 0.5,
+    "neutralRange": [-0.5, 0.5],
+    "bearThreshold": -0.5,
+    "strongBearThreshold": -1.0
+  },
+  "integration": {
+    "rejectOnMacroConflict": true,
+    "conflictThreshold": 0.5,
+    "logicTemplate": "if sign(tradeDir) != sign(macroBias) && abs(macroBias) > {{conflictThreshold}} then reject"
+  },
+  "dynamicUpdates": {
+    "FedRateDecision":    {"trigger": "event", "eventName": "FedRateAnnounce"},
+    "ECBRateDecision":    {"trigger": "event", "eventName": "ECBRateAnnounce"},
+    "dailyRecompute":     {"cron": "5 0 * * *"},
+    "hourlyRecompute":    {"cron": "0 * * * *"},
+    "economicRelease":    {"trigger": "schedule", "hook": "economicReleases"}
+  }
+}
