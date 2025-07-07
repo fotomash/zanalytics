@@ -1644,6 +1644,11 @@ class UltimateDataProcessor:
             logger.info("STARTING: apply limits")
             # Apply limits
             df = self._apply_limits(df, file_path)
+            # --- Normalize zero‑volume bars -----------------------------------
+            # If both 'volume' and 'tick_volume' columns exist, copy tick_volume
+            # into any rows where volume equals zero.
+            if 'volume' in df.columns and 'tick_volume' in df.columns:
+                df['volume'] = df['volume'].mask(df['volume'] == 0, df['tick_volume'])
             logger.info("FINISHED: apply limits")
 
             # Initialize results
@@ -1716,37 +1721,7 @@ class UltimateDataProcessor:
                 base_output_dir = self.config.output_dir if hasattr(self.config, 'output_dir') else './out'
                 parquet_root = os.path.join(base_output_dir, 'parquet')
                 json_root = os.path.join(base_output_dir, 'json')
-                # Prepare full_results for multiple timeframes (resample)
-                # Calculate and attach indicator columns to the original df
-                # (already done above; ensure we propagate indicator columns)
-                full_results = {}
-                # Ensure all calculated indicator columns are preserved
-                full_results[tf] = df  # original timeframe with indicator columns attached
-                resample_rules = {
-                    '5min': '5T',
-                    '15min': '15T',
-                    '30min': '30T',
-                    '1h': '1H',
-                    '4h': '4H',
-                    '1d': '1D'
-                }
-                for target_tf, rule in resample_rules.items():
-                    try:
-                        if tf != target_tf:
-                            df_resampled = df.resample(rule).agg({
-                                'open': 'first',
-                                'high': 'max',
-                                'low': 'min',
-                                'close': 'last',
-                                'volume': 'sum'
-                            }).dropna()
-                            # Retain all extra indicator columns via forward fill where applicable
-                            for col in df.columns:
-                                if col not in ['open', 'high', 'low', 'close', 'volume']:
-                                    df_resampled[col] = df[col].resample(rule).ffill().dropna()
-                            full_results[target_tf] = df_resampled
-                    except Exception as e:
-                        logger.warning(f"Failed to resample to {target_tf}: {e}")
+                full_results = {tf: df}  # Keep only the native timeframe; no multi‑TF reports
                 # Filtering by timeframes and limiting max candles is done here:
                 data_by_timeframe = full_results
                 if self.config.timeframes_parquet:
