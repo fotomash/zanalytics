@@ -13,7 +13,6 @@ from pyngrok import ngrok
 def setup_ngrok(port=8080):
     """Setup ngrok tunnel"""
     print(f"🌐 Starting ngrok tunnel on port {port}...")
-
     # Start ngrok
     public_url = ngrok.connect(port, "http")
     print(f"✅ Ngrok tunnel established!")
@@ -23,13 +22,11 @@ def setup_ngrok(port=8080):
     # Get tunnel info
     tunnels = ngrok.get_tunnels()
     for tunnel in tunnels:
-        print(f"
-🔗 Tunnel: {tunnel.name}")
+        print(f"🔗 Tunnel: {tunnel.name}")
         print(f"   Public: {tunnel.public_url}")
         print(f"   Local: {tunnel.config['addr']}")
 
-    print(f"
-⚡ Update your MT5 EA with:")
+    print(f" Update your MT5 EA with:")
     print(f"   URL: {public_url}/webhook")
     print(f"   Add to MT5 allowed URLs: {public_url.replace('https://', '').replace('http://', '')}")
 
@@ -64,7 +61,6 @@ if __name__ == "__main__":
     try:
         monitor_tunnel()
     except KeyboardInterrupt:
-        print("
-👋 Closing ngrok tunnel...")
+        print("👋 Closing ngrok tunnel...")
         ngrok.disconnect(public_url)
         ngrok.kill()
