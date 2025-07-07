@@ -121,71 +121,6 @@ def _find_ltf_poi_candle(df_slice: pd.DataFrame, break_candle_index: int, is_bul
         return None
 
 
-# --- Helper for Structure Break Detection (exported) ---
-def detect_structure_break(direction: str, swings: List[dict], analysis_df: pd.DataFrame):
-    """
-    direction: 'Bullish' or 'Bearish'
-    Returns (break_found, break_type, break_details, ltf_poi_details)
-    """
-    break_found = False
-    break_type = None
-    break_details = {}
-    ltf_poi_details = None
-    if direction == 'Bullish':
-        last_high = next((s for s in reversed(swings) if s['type'] == 'High'), None)
-        if last_high is None:
-            return (False, None, {}, None)
-        target_break_level = last_high['price']
-        target_break_time = last_high['timestamp']
-        break_check_df = analysis_df[analysis_df.index > target_break_time]
-        if not break_check_df.empty:
-            break_candle_mask = break_check_df['Close'] > target_break_level
-            if break_candle_mask.any():
-                first_break_candle_timestamp = break_check_df[break_candle_mask].index[0]
-                first_break_candle_price = break_check_df.loc[first_break_candle_timestamp, 'Close']
-                break_found = True
-                break_type = ConfirmationConstants.CHOCH # Default to CHoCH for first break
-                break_details = {
-                    'timestamp': first_break_candle_timestamp.isoformat(),
-                    'price': first_break_candle_price,
-                    'type': 'Bullish',
-                    'broken_swing_timestamp': target_break_time.isoformat()
-                }
-                print(f"[INFO][ConfirmEngine] Bullish {break_type} confirmed at {break_details['timestamp']} (Price: {break_details['price']:.5f}), broke high at {target_break_time}")
-                try:
-                    break_candle_iloc = analysis_df.index.get_loc(first_break_candle_timestamp)
-                    ltf_poi_details = _find_ltf_poi_candle(analysis_df, break_candle_iloc, is_bullish_break=True)
-                except KeyError:
-                    print(f"[WARN][ConfirmEngine] Could not get iloc for break candle at {first_break_candle_timestamp} to find POI.")
-    elif direction == 'Bearish':
-        last_low = next((s for s in reversed(swings) if s['type'] == 'Low'), None)
-        if last_low is None:
-            return (False, None, {}, None)
-        target_break_level = last_low['price']
-        target_break_time = last_low['timestamp']
-        break_check_df = analysis_df[analysis_df.index > target_break_time]
-        if not break_check_df.empty:
-            break_candle_mask = break_check_df['Close'] < target_break_level
-            if break_candle_mask.any():
-                first_break_candle_timestamp = break_check_df[break_candle_mask].index[0]
-                first_break_candle_price = break_check_df.loc[first_break_candle_timestamp, 'Close']
-                break_found = True
-                break_type = ConfirmationConstants.CHOCH # Default to CHoCH for first break
-                break_details = {
-                    'timestamp': first_break_candle_timestamp.isoformat(),
-                    'price': first_break_candle_price,
-                    'type': 'Bearish',
-                    'broken_swing_timestamp': target_break_time.isoformat()
-                }
-                print(f"[INFO][ConfirmEngine] Bearish {break_type} confirmed at {break_details['timestamp']} (Price: {break_details['price']:.5f}), broke low at {target_break_time}")
-                try:
-                    break_candle_iloc = analysis_df.index.get_loc(first_break_candle_timestamp)
-                    ltf_poi_details = _find_ltf_poi_candle(analysis_df, break_candle_iloc, is_bullish_break=False)
-                except KeyError:
-                    print(f"[WARN][ConfirmEngine] Could not get iloc for break candle at {first_break_candle_timestamp} to find POI.")
-    return (break_found, break_type, break_details, ltf_poi_details)
-
-
 # --- Main Confirmation Function ---
 def confirm_smc_entry(
     htf_poi: Dict,
@@ -302,6 +237,70 @@ def confirm_smc_entry(
 
         print(f"[DEBUG][ConfirmEngine] Identified {len(swings)} local swing points in confirmation window.")
 
+        # --- Helper for Structure Break Detection ---
+        def detect_structure_break(direction: str, swings: List[dict], analysis_df: pd.DataFrame):
+            """
+            direction: 'Bullish' or 'Bearish'
+            Returns (break_found, break_type, break_details, ltf_poi_details)
+            """
+            break_found = False
+            break_type = None
+            break_details = {}
+            ltf_poi_details = None
+            if direction == 'Bullish':
+                last_high = next((s for s in reversed(swings) if s['type'] == 'High'), None)
+                if last_high is None:
+                    return (False, None, {}, None)
+                target_break_level = last_high['price']
+                target_break_time = last_high['timestamp']
+                break_check_df = analysis_df[analysis_df.index > target_break_time]
+                if not break_check_df.empty:
+                    break_candle_mask = break_check_df['Close'] > target_break_level
+                    if break_candle_mask.any():
+                        first_break_candle_timestamp = break_check_df[break_candle_mask].index[0]
+                        first_break_candle_price = break_check_df.loc[first_break_candle_timestamp, 'Close']
+                        break_found = True
+                        break_type = ConfirmationConstants.CHOCH # Default to CHoCH for first break
+                        break_details = {
+                            'timestamp': first_break_candle_timestamp.isoformat(),
+                            'price': first_break_candle_price,
+                            'type': 'Bullish',
+                            'broken_swing_timestamp': target_break_time.isoformat()
+                        }
+                        print(f"[INFO][ConfirmEngine] Bullish {break_type} confirmed at {break_details['timestamp']} (Price: {break_details['price']:.5f}), broke high at {target_break_time}")
+                        try:
+                            break_candle_iloc = analysis_df.index.get_loc(first_break_candle_timestamp)
+                            ltf_poi_details = _find_ltf_poi_candle(analysis_df, break_candle_iloc, is_bullish_break=True)
+                        except KeyError:
+                            print(f"[WARN][ConfirmEngine] Could not get iloc for break candle at {first_break_candle_timestamp} to find POI.")
+            elif direction == 'Bearish':
+                last_low = next((s for s in reversed(swings) if s['type'] == 'Low'), None)
+                if last_low is None:
+                    return (False, None, {}, None)
+                target_break_level = last_low['price']
+                target_break_time = last_low['timestamp']
+                break_check_df = analysis_df[analysis_df.index > target_break_time]
+                if not break_check_df.empty:
+                    break_candle_mask = break_check_df['Close'] < target_break_level
+                    if break_candle_mask.any():
+                        first_break_candle_timestamp = break_check_df[break_candle_mask].index[0]
+                        first_break_candle_price = break_check_df.loc[first_break_candle_timestamp, 'Close']
+                        break_found = True
+                        break_type = ConfirmationConstants.CHOCH # Default to CHoCH for first break
+                        break_details = {
+                            'timestamp': first_break_candle_timestamp.isoformat(),
+                            'price': first_break_candle_price,
+                            'type': 'Bearish',
+                            'broken_swing_timestamp': target_break_time.isoformat()
+                        }
+                        print(f"[INFO][ConfirmEngine] Bearish {break_type} confirmed at {break_details['timestamp']} (Price: {break_details['price']:.5f}), broke low at {target_break_time}")
+                        try:
+                            break_candle_iloc = analysis_df.index.get_loc(first_break_candle_timestamp)
+                            ltf_poi_details = _find_ltf_poi_candle(analysis_df, break_candle_iloc, is_bullish_break=False)
+                        except KeyError:
+                            print(f"[WARN][ConfirmEngine] Could not get iloc for break candle at {first_break_candle_timestamp} to find POI.")
+            return (break_found, break_type, break_details, ltf_poi_details)
+
         # --- Detect CHoCH / BOS (via helper) ---
         break_found, break_type, break_details, ltf_poi_details = detect_structure_break(htf_poi_type, swings, analysis_df)
 
@@ -382,11 +381,7 @@ if __name__ == '__main__':
 
 
     print("\n--- Testing Bullish Confirmation ---")
-    result1 = confirm_smc_entry(
-        htf_poi=htf_poi_bullish,
-        ltf_data=ltf_df1,
-        strategy_variant="Inv"
-    )
+    result1 = confirm_smc_entry(htf_poi_bullish, ltf_df1, "Inv")
     print(json.dumps(result1, indent=2, default=str))
 
     # Scenario 2: Bearish Confirmation (Rally then CHoCH down)
@@ -408,11 +403,7 @@ if __name__ == '__main__':
 
 
     print("\n--- Testing Bearish Confirmation ---")
-    result2 = confirm_smc_entry(
-        htf_poi=htf_poi_bearish,
-        ltf_data=ltf_df2,
-        strategy_variant="Inv"
-    )
+    result2 = confirm_smc_entry(htf_poi_bearish, ltf_df2, "Inv")
     print(json.dumps(result2, indent=2, default=str))
 
     # Scenario 3: No Confirmation
@@ -422,11 +413,7 @@ if __name__ == '__main__':
     ltf_df3 = pd.DataFrame(data3, index=timestamps)
 
     print("\n--- Testing No Confirmation ---")
-    result3 = confirm_smc_entry(
-        htf_poi=htf_poi_bullish,
-        ltf_data=ltf_df3,
-        strategy_variant="Inv"
-    )
+    result3 = confirm_smc_entry(htf_poi_bullish, ltf_df3, "Inv")
     print(json.dumps(result3, indent=2, default=str))
 
 

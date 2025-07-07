@@ -12,20 +12,24 @@ import traceback
 import json # For potential report saving
 
 # --- Import Dependencies ---
-# Charting utilities
+# Charting function from main orchestrator
 try:
-    from core.strategies.utils import load_strategy_profile
-    generate_analysis_chart_json = None
+    from copilot_orchestrator import generate_analysis_chart_json, load_strategy_profile
     CHARTING_AVAILABLE = True
 except ImportError:
-    print("[ERROR][AutoChartReport] Cannot import charting utilities.")
+    print("[ERROR][AutoChartReport] Cannot import generate_analysis_chart_json/load_strategy_profile from copilot_orchestrator.")
     generate_analysis_chart_json = None
     load_strategy_profile = None
     CHARTING_AVAILABLE = False
 
-# Journaling function (placeholder)
-log_trade_summary = None
-JOURNALING_AVAILABLE = False
+# Journaling function (assuming it's now in advanced_smc_orchestrator)
+try:
+    from core.advanced_smc_orchestrator import log_trade_summary # Use the enhanced logger
+    JOURNALING_AVAILABLE = True
+except ImportError:
+    print("[ERROR][AutoChartReport] Cannot import log_trade_summary from advanced_smc_orchestrator.")
+    log_trade_summary = None
+    JOURNALING_AVAILABLE = False
 
 
 # --- Autonomous Chart Generator ---

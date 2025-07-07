@@ -1,8 +1,5 @@
-from typing import Dict, Any, List, Tuple
+from typing import Dict, Any
 from dataclasses import dataclass
-from datetime import datetime
-import json
-from pathlib import Path
 
 @dataclass
 class ScoringResult:
@@ -22,26 +19,13 @@ class PredictiveScorer:
         self.min_score_to_emit = config.get("min_score_to_emit", 0.65)
         self.conflict_config = config.get("conflict_alerts", {})
         self.audit_config = config.get("audit_trail", {})
-        self.decay_alpha = float(config.get("decay_alpha", 1.0))
-        self.history: List[Tuple[datetime, float]] = []
 
     def score(self, features: Dict[str, float], context: Dict[str, Any] = None) -> ScoringResult:
-        raw_score = 0.0
+        score = 0.0
         for key, weight in self.weights.items():
-            raw_score += weight * features.get(key, 0.0)
+            score += weight * features.get(key, 0.0)
 
-        now = datetime.utcnow()
-
-        if self.history:
-            last_ts, last_score = self.history[-1]
-            hours = (now - last_ts).total_seconds() / 3600
-            decay = self.decay_alpha ** hours
-            raw_score = raw_score * (1 - self.decay_alpha) + last_score * decay
-
-        maturity_score = round(raw_score, 4)
-        self.history.append((now, maturity_score))
-        self._log_to_journal(maturity_score)
-
+        maturity_score = round(score, 4)
         grade = self._grade(maturity_score)
         potential_entry = maturity_score >= self.min_score_to_emit
         conflict_tag = self._detect_conflict(maturity_score, features, context or {})
@@ -92,16 +76,3 @@ class PredictiveScorer:
         elif val >= 0.5:
             return "medium"
         return "low"
-
-    def _log_to_journal(self, score: float) -> None:
-        path_str = self.audit_config.get("journal_path")
-        if not path_str:
-            return
-        path = Path(path_str)
-        path.parent.mkdir(parents=True, exist_ok=True)
-        entry = {"timestamp": datetime.utcnow().isoformat(), "score": score}
-        try:
-            with path.open("a", encoding="utf-8") as f:
-                f.write(json.dumps(entry) + "\n")
-        except Exception:
-            pass
