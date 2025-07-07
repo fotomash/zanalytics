@@ -22,10 +22,21 @@ import math
 import os
 import glob
 import re
+import toml
+from collections import defaultdict
 
 warnings.filterwarnings('ignore')
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
+
+# ---------------------------------------------------------------------------
+# Load default parquet directory from a local TOML settings file (if present)
+# ---------------------------------------------------------------------------
+try:
+    _settings = toml.load("zanflow_settings.toml")
+    DEFAULT_DATA_FOLDER = _settings.get("parquet_dir", "./data")
+except Exception:
+    DEFAULT_DATA_FOLDER = "./data"
 
 # ============================================================================
 # ZANFLOW v12 STRATEGY CONFIGURATION
@@ -1450,21 +1461,36 @@ def main():
     # Sidebar configuration (add data folder selection)
     with st.sidebar:
         # ------------------------------------------------------------------
-        # Data folder selection (align with Technical Indicators app)
+        # Data folder selection (auto‑defaults from TOML)
         # ------------------------------------------------------------------
         st.markdown("### 📂 Data Location")
         data_folder = st.text_input(
             "Base folder for Parquet/CSV files",
-            value="./data",
-            help="Select the folder where your time‑series parquet files live"
+            value=DEFAULT_DATA_FOLDER,
+            help="Folder where your time‑series parquet files live"
+        )
+
+        # Scan for all available symbols in the selected folder
+        parquet_files_all = glob.glob(os.path.join(data_folder, "*_*.parquet"))
+        symbol_pattern = re.compile(r"([A-Za-z0-9]+?)_\d+(?:min|h|d)\.parquet", re.IGNORECASE)
+        symbols_found = sorted(
+            {symbol_pattern.match(Path(pf).name).group(1).upper()
+             for pf in parquet_files_all if symbol_pattern.match(Path(pf).name)}
+        )
+
+        st.markdown("### 💱 Trading Pair")
+        selected_symbol = st.selectbox(
+            "Select trading pair to analyze",
+            options=symbols_found or ["<No pairs found>"],
+            index=0
         )
     # Load data
     with st.spinner("🔄 Loading ZANFLOW v12 data..."):
         try:
-            # Dynamically discover any XAUUSD parquet files in the chosen folder
-            parquet_files = glob.glob(os.path.join(data_folder, 'XAUUSD_*.parquet'))
+            # Dynamically discover parquet files for the chosen symbol
+            parquet_files = glob.glob(os.path.join(data_folder, f'{selected_symbol}_*.parquet'))
             timeframes = {}
-            tf_pattern = re.compile(r'XAUUSD_(\d+(?:min|h|d))\.parquet', re.IGNORECASE)
+            tf_pattern = re.compile(fr'{selected_symbol}_(\d+(?:min|h|d))\.parquet', re.IGNORECASE)
             for pf in parquet_files:
                 match = tf_pattern.search(Path(pf).name)
                 if match:
@@ -1472,7 +1498,7 @@ def main():
                     timeframes[tf] = pf
 
             if not timeframes:
-                st.error(f"❌ No XAUUSD parquet files found in **{data_folder}**. "
+                st.error(f"❌ No {selected_symbol} parquet files found in **{data_folder}**. "
                          "Please verify the location or adjust the Data Location above.")
                 return
 
@@ -1503,14 +1529,14 @@ def main():
         except Exception as e:
             st.error(f"Error loading data: {e}")
             return
-    
+
     # Initialize ZANFLOW orchestrator
     orchestrator = ZANFLOWOrchestrator()
-    
+
     # Sidebar configuration
     with st.sidebar:
         st.markdown("### 🎛️ ZANFLOW v12 Strategy Controls")
-        
+
         # Timeframe selection
         selected_timeframe = st.selectbox(
             "📊 Primary Analysis Timeframe",
@@ -1518,13 +1544,13 @@ def main():
             index=len(data)-1,
             help="Select primary timeframe for strategy analysis"
         )
-        
+
         # Strategy selection
         st.markdown("### 🎯 Active Strategies")
-        
+
         strategy_configs = ZANFLOWConfig.STRATEGIES
         selected_strategies = []
-        
+
         for strategy_key, strategy_info in strategy_configs.items():
             enabled = st.checkbox(
                 f"**{strategy_info['name']}**",
@@ -1533,75 +1559,75 @@ def main():
             )
             if enabled:
                 selected_strategies.append(strategy_key)
-                
+
                 # Show strategy details
                 with st.expander(f"📋 {strategy_info['name']} Details"):
                     st.markdown(f"**Aliases**: {', '.join(strategy_info['aliases'])}")
                     st.markdown(f"**Min R:R**: {strategy_info['min_rr']}")
                     st.markdown(f"**Confluence Required**: {strategy_info['confluence_required']}")
                     st.markdown(f"**Timeframes**: {strategy_info['timeframes']}")
-        
+
         # Analysis options
         st.markdown("### 🔍 Analysis Options")
-        
+
         confluence_threshold = st.slider(
-            "Confluence Threshold", 
+            "Confluence Threshold",
             min_value=1, max_value=10, value=5,
             help="Minimum confluence score for signal generation"
         )
-        
+
         show_all_timeframes = st.checkbox("Multi-Timeframe Matrix", value=False)
         show_zbar_logs = st.checkbox("ZBAR Analysis Logs", value=True)
         show_performance = st.checkbox("Strategy Performance", value=True)
-        
+
         # Current session info
         st.markdown("---")
         st.markdown("### 📊 Session Information")
-        
+
         current_time = datetime.now(pytz.UTC)
         ny_time = current_time.astimezone(pytz.timezone('America/New_York'))
         london_time = current_time.astimezone(pytz.timezone('Europe/London'))
-        
+
         st.markdown(f"**UTC**: {current_time.strftime('%H:%M:%S')}")
         st.markdown(f"**NY**: {ny_time.strftime('%H:%M:%S')}")
         st.markdown(f"**London**: {london_time.strftime('%H:%M:%S')}")
-        
+
         # Current session detection
         current_session = "Off_Hours"
         for session, times in ZANFLOWConfig.SESSIONS.items():
             if times["start"] <= current_time.time() <= times["end"]:
                 current_session = session
                 break
-        
+
         session_color = ZANFLOWConfig.SESSIONS.get(current_session, {}).get("color", "#6c757d")
-        st.markdown(f"**Current Session**: <span style='color: {session_color}; font-weight: bold;'>{current_session}</span>", 
+        st.markdown(f"**Current Session**: <span style='color: {session_color}; font-weight: bold;'>{current_session}</span>",
                    unsafe_allow_html=True)
-    
+
     # Main content area
     current_df = data[selected_timeframe]
-    
+
     # Display current market metrics
     latest = current_df.iloc[-1]
     current_price = latest['close']
-    
+
     if len(current_df) > 1:
         price_change = current_price - current_df.iloc[-2]['close']
         price_change_pct = (price_change / current_df.iloc[-2]['close']) * 100
     else:
         price_change = 0
         price_change_pct = 0
-    
+
     # Key metrics display
     col1, col2, col3, col4, col5 = st.columns(5)
-    
+
     with col1:
         st.markdown(f"""
             <div class="metric-zanflow">
                 <div class="price-display-zanflow">${current_price:.2f}</div>
-                <div>XAUUSD Current</div>
+                <div>{selected_symbol} Current</div>
             </div>
         """, unsafe_allow_html=True)
-    
+
     with col2:
         change_color = "#28a745" if price_change >= 0 else "#dc3545"
         st.markdown(f"""
@@ -1612,7 +1638,7 @@ def main():
                 <div>Change ({price_change_pct:+.2f}%)</div>
             </div>
         """, unsafe_allow_html=True)
-    
+
     with col3:
         st.markdown(f"""
             <div class="metric-zanflow">
@@ -1622,7 +1648,7 @@ def main():
                 <div>Session High</div>
             </div>
         """, unsafe_allow_html=True)
-    
+
     with col4:
         st.markdown(f"""
             <div class="metric-zanflow">
@@ -1632,7 +1658,7 @@ def main():
                 <div>Session Low</div>
             </div>
         """, unsafe_allow_html=True)
-    
+
     with col5:
         volume = latest.get('volume', 0)
         st.markdown(f"""
@@ -1643,30 +1669,30 @@ def main():
                 <div>Volume</div>
             </div>
         """, unsafe_allow_html=True)
-    
+
     # Strategy execution button
     if st.button("🚀 Execute ZANFLOW v12 Strategy Analysis", type="primary"):
         with st.spinner("🧠 Running comprehensive strategy analysis..."):
-            
+
             # Run orchestrated analysis
             analysis_results = orchestrator.run_comprehensive_analysis(current_df, selected_strategies)
-            
+
             # Display strategy status overview
             st.subheader("🎯 Strategy Status Overview")
-            
+
             strategy_cols = st.columns(len(selected_strategies))
-            
+
             for i, strategy_key in enumerate(selected_strategies):
                 with strategy_cols[i]:
                     strategy_info = ZANFLOWConfig.STRATEGIES[strategy_key]
                     strategy_results = analysis_results['strategies'].get(strategy_key.split('_')[0], {})
-                    
+
                     is_active = strategy_results.get('strategy_active', False)
                     confluence_score = strategy_results.get('confluence_score', 0)
-                    
+
                     status_class = "status-active" if is_active else "status-monitoring" if confluence_score >= 3 else "status-inactive"
                     status_text = "ACTIVE" if is_active else "MONITORING" if confluence_score >= 3 else "INACTIVE"
-                    
+
                     st.markdown(f"""
                         <div class="strategy-tier-a">
                             <h4 style="color: {strategy_info['color']};">{strategy_info['name']}</h4>
@@ -1681,16 +1707,16 @@ def main():
                             </div>
                         </div>
                     """, unsafe_allow_html=True)
-            
+
             # Display active signals
             if analysis_results['overall_signals']:
                 st.subheader("🚨 Active Trading Signals")
-                
+
                 for signal in analysis_results['overall_signals']:
                     strategy_name = signal['strategy']
                     strategy_info = ZANFLOWConfig.STRATEGIES.get(strategy_name, {})
                     signal_color = strategy_info.get('color', '#FFD700')
-                    
+
                     if 'SMC' in strategy_name:
                         signal_class = "smc-signal"
                     elif 'Wyckoff' in strategy_name:
@@ -1699,7 +1725,7 @@ def main():
                         signal_class = "session-signal"
                     else:
                         signal_class = "smc-signal"
-                    
+
                     st.markdown(f"""
                         <div class="{signal_class}">
                             <h3>🎯 {signal['signal_type']} DETECTED</h3>
@@ -1710,82 +1736,84 @@ def main():
                             <p><strong>Description:</strong> {signal.get('description', 'High-probability setup identified')}</p>
                         </div>
                     """, unsafe_allow_html=True)
-            
+
             # Strategy-specific analysis
             for strategy_key in selected_strategies:
                 strategy_short = strategy_key.split('_')[0]
                 strategy_results = analysis_results['strategies'].get(strategy_short, {})
                 strategy_info = ZANFLOWConfig.STRATEGIES[strategy_key]
-                
+
                 if strategy_results:
                     st.subheader(f"📊 {strategy_info['name']} Analysis")
-                    
+
                     col1, col2 = st.columns(2)
-                    
+
                     with col1:
                         st.markdown("**📈 Strategy Metrics**")
                         st.metric("Confluence Score", f"{strategy_results.get('confluence_score', 0)}/10")
                         st.metric("Strategy Status", "ACTIVE" if strategy_results.get('strategy_active', False) else "MONITORING")
-                        
+
                         if 'current_phase' in strategy_results:
                             st.metric("Current Phase", strategy_results['current_phase'])
-                    
+
                     with col2:
                         st.markdown("**🔍 Analysis Details**")
-                        
+
                         if strategy_short == 'smc':
                             smc_data = strategy_results
                             st.write(f"• Liquidity Sweeps: {len(smc_data.get('liquidity_sweeps', []))}")
                             st.write(f"• Structure Shifts: {len(smc_data.get('structure_shifts', []))}")
                             st.write(f"• POI Zones: {len(smc_data.get('poi_zones', []))}")
-                            
+
                         elif strategy_short == 'wyckoff':
                             wyckoff_data = strategy_results
                             st.write(f"• Wyckoff Phases: {len(wyckoff_data.get('wyckoff_phases', []))}")
                             st.write(f"• Wyckoff Events: {len(wyckoff_data.get('wyckoff_events', []))}")
                             st.write(f"• Current Phase: {wyckoff_data.get('current_phase', 'Unknown')}")
-                            
+
                         elif strategy_short == 'session':
                             session_data = strategy_results
                             st.write(f"• Session Ranges: {len(session_data.get('session_ranges', {}))}")
                             st.write(f"• Judas Sweeps: {len(session_data.get('judas_sweeps', []))}")
                             st.write(f"• Session Reversals: {len(session_data.get('session_reversals', []))}")
-            
+
             # Master chart
             st.markdown('<div class="chart-container-zanflow">', unsafe_allow_html=True)
             st.subheader("📊 ZANFLOW v12 Master Strategy Chart")
-            
+
             master_chart = create_zanflow_master_chart(
-                current_df, "XAUUSD", selected_timeframe,
-                analysis_results, {}, {}
+                current_df,
+                analysis_results,
+                selected_symbol,
+                selected_timeframe
             )
-            
+
             st.plotly_chart(master_chart, use_container_width=True)
             st.markdown('</div>', unsafe_allow_html=True)
-            
+
             # Strategy performance dashboard
             if show_performance:
                 st.subheader("📈 Strategy Performance Dashboard")
-                
+
                 performance_chart = create_strategy_performance_dashboard(analysis_results)
                 st.plotly_chart(performance_chart, use_container_width=True)
-            
+
             # Multi-timeframe analysis
             if show_all_timeframes:
                 st.subheader("🔄 Multi-Timeframe Strategy Matrix")
-                
+
                 mtf_cols = st.columns(len(data))
                 for i, (tf, df_tf) in enumerate(data.items()):
                     with mtf_cols[i]:
                         # Quick analysis for each timeframe
                         tf_results = orchestrator.run_comprehensive_analysis(df_tf.tail(100), selected_strategies)
-                        
+
                         active_strategies = sum(1 for s in tf_results['strategies'].values() if s.get('strategy_active', False))
                         total_confluence = sum(s.get('confluence_score', 0) for s in tf_results['strategies'].values())
-                        
+
                         signal_strength = "HIGH" if active_strategies > 0 else "MEDIUM" if total_confluence > 10 else "LOW"
                         signal_color = "#28a745" if signal_strength == "HIGH" else "#ffc107" if signal_strength == "MEDIUM" else "#6c757d"
-                        
+
                         st.markdown(f"""
                             <div style="background: rgba(255,255,255,0.1); padding: 1rem; border-radius: 10px; text-align: center; border: 2px solid {signal_color};">
                                 <h4>{tf.upper()}</h4>
@@ -1797,11 +1825,11 @@ def main():
                                 <div>Price: ${df_tf.iloc[-1]['close']:.2f}</div>
                             </div>
                         """, unsafe_allow_html=True)
-            
+
             # ZBAR Logs
             if show_zbar_logs and analysis_results['zbar_logs']:
                 st.subheader("📊 ZBAR Analysis Logs")
-                
+
                 for log in analysis_results['zbar_logs'][-5:]:  # Show last 5 logs
                     st.markdown(f"""
                         <div class="zbar-log">
@@ -1811,12 +1839,12 @@ def main():
                             Market Context: {json.dumps(log['market_context'], indent=2)}
                         </div>
                     """, unsafe_allow_html=True)
-            
+
             # Export functionality
             st.subheader("💾 Export Analysis Results")
-            
+
             col1, col2, col3 = st.columns(3)
-            
+
             with col1:
                 if st.button("📄 Export ZBAR Logs"):
                     logs_json = json.dumps(analysis_results['zbar_logs'], indent=2, default=str)
@@ -1826,7 +1854,7 @@ def main():
                         file_name=f"zanflow_v12_zbar_logs_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json",
                         mime="application/json"
                     )
-            
+
             with col2:
                 if st.button("📊 Export Strategy Analysis"):
                     analysis_json = json.dumps(analysis_results, indent=2, default=str)
@@ -1836,14 +1864,14 @@ def main():
                         file_name=f"zanflow_v12_analysis_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json",
                         mime="application/json"
                     )
-            
+
             with col3:
                 if st.button("📈 Export Enhanced Data"):
                     csv_data = current_df.to_csv()
                     st.download_button(
                         label="Download CSV",
                         data=csv_data,
-                        file_name=f"zanflow_v12_data_{selected_timeframe}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv",
+                        file_name=f"zanflow_v12_data_{selected_symbol}_{selected_timeframe}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv",
                         mime="text/csv"
                     )
     
