@@ -36,8 +36,13 @@ def main():
         start_service("Redis", "redis-server &")
 
     # Start API Server on port 8080
+<<<<<<< HEAD
     print("\n2️⃣ Starting enriched_api_server Server on port 8080...")
     start_service("API Server", f"{sys.executable} enriched_api_server")
+=======
+    print("\n2️⃣ Starting enriched_api_server.py Server on port 8080...")
+    start_service("API Server", f"{sys.executable} enriched_api_server.py")
+>>>>>>> bbb4eb41e2a0fd804e07ac17a40abbc63ab0f2a2
 
     # Start Dashboard
     print("\n3️⃣ Starting Dashboard...")
