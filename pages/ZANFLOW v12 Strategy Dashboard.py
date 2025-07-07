@@ -22,7 +22,6 @@ import math
 import os
 import glob
 import re
-import toml
 from collections import defaultdict
 
 warnings.filterwarnings('ignore')
@@ -30,13 +29,17 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 # ---------------------------------------------------------------------------
-# Load default parquet directory from a local TOML settings file (if present)
+# Load default parquet directory from Streamlit secrets (./.streamlit/secrets.toml)
 # ---------------------------------------------------------------------------
 try:
-    _settings = toml.load("zanflow_settings.toml")
-    DEFAULT_DATA_FOLDER = _settings.get("parquet_dir", "./data")
+    DEFAULT_DATA_FOLDER = st.secrets.get(
+        "parquet_dir",
+        "/Users/tom/Documents/_trade/_exports/_tick/parquet/"
+    )
 except Exception:
-    DEFAULT_DATA_FOLDER = "./data"
+    DEFAULT_DATA_FOLDER = "/Users/tom/Documents/_trade/_exports/_tick/parquet/"
+
+PARQUET_DATA_DIR = DEFAULT_DATA_FOLDER  # for external modules / clarity
 
 # ============================================================================
 # ZANFLOW v12 STRATEGY CONFIGURATION
@@ -1470,25 +1473,24 @@ def main():
             help="Folder where your time‑series parquet files live"
         )
 
-        # Scan for all available symbols in the selected folder
-        parquet_files_all = glob.glob(os.path.join(data_folder, "*_*.parquet"))
-        symbol_pattern = re.compile(r"([A-Za-z0-9]+?)_\d+(?:min|h|d)\.parquet", re.IGNORECASE)
+        # Scan for symbols as subfolders in the data folder
         symbols_found = sorted(
-            {symbol_pattern.match(Path(pf).name).group(1).upper()
-             for pf in parquet_files_all if symbol_pattern.match(Path(pf).name)}
+            [d.name.upper() for d in Path(data_folder).iterdir() if d.is_dir()]
         )
 
         st.markdown("### 💱 Trading Pair")
         selected_symbol = st.selectbox(
-            "Select trading pair to analyze",
+            "💱 Select Pair",
             options=symbols_found or ["<No pairs found>"],
-            index=0
+            index=0,
+            help="Choose a trading pair detected in the data folder"
         )
     # Load data
     with st.spinner("🔄 Loading ZANFLOW v12 data..."):
         try:
-            # Dynamically discover parquet files for the chosen symbol
-            parquet_files = glob.glob(os.path.join(data_folder, f'{selected_symbol}_*.parquet'))
+            # Dynamically discover parquet files within the symbol subfolder
+            symbol_dir = os.path.join(data_folder, selected_symbol)
+            parquet_files = glob.glob(os.path.join(symbol_dir, f'{selected_symbol}_*.parquet'))
             timeframes = {}
             tf_pattern = re.compile(fr'{selected_symbol}_(\d+(?:min|h|d))\.parquet', re.IGNORECASE)
             for pf in parquet_files:
@@ -1498,7 +1500,7 @@ def main():
                     timeframes[tf] = pf
 
             if not timeframes:
-                st.error(f"❌ No {selected_symbol} parquet files found in **{data_folder}**. "
+                st.error(f"❌ No {selected_symbol} parquet files found in **{symbol_dir}**. "
                          "Please verify the location or adjust the Data Location above.")
                 return
 
