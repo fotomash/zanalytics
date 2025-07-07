@@ -20,6 +20,8 @@ import json
 from pathlib import Path
 import math
 import os
+import glob
+import re
 
 warnings.filterwarnings('ignore')
 logging.basicConfig(level=logging.INFO)
@@ -1459,16 +1461,20 @@ def main():
     # Load data
     with st.spinner("🔄 Loading ZANFLOW v12 data..."):
         try:
-            # Try to load the parquet files
-            timeframes = {
-                '1min': os.path.join(data_folder, 'XAUUSD_1min.parquet'),
-                '5min': os.path.join(data_folder, 'XAUUSD_5min.parquet'),
-                '15min': os.path.join(data_folder, 'XAUUSD_15min.parquet'),
-                '30min': os.path.join(data_folder, 'XAUUSD_30min.parquet'),
-                '1h': os.path.join(data_folder, 'XAUUSD_1h.parquet'),
-                '4h': os.path.join(data_folder, 'XAUUSD_4h.parquet'),
-                '1d': os.path.join(data_folder, 'XAUUSD_1d.parquet')
-            }
+            # Dynamically discover any XAUUSD parquet files in the chosen folder
+            parquet_files = glob.glob(os.path.join(data_folder, 'XAUUSD_*.parquet'))
+            timeframes = {}
+            tf_pattern = re.compile(r'XAUUSD_(\d+(?:min|h|d))\.parquet', re.IGNORECASE)
+            for pf in parquet_files:
+                match = tf_pattern.search(Path(pf).name)
+                if match:
+                    tf = match.group(1).lower()
+                    timeframes[tf] = pf
+
+            if not timeframes:
+                st.error(f"❌ No XAUUSD parquet files found in **{data_folder}**. "
+                         "Please verify the location or adjust the Data Location above.")
+                return
 
             data = {}
             for tf, filename in timeframes.items():
@@ -1494,11 +1500,6 @@ def main():
                 except Exception as e:
                     st.warning(f"Could not load {filename}: {e}")
 
-            if not data:
-                st.error(f"❌ No XAUUSD parquet files found in **{data_folder}**. "
-                         "Please verify the location or adjust the Data Location above.")
-                return
-                
         except Exception as e:
             st.error(f"Error loading data: {e}")
             return
