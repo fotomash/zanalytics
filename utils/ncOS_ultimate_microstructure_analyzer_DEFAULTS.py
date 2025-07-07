@@ -151,6 +151,10 @@ class AnalysisConfig:
     save_detailed_reports: bool = True
     export_excel: bool = True
     export_csv: bool = True
+    export_parquet: bool = True          # enable/disable parquet export
+    export_json: bool = False            # disable bulky JSON export by default
+    output_dir: str = './out'            # override default output directory
+    resample_timeframes: bool = True     # build additional time‑frames
 
 class UltimateIndicatorEngine:
     """Maximum indicator calculation engine"""
@@ -187,7 +191,7 @@ class UltimateIndicatorEngine:
             pass
 
         return df
-    
+
     def __init__(self):
         self.indicators = {}
 
@@ -907,10 +911,10 @@ class SMCAnalyzer:
         recent_highs = sorted(swing_highs, key=lambda x: x['index'])[-2:]
         recent_lows = sorted(swing_lows, key=lambda x: x['index'])[-2:]
 
-        if (recent_highs[1]['price'] > recent_highs[0]['price'] and 
+        if (recent_highs[1]['price'] > recent_highs[0]['price'] and
             recent_lows[1]['price'] > recent_lows[0]['price']):
             return 'uptrend'
-        elif (recent_highs[1]['price'] < recent_highs[0]['price'] and 
+        elif (recent_highs[1]['price'] < recent_highs[0]['price'] and
               recent_lows[1]['price'] < recent_lows[0]['price']):
             return 'downtrend'
         else:
@@ -960,8 +964,8 @@ class WyckoffAnalyzer:
     def _identify_phases(self, df: pd.DataFrame) -> List[Dict]:
         """
         **Stable Wyckoff phase detector**
-        • Pre‑computes 20‑bar volatility & volume means once  
-        • No nested rolling inside the main loop  
+        • Pre‑computes 20‑bar volatility & volume means once
+        • No nested rolling inside the main loop
         • Hard‑cap of 1 000 detected segments to avoid runaway loops
         """
         phases: List[Dict] = []
@@ -1350,7 +1354,7 @@ class TickDataAnalyzer:
                     ask_change = abs(ask[i] - ask[i-1])
 
                     # Large price change with zero volume (potential spoofing)
-                    if (bid_change > np.std(np.diff(bid)) * 3 or 
+                    if (bid_change > np.std(np.diff(bid)) * 3 or
                         ask_change > np.std(np.diff(ask)) * 3) and volume[i] == 0:
                         spoofing_events.append({
                             'index': i,
@@ -1383,7 +1387,7 @@ class TickDataAnalyzer:
                     recent_ask_changes = np.diff(ask[i-5:i])
 
                     # Multiple rapid changes in same direction
-                    if (np.sum(recent_bid_changes > 0) >= 3 or 
+                    if (np.sum(recent_bid_changes > 0) >= 3 or
                         np.sum(recent_ask_changes > 0) >= 3):
                         layering_events.append({
                             'index': i,
@@ -1413,7 +1417,7 @@ class TickDataAnalyzer:
                     avg_price = np.mean(last_price[i-10:i])
 
                     # High volume, low price movement
-                    if (recent_volume > np.mean(volume) * 5 and 
+                    if (recent_volume > np.mean(volume) * 5 and
                         price_range < avg_price * 0.001):
                         wash_events.append({
                             'index': i,
@@ -1718,18 +1722,75 @@ class UltimateDataProcessor:
             try:
                 # Use regex-based extractor for symbol
                 tf = results.get('timeframe', 'unknown')
-                base_output_dir = self.config.output_dir if hasattr(self.config, 'output_dir') else './out'
-                parquet_root = os.path.join(base_output_dir, 'parquet')
-                json_root = os.path.join(base_output_dir, 'json')
-                full_results = {tf: df}  # Keep only the native timeframe; no multi‑TF reports
+                base_output_dir = getattr(self.config, 'output_dir', './out')
+
+                parquet_root = (os.path.join(base_output_dir, 'parquet')
+                                if getattr(self.config, 'export_parquet', True) else None)
+                json_root    = (os.path.join(base_output_dir, 'json')
+                                if getattr(self.config, 'export_json', False) else None)
+
+                # ---------------- Assemble per‑time‑frame DataFrames ----------------
+                full_results = {tf: df}   # always include the native TF
+
+                if getattr(self.config, 'resample_timeframes', True):
+                    resample_rules = {
+                        '5min': '5T',
+                        '15min': '15T',
+                        '30min': '30T',
+                        '1h': '1H',
+                        '4h': '4H',
+                        '1d': '1D'
+                    }
+                    for target_tf, rule in resample_rules.items():
+                        if tf == target_tf:
+                            continue
+                        try:
+                            df_resampled = df.resample(rule).agg({
+                                'open':   'first',
+                                'high':   'max',
+                                'low':    'min',
+                                'close':  'last',
+                                'volume': 'sum'
+                            }).dropna()
+
+                            # Forward‑fill all indicator columns
+                            for col in df.columns:
+                                if col not in ('open', 'high', 'low', 'close', 'volume'):
+                                    df_resampled[col] = (
+                                        df[col].resample(rule).ffill()
+                                    ).reindex(df_resampled.index)
+
+                            full_results[target_tf] = df_resampled
+                        except Exception as e:
+                            logger.warning(f"Failed to resample to {target_tf}: {e}")
+
                 # Filtering by timeframes and limiting max candles is done here:
                 data_by_timeframe = full_results
                 if self.config.timeframes_parquet:
-                    data_by_timeframe = {t: d for t, d in data_by_timeframe.items() if t in self.config.timeframes_parquet}
+                    data_by_timeframe = {
+                        t: d for t, d in data_by_timeframe.items()
+                        if t in self.config.timeframes_parquet
+                    }
                 if self.config.max_candles:
-                    data_by_timeframe = {t: d.tail(self.config.max_candles) for t, d in data_by_timeframe.items()}
-                save_results_to_parquet_and_json(symbol, data_by_timeframe, parquet_root, json_root, self.config.csv_dir)
-                logger.info(f"Saved parquet and JSON for symbol: {symbol}")
+                    data_by_timeframe = {
+                        t: d.tail(self.config.max_candles)
+                        for t, d in data_by_timeframe.items()
+                    }
+
+                # ---------------- Persist results conditionally ----------------
+                if parquet_root or json_root:
+                    try:
+                        save_results_to_parquet_and_json(
+                            symbol,
+                            data_by_timeframe,
+                            parquet_root,
+                            json_root,
+                            self.config.csv_dir
+                        )
+                        logger.info(f"Saved parquet/JSON for symbol: {symbol} "
+                                    f"({' | '.join(data_by_timeframe.keys())})")
+                    except Exception as e:
+                        logger.error(f"Error saving parquet/JSON for {symbol}: {e}")
             except Exception as e:
                 logger.error(f"Error saving parquet/JSON for {symbol}: {e}")
 
