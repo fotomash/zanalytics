@@ -2244,73 +2244,47 @@ def add_fuller(series: np.ndarray) -> Dict[str, Any]:
 # ------------------------------------------------------------------------
 # -------------- MERGED FROM PyCharm: save_results_to_parquet_and_json ---
 # This is the more complete version from PyCharm, merged in.
-def save_results_to_parquet_and_json(symbol, data_by_timeframe, parquet_root='./parquet', json_root='./json', csv_root='./csv'):
+def save_results_to_parquet_and_json(symbol, data_by_timeframe,
+                                     parquet_root=None, json_root=None, csv_root=None):
     """
-    Save results to parquet, JSON, and CSV for each timeframe.
-    Merged from PyCharm version for completeness.
+    Save results to Parquet, CSV, and JSON depending on which roots are provided.
+    Pass None for any format to skip it.
     """
-    import os
-    import json
-    symbol_csv_dir = os.path.join(csv_root, symbol)
-    os.makedirs(symbol_csv_dir, exist_ok=True)
+    import os, json, pyarrow as pa, pyarrow.parquet as pq
 
-    for tf, df in data_by_timeframe.items():
-        csv_file = os.path.join(symbol_csv_dir, f"{symbol}_{tf}.csv")
-        # --- PATCH: Export tickvol as volume if tickvol exists ---
-        if 'tickvol' in df.columns:
-            df['volume'] = df['tickvol']
-        # --- PATCH: Ensure 'timestamp' column for dashboard compatibility ---
-        if isinstance(df.index, pd.DatetimeIndex):
-            df = df.reset_index()
-            df = df.rename(columns={"index": "timestamp"})
-        elif "timestamp" not in df.columns:
-            for col in df.columns:
-                if col.lower().startswith("time") or col.lower().startswith("date"):
-                    df = df.rename(columns={col: "timestamp"})
-                    break
-        if "timestamp" in df.columns:
-            cols = list(df.columns)
-            cols.insert(0, cols.pop(cols.index("timestamp")))
-            df = df[cols]
-        df.to_csv(csv_file, index=False)
-    symbol_parquet_dir = os.path.join(parquet_root, symbol)
-    os.makedirs(symbol_parquet_dir, exist_ok=True)
-    os.makedirs(json_root, exist_ok=True)
+    # Prepare directories if a root is set
+    symbol_csv_dir = os.path.join(csv_root, symbol) if csv_root else None
+    if symbol_csv_dir:
+        os.makedirs(symbol_csv_dir, exist_ok=True)
+
+    symbol_parquet_dir = os.path.join(parquet_root, symbol) if parquet_root else None
+    if symbol_parquet_dir:
+        os.makedirs(symbol_parquet_dir, exist_ok=True)
+
+    if json_root:
+        os.makedirs(json_root, exist_ok=True)
 
     comprehensive_json = {}
-    for tf, df in data_by_timeframe.items():
-        parquet_file = os.path.join(symbol_parquet_dir, f"{symbol}_{tf}.parquet")
-        # --- PATCH: Export tickvol as volume if tickvol exists ---
-        if 'tickvol' in df.columns:
-            df['volume'] = df['tickvol']
-        # --- PATCH: Ensure 'timestamp' column for dashboard compatibility ---
-        if isinstance(df.index, pd.DatetimeIndex):
-            df = df.reset_index()
-            df = df.rename(columns={"index": "timestamp"})
-        elif "timestamp" not in df.columns:
-            for col in df.columns:
-                if col.lower().startswith("time") or col.lower().startswith("date"):
-                    df = df.rename(columns={col: "timestamp"})
-                    break
-        if "timestamp" in df.columns:
-            cols = list(df.columns)
-            cols.insert(0, cols.pop(cols.index("timestamp")))
-            df = df[cols]
-        import pyarrow as pa, pyarrow.parquet as pq, json
-        table = pa.Table.from_pandas(df, preserve_index=False)
-        meta = {
-            "columns": df.columns.tolist(),
-            "symbol": symbol,
-            "timeframe": tf
-        }
-        table = table.replace_schema_metadata({b"ncos_meta": json.dumps(meta).encode()})
-        pq.write_table(table, parquet_file, compression="snappy")
 
+    for tf, df in data_by_timeframe.items():
+        # CSV export
+        if symbol_csv_dir:
+            csv_file = os.path.join(symbol_csv_dir, f"{symbol}_{tf}.csv")
+            df.to_csv(csv_file, index=False)
+
+        # Parquet export
+        if symbol_parquet_dir:
+            parquet_file = os.path.join(symbol_parquet_dir, f"{symbol}_{tf}.parquet")
+            table = pa.Table.from_pandas(df.reset_index(drop=True))
+            pq.write_table(table, parquet_file, compression="snappy")
+
+        # Add to JSON
         comprehensive_json[tf] = df.to_dict(orient='records')
 
-    json_file_path = os.path.join(json_root, f"{symbol}_comprehensive.json")
-    with open(json_file_path, 'w') as json_file:
-        json.dump(comprehensive_json, json_file, indent=4)
+    if json_root:
+        json_file_path = os.path.join(json_root, f"{symbol}_comprehensive.json")
+        with open(json_file_path, 'w') as json_file:
+            json.dump(comprehensive_json, json_file, indent=4)
 
 # ------------------------------------------------------------------------
 # -------------- MERGED FROM PyCharm: main() and CLI for full analytics ---
