@@ -2267,19 +2267,29 @@ def save_results_to_parquet_and_json(symbol, data_by_timeframe,
     comprehensive_json = {}
 
     for tf, df in data_by_timeframe.items():
+        # Prepare DataFrame for export, preserving timestamp as column
+        df_export = df
+        if isinstance(df_export.index, pd.DatetimeIndex):
+            df_export = df_export.reset_index().rename(columns={'index':'timestamp'})
+        # Ensure 'timestamp' column is first
+        if 'timestamp' in df_export.columns:
+            cols = list(df_export.columns)
+            cols.insert(0, cols.pop(cols.index('timestamp')))
+            df_export = df_export[cols]
+
         # CSV export
         if symbol_csv_dir:
             csv_file = os.path.join(symbol_csv_dir, f"{symbol}_{tf}.csv")
-            df.to_csv(csv_file, index=False)
+            df_export.to_csv(csv_file, index=False)
 
         # Parquet export
         if symbol_parquet_dir:
             parquet_file = os.path.join(symbol_parquet_dir, f"{symbol}_{tf}.parquet")
-            table = pa.Table.from_pandas(df.reset_index(drop=True))
+            table = pa.Table.from_pandas(df_export, preserve_index=False)
             pq.write_table(table, parquet_file, compression="snappy")
 
         # Add to JSON
-        comprehensive_json[tf] = df.to_dict(orient='records')
+        comprehensive_json[tf] = df_export.to_dict(orient='records')
 
     if json_root:
         json_file_path = os.path.join(json_root, f"{symbol}_comprehensive.json")
