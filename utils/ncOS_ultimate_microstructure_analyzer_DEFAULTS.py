@@ -2250,7 +2250,7 @@ def save_results_to_parquet_and_json(symbol, data_by_timeframe,
     Save results to Parquet, CSV, and JSON depending on which roots are provided.
     Pass None for any format to skip it.
     """
-    import os, json, pyarrow as pa, pyarrow.parquet as pq
+    import os, json, pandas as pd, pyarrow as pa, pyarrow.parquet as pq
 
     # Prepare directories if a root is set
     symbol_csv_dir = os.path.join(csv_root, symbol) if csv_root else None
